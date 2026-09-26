@@ -16,6 +16,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "thumbnail_size": 140,
     "image_zoom": 1.0,
     "language": "system",
+    "theme": "system",
 }
 
 
