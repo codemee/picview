@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QMenu, QPushButton, QScrollArea, QSlider, QSplitter, QStyle, QStyleOptionSlider, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
 )
 
+from . import __version__
 from .settings import load_settings, save_settings
 from .utils import image_files
 
@@ -453,6 +454,7 @@ class PicView(QMainWindow):
         app=QApplication.instance(); self.system_palette=QPalette(app.palette()); self.theme_mode=self.settings.get("theme","system"); self.theme_mode=self.theme_mode if self.theme_mode in ("system","light","dark") else "system"; self._applying_theme=False
         if self.theme_mode != "system": app.setPalette(themed_palette(self.system_palette,self.theme_mode))
         use_system_palette(app)
+        self.setWindowTitle(f"PicView v{__version__}")
         self.setMinimumSize(720,500); self.resize(1100,780); self.setAcceptDrops(True); self.build(); self.setup_shortcuts(); self.restore()
 
     def setup_shortcuts(self):
@@ -557,7 +559,7 @@ class PicView(QMainWindow):
     def open_folder(self,folder,selected=None):
         self.folder=folder.resolve(); self.files=image_files(self.folder); self.thumbs.set_files(self.files,selected)
         if not self.files: self.image.clear()
-        self.setWindowTitle(f"PicView — {self.folder}")
+        self.setWindowTitle(f"PicView v{__version__} — {self.folder}")
     def set_orientation(self,o):
         if self.split.orientation()==o:return
         sizes=self.split.sizes(); self.split.setOrientation(o); QTimer.singleShot(0,lambda:self.split.setSizes(sizes))
