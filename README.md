@@ -55,7 +55,7 @@ uv run picview
 
 ### Open images
 
-- The window title shows the current version (for example, **PicView v0.0.1**).
+- The window title shows the current version (for example, **PicView v0.0.2**).
 - Click **Open folder**, or drop a folder or image file onto the window.
 - Rotation and mirror controls only affect the current view; image files are never modified.
 
