@@ -6,6 +6,15 @@
 
 ## 安裝與啟動
 
+### 桌面版下載
+
+- 已附加桌面版的版本可從 [GitHub Releases](https://github.com/codemee/picview/releases) 下載，不需要安裝 Python 或 uv。
+- **Windows x64：**直接執行 `PicView-<版本>-windows-x64.exe`。
+- **macOS Apple Silicon：**開啟 `PicView-<版本>-macos-arm64.dmg`，將 **PicView.app** 拖曳到 **Applications**。
+- 桌面版目前沒有 Windows 發行者簽章或 Apple Developer ID 公證，首次開啟時可能會出現系統提示或遭到阻擋。
+
+### 使用 uv
+
 - 需要先安裝 [uv](https://docs.astral.sh/uv/getting-started/installation/)，並在圖形桌面環境執行。PicView 目前於 Windows 開發與測試。
 - 不永久安裝工具，直接執行：
 

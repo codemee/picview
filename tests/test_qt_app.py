@@ -5,7 +5,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PIL import Image
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QKeySequence
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
@@ -169,7 +169,7 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     QTest.keyClick(window, Qt.Key.Key_Left)
     assert window.thumbs.selected_path == paths[0]
 
-    QTest.keyClick(window, Qt.Key.Key_C, Qt.KeyboardModifier.ControlModifier)
+    QTest.keySequence(window, QKeySequence(QKeySequence.StandardKey.Copy))
     assert Path(QApplication.clipboard().mimeData().urls()[0].toLocalFile()) == paths[0]
 
     assert window.theme_mode == "system"

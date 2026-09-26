@@ -1,0 +1,55 @@
+name: Build desktop apps
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            target: windows-x64
+          - runner: macos-15
+            target: macos-arm64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.15"
+          python-version: "3.11"
+      - name: Install build dependencies
+        run: uv sync --locked --group build
+      - name: Check release version
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: uv run --frozen python -c "import os, picview, tomllib; v=tomllib.load(open('pyproject.toml','rb'))['project']['version']; assert os.environ['RELEASE_TAG'] == 'v' + v and v == picview.__version__"
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: uv run --frozen --group build pytest
+      - name: Build and smoke-test desktop app
+        run: uv run --frozen --group build python scripts/build_desktop.py
+      - name: Store download artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: PicView-${{ matrix.target }}
+          path: dist/desktop/release/*
+          if-no-files-found: error
+      - name: Attach files to GitHub Release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        shell: bash
+        run: gh release upload "$RELEASE_TAG" dist/desktop/release/*
