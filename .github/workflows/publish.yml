@@ -1,0 +1,50 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pypi-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/picview/
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.15"
+          python-version: "3.11"
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: uv run --frozen pytest
+      - name: Check release version
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: uv run --frozen python -c "import os, picview; assert os.environ['RELEASE_TAG'] == 'v' + picview.__version__, 'Release tag must match package version'"
+      - name: Build distributions
+        run: uv build --no-sources
+      - name: Check package metadata
+        run: uvx --from twine twine check dist/*
+      - name: Check packaged command
+        run: |
+          $wheel = (Get-ChildItem dist/*.whl).FullName
+          uvx --from $wheel picview --version
+      - name: Publish with PyPI Trusted Publishing
+        run: uv publish --trusted-publishing always

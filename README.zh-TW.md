@@ -4,7 +4,37 @@
 
 [English](README.md)
 
-## 啟動
+## 安裝與啟動
+
+- 需要先安裝 [uv](https://docs.astral.sh/uv/getting-started/installation/)，並在圖形桌面環境執行。PicView 目前於 Windows 開發與測試。
+- 不永久安裝工具，直接執行：
+
+  ```powershell
+  uvx picview
+  ```
+
+- 安裝為命令列工具，再啟動：
+
+  ```powershell
+  uv tool install picview
+  picview
+  ```
+
+- 更新已安裝的版本：
+
+  ```powershell
+  uv tool upgrade picview
+  ```
+
+- 查詢版本：
+
+  ```powershell
+  picview --version
+  # 或不安裝直接查詢：
+  uvx picview --version
+  ```
+
+## 從原始碼啟動
 
 在專案目錄中執行：
 

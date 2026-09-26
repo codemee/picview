@@ -2,9 +2,39 @@
 
 Image folder viewer built with Qt.
 
-[繁體中文](README.zh-TW.md)
+[繁體中文](https://github.com/codemee/picview/blob/main/README.zh-TW.md)
 
-## Run
+## Install and run
+
+- Requires [uv](https://docs.astral.sh/uv/getting-started/installation/) and a graphical desktop. PicView is developed and tested on Windows.
+- Run without a permanent tool installation:
+
+  ```powershell
+  uvx picview
+  ```
+
+- Install as a command-line tool, then launch:
+
+  ```powershell
+  uv tool install picview
+  picview
+  ```
+
+- Upgrade an installed copy:
+
+  ```powershell
+  uv tool upgrade picview
+  ```
+
+- Check the version:
+
+  ```powershell
+  picview --version
+  # Or without installing:
+  uvx picview --version
+  ```
+
+## Run from source
 
 From the project directory, run:
 

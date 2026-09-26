@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import locale
+import argparse
 import sys
 from pathlib import Path
 
@@ -582,4 +583,7 @@ class PicView(QMainWindow):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="PicView image folder viewer")
+    parser.add_argument("--version", action="version", version=f"PicView {__version__}")
+    parser.parse_args()
     app=QApplication(sys.argv); app.setApplicationName("PicView"); use_system_palette(app); w=PicView(); app.paletteChanged.connect(w.refresh_system_theme); icon=Path(__file__).parent/"assets"/"picview-icon.png"; w.setWindowIcon(QIcon(str(icon))); w.show(); sys.exit(app.exec())

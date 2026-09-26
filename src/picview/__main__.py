@@ -1,3 +1,3 @@
-from .app import main
+from .qt_app import main
 
 main()
