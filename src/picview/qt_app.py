@@ -590,7 +590,23 @@ class PicView(QMainWindow):
         self.theme_button=IconButton(f"theme-{self.theme_mode}",self.t[f"theme_{self.theme_mode}"]); self.theme_button.clicked.connect(self.toggle_theme); tl.addWidget(self.theme_button)
         tl.addStretch(); outer.addWidget(tool)
         self.split=QSplitter(Qt.Orientation.Vertical); self.split.setChildrenCollapsible(False); self.split.setHandleWidth(7); self.thumbs=ThumbnailPane(self.t); self.image=ImagePane(self.t); self.split.addWidget(self.thumbs); self.split.addWidget(self.image); self.thumbs.selected.connect(self.image.load); self.thumbs.max_button.clicked.connect(lambda:self.maximize("thumb")); self.image.max_button.clicked.connect(lambda:self.maximize("image")); outer.addWidget(self.split)
-        self.setStyleSheet(f"#root{{background:{PALETTE['surface']};}} #toolbar{{background:transparent;border:0;}} #card{{background:{PALETTE['card']};border:0;border-radius:12px;}} QLabel{{color:{PALETTE['text']};}} QSlider::groove:horizontal{{height:5px;background:{PALETTE['edge']};border-radius:2px}} QSlider::handle:horizontal{{background:{PALETTE['accent']};width:15px;margin:-5px 0;border-radius:7px}} QScrollBar:vertical{{background:{PALETTE['surface']};width:12px}} QScrollBar::handle:vertical{{background:{PALETTE['edge']};border-radius:6px;min-height:25px}}")
+        self.setStyleSheet(f"""
+            #root{{background:{PALETTE['surface']};}}
+            #toolbar{{background:transparent;border:0;}}
+            #card{{background:{PALETTE['card']};border:0;border-radius:12px;}}
+            QLabel{{color:{PALETTE['text']};}}
+            QSlider::groove:horizontal{{height:5px;background:{PALETTE['edge']};border-radius:2px}}
+            QSlider::handle:horizontal{{background:{PALETTE['accent']};width:15px;margin:-5px 0;border-radius:7px}}
+            QScrollBar{{background:{PALETTE['surface']};border:0;margin:0;}}
+            QScrollBar:vertical{{width:12px;}}
+            QScrollBar:horizontal{{height:12px;}}
+            QScrollBar::handle{{background:{PALETTE['edge']};border-radius:6px;}}
+            QScrollBar::handle:vertical{{min-height:25px;}}
+            QScrollBar::handle:horizontal{{min-width:25px;}}
+            QScrollBar::add-page,QScrollBar::sub-page{{background:{PALETTE['surface']};}}
+            QScrollBar::add-line,QScrollBar::sub-line{{width:0;height:0;border:0;background:none;}}
+            QScrollArea::corner{{background:{PALETTE['surface']};}}
+        """)
     def choose(self):
         d=QFileDialog.getExistingDirectory(self,self.t["open"],str(self.folder) if self.folder else "")
         if d:self.open_folder(Path(d))
