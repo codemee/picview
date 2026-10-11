@@ -15,10 +15,12 @@ def natural_key(path: Path) -> list[object]:
     return [int(part) if part.isdigit() else part.casefold() for part in re.split(r"(\d+)", path.name)]
 
 
-def image_files(folder: Path) -> list[Path]:
+def image_files(folder: Path, *, strict: bool = False) -> list[Path]:
     try:
         return sorted((item for item in folder.iterdir() if is_image_file(item)), key=natural_key)
     except OSError:
+        if strict:
+            raise
         return []
 
 

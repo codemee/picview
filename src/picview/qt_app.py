@@ -5,8 +5,8 @@ import sys
 from pathlib import Path
 
 from PIL import Image, ImageOps
-from PySide6.QtCore import QLocale, QMimeData, QPoint, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPolygon, QPalette, QShortcut
+from PySide6.QtCore import QFileSystemWatcher, QLocale, QMimeData, QPoint, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QColor, QDrag, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPolygon, QPalette, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow,
     QMenu, QPushButton, QScrollArea, QSlider, QSplitter, QStyle, QStyleOptionSlider, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 
 from . import __version__
 from .settings import load_settings, save_settings
-from .utils import image_files
+from .utils import image_files, natural_key
 
 
 IMAGE_BACKGROUND = "#e9edf2"
@@ -80,11 +80,15 @@ TEXT = {
 LANGUAGE_MODES = ("system", "zh", "en")
 LANGUAGE_ICONS = {"system": "lang-system", "zh": "中", "en": "En"}
 TEXT["en"].update({
+    "image_deleted": "The image being viewed was deleted: {name}. Now viewing {next}.",
+    "image_deleted_empty": "The image being viewed was deleted: {name}. No images remain in this folder.",
     "lang_system": "Language: follow system (click to switch)",
     "lang_zh": "Language: Chinese (click to switch)",
     "lang_en": "Language: English (click to switch)",
 })
 TEXT["zh"].update({
+    "image_deleted": "正在檢視的圖片已被刪除：{name}。已切換至 {next}。",
+    "image_deleted_empty": "正在檢視的圖片已被刪除：{name}。資料夾中已沒有圖片。",
     "lang_system": "語言：跟隨系統（點擊切換）",
     "lang_zh": "語言：中文（點擊切換）",
     "lang_en": "語言：英文（點擊切換）",
@@ -311,9 +315,12 @@ class ThumbnailTile(QFrame):
     clicked_path = Signal(Path)
     def __init__(self, path: Path, pixmap: QPixmap | None, size: int, selected: bool) -> None:
         super().__init__(); self.path = path; self.selected = selected; self.setFixedSize(size + 12, size + 38)
+        self._drag_start = None
         layout = QVBoxLayout(self); layout.setContentsMargins(5, 5, 5, 5); layout.setSpacing(2)
         self.name = QLabel(path.name); self.name.setAlignment(Qt.AlignmentFlag.AlignCenter); self.name.setFixedHeight(20); self.name.setWordWrap(False)
         self.preview = QLabel(); self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter); self.preview.setFixedHeight(size)
+        for label in (self.name, self.preview):
+            label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         if pixmap: self.preview.setPixmap(pixmap)
         layout.addWidget(self.name); layout.addWidget(self.preview); self.apply_style()
     def apply_style(self) -> None:
@@ -321,30 +328,77 @@ class ThumbnailTile(QFrame):
         text = "#153047" if self.selected else PALETTE["text"]
         self.setStyleSheet(f"ThumbnailTile{{background:{color};border:0;border-radius:9px;}} QLabel{{background:{color};color:{text};}}")
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton: self.clicked_path.emit(self.path)
+        self._drag_start = None
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_start = event.position().toPoint()
+            self.clicked_path.emit(self.path)
+            event.accept()
+            return
         super().mousePressEvent(event)
+    def mouseMoveEvent(self, event):
+        if self._drag_start is not None and event.buttons() & Qt.MouseButton.LeftButton:
+            if (event.position().toPoint() - self._drag_start).manhattanLength() >= QApplication.startDragDistance():
+                self._drag_start = None
+                if self.path.is_file():
+                    # Keep the drag source alive if a folder update rebuilds the tiles.
+                    drag = QDrag(self.window())
+                    data = QMimeData()
+                    data.setUrls([QUrl.fromLocalFile(str(self.path.resolve()))])
+                    drag.setMimeData(data)
+                    pixmap = self.preview.pixmap()
+                    if pixmap is not None and not pixmap.isNull():
+                        pixmap = pixmap.scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                        drag.setPixmap(pixmap)
+                        drag.setHotSpot(QPoint(pixmap.width() // 2, pixmap.height() // 2))
+                    drag.exec(Qt.DropAction.CopyAction, Qt.DropAction.CopyAction)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+    def mouseReleaseEvent(self, event):
+        self._drag_start = None
+        super().mouseReleaseEvent(event)
 
 
 class ThumbnailPane(QFrame):
     selected = Signal(Path)
     def __init__(self, labels: dict[str, str], parent=None):
-        super().__init__(parent); self.labels=labels; self.files=[]; self.size=THUMBNAIL_BASE_SIZE; self.buttons={}
+        super().__init__(parent); self.labels=labels; self.files=[]; self.size=THUMBNAIL_BASE_SIZE; self.buttons={}; self.failed_paths=set()
         self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,6,10,8)
-        header=QHBoxLayout(); header.addWidget(QLabel(labels["thumb"])); self.max_button=IconButton("expand",labels["max"]); header.addWidget(self.max_button); header.addStretch(); self.size_label=ScaleValueButton(self.size,72,260,THUMBNAIL_BASE_SIZE,1,"px",labels["edit_thumb"]); header.addWidget(self.size_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,THUMBNAIL_BASE_SIZE); self.slider.setRange(72,260); self.slider.setValue(self.size); self.slider.setFixedSize(SLIDER_WIDTH,30); self.slider.logicalValueChanged.connect(self._resize); self.size_label.valueChosen.connect(self.slider.setValue); header.addWidget(self.slider); layout.addLayout(header)
+        header=QHBoxLayout(); self.max_button=IconButton("expand",labels["max"]); header.addWidget(self.max_button); header.addStretch(); self.size_label=ScaleValueButton(self.size,72,260,THUMBNAIL_BASE_SIZE,1,"px",labels["edit_thumb"]); header.addWidget(self.size_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,THUMBNAIL_BASE_SIZE); self.slider.setRange(72,260); self.slider.setValue(self.size); self.slider.setFixedSize(SLIDER_WIDTH,30); self.slider.logicalValueChanged.connect(self._resize); self.size_label.valueChosen.connect(self.slider.setValue); header.addWidget(self.slider); layout.addLayout(header)
         self.scroll=QScrollArea(); self.scroll.setWidgetResizable(True); self.scroll.setFrameShape(QFrame.Shape.NoFrame); self.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};"); self.grid_host=QWidget(); self.grid_host.setObjectName("thumbnailGrid"); self.grid_host.setStyleSheet(f"#thumbnailGrid{{background:{PALETTE['pane']};}}"); self.grid=QGridLayout(self.grid_host); self.grid.setAlignment(Qt.AlignmentFlag.AlignTop|Qt.AlignmentFlag.AlignLeft); self.scroll.setWidget(self.grid_host); layout.addWidget(self.scroll)
-    def set_files(self, files, selected=None): self.files=files; self.selected_path=selected if selected in files else (files[0] if files else None); self.build(); self.selected.emit(self.selected_path) if self.selected_path else None
+    def set_files(self, files, selected=None, *, emit_selection=True):
+        self.files=files; self.selected_path=selected if selected in files else (files[0] if files else None); self.build()
+        if emit_selection and self.selected_path: self.selected.emit(self.selected_path)
     def _resize(self,v): self.size=v; self.size_label.set_value(v); self.build()
     def build(self):
         while self.grid.count(): item=self.grid.takeAt(0); item.widget().deleteLater() if item.widget() else None
-        cols=max(1,self.scroll.viewport().width()//(self.size+20)); self.buttons={}
+        cols=max(1,self.scroll.viewport().width()//(self.size+20)); self.buttons={}; self.failed_paths=set()
         for i,path in enumerate(self.files):
             try:
                 with Image.open(path) as im: im=ImageOps.exif_transpose(im).convert("RGB"); im.thumbnail((self.size,self.size)); pix=QPixmap.fromImage(qimage(im.copy()))
                 b=ThumbnailTile(path, pix, self.size, path == self.selected_path)
-            except Exception: b=ThumbnailTile(path, None, self.size, path == self.selected_path)
+            except Exception:
+                self.failed_paths.add(path)
+                b=ThumbnailTile(path, None, self.size, path == self.selected_path)
             b.clicked_path.connect(self.select)
             self.grid.addWidget(b,i//cols,i%cols); self.buttons[path]=b
     def resizeEvent(self,event): super().resizeEvent(event); QTimer.singleShot(0,self.build)
+    def refresh_previews(self, paths):
+        completed = set()
+        for path in paths:
+            if path not in self.buttons: continue
+            try:
+                with Image.open(path) as image:
+                    image=ImageOps.exif_transpose(image).convert("RGB")
+                    image.thumbnail((self.size, self.size))
+                    pixmap=QPixmap.fromImage(qimage(image.copy()))
+            except Exception:
+                self.failed_paths.add(path)
+                continue
+            self.buttons[path].preview.setPixmap(pixmap)
+            self.failed_paths.discard(path)
+            completed.add(path)
+        return completed
     def select(self,path):
         if path not in self.files: return
         self.selected_path=path
@@ -365,13 +419,46 @@ class ImagePane(QFrame):
         self.filename_label=QLabel(); self.filename_label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.filename_label.setSizePolicy(QSizePolicy.Policy.Ignored,QSizePolicy.Policy.Fixed); bar.addWidget(self.filename_label,1)
         self.zoom_label=ScaleValueButton(1000,1,4000,1000,10,"%",labels["edit_zoom"]); bar.addWidget(self.zoom_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,1000); self.slider.setRange(1,4000); self.slider.setValue(1000); self.slider.logicalValueChanged.connect(self.set_zoom_percent); self.zoom_label.valueChosen.connect(self.choose_zoom); self.slider.setFixedSize(SLIDER_WIDTH,30); bar.addWidget(self.slider); layout.addLayout(bar)
         self.scroll=QScrollArea(); self.scroll.setWidgetResizable(False); self.scroll.setAlignment(Qt.AlignmentFlag.AlignCenter); self.scroll.setFrameShape(QFrame.Shape.NoFrame); self.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};"); self.label=QLabel(labels["empty"]); self.label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.label.setStyleSheet(f"color:{PALETTE['muted']};background:transparent;"); self.scroll.setWidget(self.label); layout.addWidget(self.scroll)
+    @staticmethod
+    def read_frames(path):
+        frames = []
+        with Image.open(path) as image:
+            for index in range(getattr(image, "n_frames", 1)):
+                image.seek(index)
+                frames.append((ImageOps.exif_transpose(image).convert("RGBA").copy(), max(20, int(image.info.get("duration", 100)))))
+        return frames
+
+    def reload_preserving_view(self):
+        if self.path is None: return False
+        try:
+            frames = self.read_frames(self.path)
+        except Exception:
+            # Keep displaying the last complete image while a writer is active.
+            return False
+        scroll_x = self.scroll.horizontalScrollBar().value()
+        scroll_y = self.scroll.verticalScrollBar().value()
+        was_empty = not self.frames
+        self.timer.stop()
+        self.frames = frames
+        self.index = min(self.index, len(frames) - 1)
+        if was_empty:
+            self.auto_scale = True
+            self.apply_default_zoom()
+        self.render()
+        def restore_scroll():
+            if self.frames is frames:
+                self.scroll.horizontalScrollBar().setValue(scroll_x)
+                self.scroll.verticalScrollBar().setValue(scroll_y)
+        QTimer.singleShot(0, self, restore_scroll)
+        if len(frames) > 1: self.timer.start(frames[self.index][1])
+        return True
+
     def load(self,path):
         self.auto_scale=False; self.path=path; self.rotation=0; self.fh=self.fv=False; self.zoom=1.0; self.frames=[]; self.timer.stop(); self.fit_b.setChecked(False)
         self.slider.blockSignals(True); self.slider.setMaximum(4000); self.slider.setValue(1000); self.slider.blockSignals(False); self.zoom_label.set_value(1000)
         self.filename_label.setText(path.name); self.filename_label.setToolTip(str(path))
         try:
-            with Image.open(path) as im:
-                for i in range(getattr(im,"n_frames",1)): im.seek(i); self.frames.append((ImageOps.exif_transpose(im).convert("RGBA").copy(),max(20,int(im.info.get("duration",100)))))
+            self.frames = self.read_frames(path)
             self.index=0; self.auto_scale=True
             if self.isVisible():
                 self.apply_default_zoom()
@@ -485,6 +572,26 @@ class PicView(QMainWindow):
         self.lang = resolve_language(self.language_mode)
         self.t = TEXT[self.lang]
         self.folder = None; self.files = []; self.saved_sizes = None
+        self._closing = False
+        self._pending_image_versions = {}
+        self._pending_image_retries = {}
+        self._image_versions = {}
+        self._changed_image_paths = set()
+        self._image_reload_retries = 0
+        self.folder_watcher = QFileSystemWatcher(self)
+        self.folder_watcher.directoryChanged.connect(self.schedule_folder_refresh)
+        self.folder_watcher.fileChanged.connect(self.schedule_image_refresh)
+        self.folder_refresh_timer = QTimer(self)
+        self.folder_refresh_timer.setSingleShot(True)
+        self.folder_refresh_timer.setInterval(100)
+        self.folder_refresh_timer.timeout.connect(self.refresh_folder)
+        # Also handles missed events and folders that are removed and recreated.
+        self.folder_poll_timer = QTimer(self)
+        self.folder_poll_timer.setInterval(750)
+        self.folder_poll_timer.timeout.connect(self.refresh_folder)
+        self.notification_bar = self.statusBar()
+        self.notification_bar.setVisible(False)
+        self.notification_bar.messageChanged.connect(lambda message: self.notification_bar.setVisible(bool(message)))
         app=QApplication.instance(); self.system_palette=QPalette(app.palette()); self.theme_mode=self.settings.get("theme","system"); self.theme_mode=self.theme_mode if self.theme_mode in ("system","light","dark") else "system"; self._applying_theme=False
         if self.theme_mode != "system": app.setPalette(themed_palette(self.system_palette,self.theme_mode))
         use_system_palette(app)
@@ -611,9 +718,132 @@ class PicView(QMainWindow):
         d=QFileDialog.getExistingDirectory(self,self.t["open"],str(self.folder) if self.folder else "")
         if d:self.open_folder(Path(d))
     def open_folder(self,folder,selected=None):
+        self.folder_refresh_timer.stop()
+        watched = self.folder_watcher.directories() + self.folder_watcher.files()
+        if watched: self.folder_watcher.removePaths(watched)
         self.folder=folder.resolve(); self.files=image_files(self.folder); self.thumbs.set_files(self.files,selected)
+        self._pending_image_versions = self.pending_image_versions()
+        self._pending_image_retries = dict.fromkeys(self.thumbs.failed_paths, 8)
+        self._image_versions = self.image_versions(self.files)
+        self._changed_image_paths.clear()
+        self._image_reload_retries = 0
+        self.watch_current_folder()
+        self.watch_image_files(self.files)
+        self.folder_poll_timer.start()
         if not self.files: self.image.clear()
         self.setWindowTitle(f"PicView v{__version__} — {self.folder}")
+    def watch_current_folder(self):
+        if self.folder and self.folder.is_dir() and str(self.folder) not in self.folder_watcher.directories():
+            self.folder_watcher.addPath(str(self.folder))
+
+    def schedule_folder_refresh(self, folder):
+        if not self._closing and self.folder == Path(folder):
+            self.folder_refresh_timer.start()
+
+    def schedule_image_refresh(self, filename):
+        path = Path(filename)
+        if not self._closing and self.folder == path.parent:
+            self._changed_image_paths.add(path)
+            self.folder_refresh_timer.start()
+
+    def watch_image_files(self, files):
+        watched = set(self.folder_watcher.files())
+        wanted = {str(path) for path in files}
+        removed = watched - wanted
+        if removed: self.folder_watcher.removePaths(list(removed))
+        added = wanted - watched
+        if added: self.folder_watcher.addPaths(list(added))
+
+    @staticmethod
+    def image_versions(files):
+        versions = {}
+        for path in files:
+            try:
+                stat = path.stat()
+                versions[path] = (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_ino)
+            except OSError:
+                versions[path] = None
+        return versions
+
+    def pending_image_versions(self):
+        versions = {}
+        for path in self.thumbs.failed_paths:
+            try:
+                stat = path.stat()
+                versions[path] = (stat.st_size, stat.st_mtime_ns)
+            except OSError:
+                versions[path] = None
+        return versions
+
+    def refresh_folder(self):
+        if self._closing or self.folder is None: return
+        self.watch_current_folder()
+        try:
+            files = image_files(self.folder, strict=True)
+        except (FileNotFoundError, NotADirectoryError):
+            files = []
+        except OSError:
+            # A temporary access failure does not mean the images were deleted.
+            return
+        versions = self.image_versions(files)
+        changed = {path for path in files if path in self._image_versions and versions[path] != self._image_versions[path]}
+        changed.update(self._changed_image_paths.intersection(files))
+        self._changed_image_paths.clear()
+        self._image_versions = versions
+        # Atomic replacement can remove a native file watch; reattach it here.
+        self.watch_image_files(files)
+        pending = self.pending_image_versions()
+        for path, version in pending.items():
+            if path not in self._pending_image_retries or version != self._pending_image_versions.get(path):
+                self._pending_image_retries[path] = 8
+        if files == self.files:
+            retry_paths = {path for path in self.thumbs.failed_paths if self._pending_image_retries.get(path, 0) > 0}
+            retry_paths.update(changed)
+            for path in changed: self._pending_image_retries[path] = 8
+            selected = self.thumbs.selected_path
+            if selected in changed: self._image_reload_retries = 8
+            if self._image_reload_retries and selected == self.image.path:
+                retry_paths.add(selected)
+            if not retry_paths: return
+            # Retry only incomplete thumbnails, including files briefly locked by a copy.
+            completed = self.thumbs.refresh_previews(retry_paths)
+            for path in retry_paths:
+                self._pending_image_retries[path] = max(0, self._pending_image_retries.get(path, 8) - 1)
+            self._pending_image_versions = self.pending_image_versions()
+            self._pending_image_retries = {path: self._pending_image_retries[path] for path in self.thumbs.failed_paths}
+            if selected in completed and (selected in changed or self._image_reload_retries or not self.image.frames):
+                if self.image.reload_preserving_view(): self._image_reload_retries = 0
+                else: self._image_reload_retries = max(0, self._image_reload_retries - 1)
+            elif selected in retry_paths:
+                self._image_reload_retries = max(0, self._image_reload_retries - 1)
+            return
+        previous = self.thumbs.selected_path
+        removed = previous is not None and previous not in files
+        selected = previous
+        if removed:
+            selected = next((path for path in files if natural_key(path) > natural_key(previous)), files[0] if files else None)
+        elif selected is None and files:
+            selected = files[0]
+        thumbs = self.thumbs
+        scroll_position = thumbs.scroll.verticalScrollBar().value()
+        self.files = files
+        reload_image = selected != previous or (selected is not None and not self.image.frames)
+        thumbs.set_files(files, selected, emit_selection=reload_image)
+        self._image_reload_retries = 0
+        if selected == previous and selected in changed and not reload_image:
+            if not self.image.reload_preserving_view(): self._image_reload_retries = 8
+        self._pending_image_versions = self.pending_image_versions()
+        self._pending_image_retries = {path: self._pending_image_retries.get(path, 8) for path in self.thumbs.failed_paths}
+        if not files: self.image.clear()
+        def restore_scroll():
+            if self._closing or self.thumbs is not thumbs: return
+            thumbs.scroll.verticalScrollBar().setValue(scroll_position)
+            if removed and selected in thumbs.buttons:
+                thumbs.scroll.ensureWidgetVisible(thumbs.buttons[selected])
+        QTimer.singleShot(0, restore_scroll)
+        if removed:
+            key = "image_deleted" if selected else "image_deleted_empty"
+            self.notification_bar.showMessage(self.t[key].format(name=previous.name, next=selected.name if selected else ""), 8000)
     def set_orientation(self,o):
         if self.split.orientation()==o:return
         sizes=self.split.sizes(); self.split.setOrientation(o); QTimer.singleShot(0,lambda:self.split.setSizes(sizes))
@@ -629,14 +859,25 @@ class PicView(QMainWindow):
         self.t = TEXT[self.lang]
         self.rebuild_ui()
     def dragEnterEvent(self,e):
+        if e.source() is self:
+            e.ignore()
+            return
         if e.mimeData().hasUrls(): e.acceptProposedAction()
     def dropEvent(self,e):
+        if e.source() is self:
+            e.ignore()
+            return
         path=Path(e.mimeData().urls()[0].toLocalFile()); self.open_folder(path if path.is_dir() else path.parent,path if path.is_file() else None)
     def restore(self):
         f=Path(self.settings["folder"]) if self.settings.get("folder") else None
         if f and f.is_dir(): self.open_folder(f,Path(self.settings.get("selected_file","")))
         QTimer.singleShot(0,lambda:self.split.setSizes([max(100,int(self.height()*float(self.settings.get("sash_fraction",.45)))),max(100,int(self.height()*(1-float(self.settings.get("sash_fraction",.45)))))]))
     def closeEvent(self,e):
+        self._closing = True
+        self.folder_refresh_timer.stop()
+        self.folder_poll_timer.stop()
+        watched = self.folder_watcher.directories() + self.folder_watcher.files()
+        if watched: self.folder_watcher.removePaths(watched)
         sizes=self.split.sizes(); fraction=sizes[0]/sum(sizes) if len(sizes)==2 and sum(sizes) else .45; save_settings({"folder":str(self.folder) if self.folder else "","selected_file":str(self.thumbs.selected_path) if getattr(self.thumbs,"selected_path",None) else "","orientation":"vertical" if self.split.orientation()==Qt.Orientation.Vertical else "horizontal","sash_fraction":fraction,"maximized_pane":"","thumbnail_size":self.thumbs.size,"image_zoom":self.image.zoom,"language":self.language_mode,"theme":self.theme_mode}); e.accept()
 
 
