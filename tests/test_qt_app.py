@@ -1,15 +1,86 @@
 import os
 from pathlib import Path
 
+import pytest
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PIL import Image
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QLocale, Qt
 from PySide6.QtGui import QColor, QKeySequence
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from picview.qt_app import IMAGE_BACKGROUND, PALETTE, THUMBNAIL_SELECTED, PicView
+from picview.settings import load_settings, save_settings
+
+
+@pytest.mark.parametrize("system_locale, stored_mode, expected_mode, expected_language", [
+    ("zh_TW", None, "system", "zh"),
+    ("en_US", None, "system", "en"),
+    ("ja_JP", None, "system", "en"),
+    ("zh_CN", "system", "system", "zh"),
+    ("zh_TW", "en", "en", "en"),
+    ("en_US", "zh", "zh", "zh"),
+    ("zh_TW", "invalid", "system", "zh"),
+])
+def test_language_defaults_and_explicit_selection(tmp_path, monkeypatch, system_locale, stored_mode, expected_mode, expected_language):
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    monkeypatch.setattr(QLocale, "system", lambda: QLocale(system_locale))
+    if stored_mode is not None:
+        save_settings({"language": stored_mode})
+    app = QApplication.instance() or QApplication([])
+    window = PicView()
+    app.processEvents()
+    assert window.language_mode == expected_mode
+    assert window.lang == expected_language
+    assert window.language_button.toolTip() == window.t[f"lang_{expected_mode}"]
+    window.close()
+    assert load_settings()["language"] == expected_mode
+    window.deleteLater()
+    app.processEvents()
+
+
+@pytest.mark.parametrize("system_locale, system_language", [("zh_TW", "zh"), ("en_US", "en"), ("ja_JP", "en")])
+def test_language_button_cycles_and_restores_system_mode(tmp_path, monkeypatch, system_locale, system_language):
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    monkeypatch.setattr(QLocale, "system", lambda: QLocale(system_locale))
+    folder = tmp_path / "images"
+    folder.mkdir()
+    path = folder / "image.png"
+    Image.new("RGB", (200, 100), "red").save(path)
+    app = QApplication.instance() or QApplication([])
+    window = PicView()
+    window.show()
+    window.open_folder(folder)
+    app.processEvents()
+    window.thumbs.slider.setValue(180)
+    window.image.slider.setValue(1250)
+    window.split.setOrientation(Qt.Orientation.Horizontal)
+    assert window.language_button.kind == "lang-system"
+    for mode, language, icon in [("zh", "zh", "中"), ("en", "en", "En"), ("system", system_language, "lang-system")]:
+        window.language_button.click()
+        app.processEvents()
+        assert window.language_mode == mode
+        assert window.lang == language
+        assert window.language_button.kind == icon
+        assert window.language_button.toolTip() == window.t[f"lang_{mode}"]
+        assert window.thumbs.selected_path == path
+        assert window.thumbs.size == 180
+        assert window.image.slider.value() == 1250
+        assert window.split.orientation() == Qt.Orientation.Horizontal
+    window.close()
+    assert load_settings()["language"] == "system"
+    window.deleteLater()
+    app.processEvents()
+    restored = PicView()
+    app.processEvents()
+    assert restored.language_mode == "system"
+    assert restored.lang == system_language
+    assert restored.language_button.kind == "lang-system"
+    restored.close()
+    restored.deleteLater()
+    app.processEvents()
 
 
 def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):

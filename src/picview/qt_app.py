@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import locale
 import argparse
 import sys
 from pathlib import Path
 
 from PIL import Image, ImageOps
-from PySide6.QtCore import QMimeData, QPoint, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QLocale, QMimeData, QPoint, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPolygon, QPalette, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow,
@@ -78,6 +77,25 @@ TEXT = {
     "zh": {"open": "開啟資料夾", "vertical": "上下窗格", "horizontal": "左右窗格", "lang": "En", "theme_system": "配色：跟隨系統（點擊切換）", "theme_light": "配色：淺色（點擊切換）", "theme_dark": "配色：深色（點擊切換）", "thumb": "縮圖", "max": "最大化窗格", "restore": "還原窗格", "rotate": "順時針旋轉", "mh": "水平鏡射", "mv": "垂直鏡射", "fit": "符合窗格", "full": "全螢幕", "zoom": "縮放", "edit_zoom": "編輯顯示比例", "edit_thumb": "編輯縮圖大小", "apply": "套用", "empty": "開啟資料夾以檢視圖片"},
 }
 
+LANGUAGE_MODES = ("system", "zh", "en")
+LANGUAGE_ICONS = {"system": "lang-system", "zh": "中", "en": "En"}
+TEXT["en"].update({
+    "lang_system": "Language: follow system (click to switch)",
+    "lang_zh": "Language: Chinese (click to switch)",
+    "lang_en": "Language: English (click to switch)",
+})
+TEXT["zh"].update({
+    "lang_system": "語言：跟隨系統（點擊切換）",
+    "lang_zh": "語言：中文（點擊切換）",
+    "lang_en": "語言：英文（點擊切換）",
+})
+
+
+def resolve_language(mode: str) -> str:
+    if mode == "system":
+        return "zh" if QLocale.system().language() == QLocale.Language.Chinese else "en"
+    return mode
+
 
 def qimage(image: Image.Image) -> QImage:
     image = image.convert("RGBA")
@@ -139,6 +157,14 @@ class IconButton(QToolButton):
             p.drawRect(9, 9, 18, 18); p.drawRect(13, 14, 10, 8)
         elif self.kind == "fullscreen":
             for x,y,dx,dy in ((9,9,1,1),(27,9,-1,1),(9,27,1,-1),(27,27,-1,-1)): p.drawLine(x,y,x+6*dx,y); p.drawLine(x,y,x,y+6*dy)
+        elif self.kind == "lang-system":
+            p.drawLine(24, 10, 12, 26)
+            for glyph, x, y in ((LANGUAGE_ICONS["zh"], 13, 12), (LANGUAGE_ICONS["en"], 24, 24)):
+                p.save()
+                p.translate(x, y)
+                p.scale(0.65, 0.65)
+                p.drawText(-18, -18, 36, 36, Qt.AlignmentFlag.AlignCenter, glyph)
+                p.restore()
         elif self.kind == "theme-system":
             moon = QPainterPath()
             moon.moveTo(15, 9)
@@ -451,7 +477,14 @@ class ImagePane(QFrame):
 
 class PicView(QMainWindow):
     def __init__(self):
-        super().__init__(); self.settings=load_settings(); syslang=(locale.getlocale()[0] or "en").lower(); self.lang="zh" if self.settings.get("language")=="system" and syslang.startswith("zh") else self.settings.get("language","en"); self.lang=self.lang if self.lang in TEXT else "en"; self.t=TEXT[self.lang]; self.folder=None; self.files=[]; self.saved_sizes=None
+        super().__init__()
+        self.settings = load_settings()
+        self.language_mode = self.settings.get("language", "system")
+        if self.language_mode not in LANGUAGE_MODES:
+            self.language_mode = "system"
+        self.lang = resolve_language(self.language_mode)
+        self.t = TEXT[self.lang]
+        self.folder = None; self.files = []; self.saved_sizes = None
         app=QApplication.instance(); self.system_palette=QPalette(app.palette()); self.theme_mode=self.settings.get("theme","system"); self.theme_mode=self.theme_mode if self.theme_mode in ("system","light","dark") else "system"; self._applying_theme=False
         if self.theme_mode != "system": app.setPalette(themed_palette(self.system_palette,self.theme_mode))
         use_system_palette(app)
@@ -548,8 +581,12 @@ class PicView(QMainWindow):
     def build(self):
         root=QWidget(); root.setObjectName("root"); self.setCentralWidget(root); outer=QVBoxLayout(root); outer.setContentsMargins(8,8,8,8); outer.setSpacing(8)
         tool=QFrame(); tool.setObjectName("toolbar"); tool.setFixedHeight(42); tool.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed); tl=QHBoxLayout(tool); tl.setContentsMargins(8,6,8,6)
-        for kind,key,fn in (("folder","open",self.choose), ("split-h","vertical",lambda:self.set_orientation(Qt.Orientation.Vertical)), ("split-v","horizontal",lambda:self.set_orientation(Qt.Orientation.Horizontal)), (self.t["lang"],"lang",self.toggle_lang)):
+        for kind,key,fn in (("folder","open",self.choose), ("split-h","vertical",lambda:self.set_orientation(Qt.Orientation.Vertical)), ("split-v","horizontal",lambda:self.set_orientation(Qt.Orientation.Horizontal))):
             b=IconButton(kind,self.t[key]); b.clicked.connect(fn); tl.addWidget(b)
+        self.language_button = IconButton(LANGUAGE_ICONS[self.language_mode], self.t[f"lang_{self.language_mode}"])
+        self.language_button.setAccessibleName(self.t[f"lang_{self.language_mode}"])
+        self.language_button.clicked.connect(self.toggle_lang)
+        tl.addWidget(self.language_button)
         self.theme_button=IconButton(f"theme-{self.theme_mode}",self.t[f"theme_{self.theme_mode}"]); self.theme_button.clicked.connect(self.toggle_theme); tl.addWidget(self.theme_button)
         tl.addStretch(); outer.addWidget(tool)
         self.split=QSplitter(Qt.Orientation.Vertical); self.split.setChildrenCollapsible(False); self.split.setHandleWidth(7); self.thumbs=ThumbnailPane(self.t); self.image=ImagePane(self.t); self.split.addWidget(self.thumbs); self.split.addWidget(self.image); self.thumbs.selected.connect(self.image.load); self.thumbs.max_button.clicked.connect(lambda:self.maximize("thumb")); self.image.max_button.clicked.connect(lambda:self.maximize("image")); outer.addWidget(self.split)
@@ -569,7 +606,12 @@ class PicView(QMainWindow):
             self.saved_sizes=self.split.sizes(); hide=self.image if which=="thumb" else self.thumbs; hide.hide(); b=self.thumbs.max_button if which=="thumb" else self.image.max_button; b.set_kind("shrink",self.t["restore"])
         else:
             self.thumbs.show(); self.image.show(); self.split.setSizes(self.saved_sizes); self.saved_sizes=None; self.thumbs.max_button.set_kind("expand",self.t["max"]); self.image.max_button.set_kind("expand",self.t["max"])
-    def toggle_lang(self): self.settings["language"]="en" if self.lang=="zh" else "zh"; self.lang=self.settings["language"]; self.t=TEXT[self.lang]; self.rebuild_ui()
+    def toggle_lang(self):
+        self.language_mode = LANGUAGE_MODES[(LANGUAGE_MODES.index(self.language_mode) + 1) % len(LANGUAGE_MODES)]
+        self.settings["language"] = self.language_mode
+        self.lang = resolve_language(self.language_mode)
+        self.t = TEXT[self.lang]
+        self.rebuild_ui()
     def dragEnterEvent(self,e):
         if e.mimeData().hasUrls(): e.acceptProposedAction()
     def dropEvent(self,e):
@@ -579,7 +621,7 @@ class PicView(QMainWindow):
         if f and f.is_dir(): self.open_folder(f,Path(self.settings.get("selected_file","")))
         QTimer.singleShot(0,lambda:self.split.setSizes([max(100,int(self.height()*float(self.settings.get("sash_fraction",.45)))),max(100,int(self.height()*(1-float(self.settings.get("sash_fraction",.45)))))]))
     def closeEvent(self,e):
-        sizes=self.split.sizes(); fraction=sizes[0]/sum(sizes) if len(sizes)==2 and sum(sizes) else .45; save_settings({"folder":str(self.folder) if self.folder else "","selected_file":str(self.thumbs.selected_path) if getattr(self.thumbs,"selected_path",None) else "","orientation":"vertical" if self.split.orientation()==Qt.Orientation.Vertical else "horizontal","sash_fraction":fraction,"maximized_pane":"","thumbnail_size":self.thumbs.size,"image_zoom":self.image.zoom,"language":self.lang,"theme":self.theme_mode}); e.accept()
+        sizes=self.split.sizes(); fraction=sizes[0]/sum(sizes) if len(sizes)==2 and sum(sizes) else .45; save_settings({"folder":str(self.folder) if self.folder else "","selected_file":str(self.thumbs.selected_path) if getattr(self.thumbs,"selected_path",None) else "","orientation":"vertical" if self.split.orientation()==Qt.Orientation.Vertical else "horizontal","sash_fraction":fraction,"maximized_pane":"","thumbnail_size":self.thumbs.size,"image_zoom":self.image.zoom,"language":self.language_mode,"theme":self.theme_mode}); e.accept()
 
 
 def main():

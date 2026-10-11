@@ -58,6 +58,7 @@ uv run picview
 - The window title shows the current version (for example, **PicView v0.0.2**).
 - Click **Open folder**, or drop a folder or image file onto the window.
 - Rotation and mirror controls only affect the current view; image files are never modified.
+- The language button cycles through **Follow system → Chinese (中) → English (En)**. The system icon shows smaller Chinese and English glyphs separated by a diagonal line. It follows the system by default, using Chinese for Chinese locales and English otherwise, and remembers the mode across restarts.
 
 ### Zoom and thumbnail size
 
