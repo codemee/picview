@@ -342,7 +342,8 @@ def test_modified_image_preserves_fit_and_updates_fullscreen(viewer):
     window.image.open_full()
 
 
-def test_modified_image_preserves_scroll_position(viewer):
+@pytest.mark.parametrize("updated_size", [(1600, 1200), (1800, 1400)])
+def test_modified_image_preserves_scroll_position(viewer, updated_size):
     window, folder, paths = viewer
     Image.new("RGB", (1600, 1200), "red").save(paths[0])
     window.image.load(paths[0])
@@ -353,8 +354,25 @@ def test_modified_image_preserves_scroll_position(viewer):
     horizontal.setValue(35)
     vertical.setValue(75)
     assert horizontal.value() == 35 and vertical.value() == 75
-    Image.new("RGB", (1600, 1200), "blue").save(paths[0])
+    Image.new("RGB", updated_size, "blue").save(paths[0])
     wait_until(lambda: window.image.frames[0][0].getpixel((0, 0)) == (0, 0, 255, 255))
     QTest.qWait(25)
     assert horizontal.value() == 35 and vertical.value() == 75
     assert window.image.slider.value() == 1500
+
+
+def test_reload_does_not_override_subsequent_user_scroll(viewer):
+    window, folder, paths = viewer
+    Image.new("RGB", (1600, 1200), "red").save(paths[0])
+    window.image.load(paths[0])
+    window.image.slider.setValue(1500)
+    QTest.qWait(50)
+    horizontal = window.image.scroll.horizontalScrollBar()
+    vertical = window.image.scroll.verticalScrollBar()
+    horizontal.setValue(20)
+    vertical.setValue(40)
+    assert window.image.reload_preserving_view()
+    horizontal.setValue(35)
+    vertical.setValue(75)
+    QTest.qWait(25)
+    assert horizontal.value() == 35 and vertical.value() == 75

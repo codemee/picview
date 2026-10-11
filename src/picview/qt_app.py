@@ -445,11 +445,8 @@ class ImagePane(QFrame):
             self.auto_scale = True
             self.apply_default_zoom()
         self.render()
-        def restore_scroll():
-            if self.frames is frames:
-                self.scroll.horizontalScrollBar().setValue(scroll_x)
-                self.scroll.verticalScrollBar().setValue(scroll_y)
-        QTimer.singleShot(0, self, restore_scroll)
+        self.scroll.horizontalScrollBar().setValue(scroll_x)
+        self.scroll.verticalScrollBar().setValue(scroll_y)
         if len(frames) > 1: self.timer.start(frames[self.index][1])
         return True
 
