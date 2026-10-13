@@ -99,7 +99,7 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     window.open_folder(folder)
     app.processEvents()
 
-    toolbar = window.image.layout().itemAt(0).layout()
+    toolbar = window.image.toolbar
     widgets = [toolbar.itemAt(i).widget() for i in range(toolbar.count()) if toolbar.itemAt(i).widget()]
     assert widgets[:3] == [window.image.rotate_b, window.image.mh, window.image.mv]
     assert widgets[3].width() == 1

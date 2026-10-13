@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from pathlib import Path
 from typing import Any
@@ -17,7 +18,30 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "image_zoom": 1.0,
     "language": "system",
     "theme": "system",
+    "tabs": [],
+    "active_tab": 0,
 }
+
+
+def normalize_tab_state(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict) or not isinstance(value.get("folder"), str) or not value["folder"]:
+        return None
+    state = {key: value.get(key, default) for key, default in DEFAULT_SETTINGS.items()
+             if key in ("folder", "selected_file", "orientation", "sash_fraction", "thumbnail_size", "image_zoom")}
+    if not isinstance(state["selected_file"], str): state["selected_file"] = ""
+    if state["orientation"] not in ("vertical", "horizontal"): state["orientation"] = "vertical"
+    for key, minimum, maximum, default in (("sash_fraction", .05, .95, .45), ("thumbnail_size", 72, 260, 140), ("image_zoom", .001, 4, 1.0)):
+        item = state[key]
+        state[key] = min(maximum, max(minimum, item)) if isinstance(item, (int, float)) and not isinstance(item, bool) and math.isfinite(item) else default
+    state["thumbnail_size"] = int(state["thumbnail_size"])
+    state["rotation"] = value.get("rotation", 0) if value.get("rotation", 0) in (0, 90, 180, 270) else 0
+    for key in ("fh", "fv"):
+        state[key] = value.get(key) is True
+    state["fit_to_pane"] = value.get("fit_to_pane") if isinstance(value.get("fit_to_pane"), bool) else None
+    for key in ("thumbnail_scroll", "image_scroll_x", "image_scroll_y"):
+        item = value.get(key, 0)
+        state[key] = max(0, item) if isinstance(item, int) and not isinstance(item, bool) else 0
+    return state
 
 
 def settings_path() -> Path:
@@ -31,7 +55,12 @@ def load_settings(path: Path | None = None) -> dict[str, Any]:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict) or data.get("version") != DEFAULT_SETTINGS["version"]:
             return DEFAULT_SETTINGS.copy()
-        return DEFAULT_SETTINGS | {key: value for key, value in data.items() if key in DEFAULT_SETTINGS}
+        settings = DEFAULT_SETTINGS | {key: value for key, value in data.items() if key in DEFAULT_SETTINGS}
+        tabs = settings["tabs"]
+        settings["tabs"] = [state for item in tabs if (state := normalize_tab_state(item)) is not None] if isinstance(tabs, list) else []
+        active = settings["active_tab"]
+        settings["active_tab"] = min(max(0, active), max(0, len(settings["tabs"]) - 1)) if isinstance(active, int) and not isinstance(active, bool) else 0
+        return settings
     except (OSError, ValueError, TypeError):
         return DEFAULT_SETTINGS.copy()
 

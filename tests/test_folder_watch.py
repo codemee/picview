@@ -32,7 +32,7 @@ def viewer(tmp_path, monkeypatch):
     window.open_folder(folder)
     app.processEvents()
     QTest.qWait(50)
-    yield window, folder, paths
+    yield window.current_tab(), folder, paths
     window.close()
     window.deleteLater()
     app.processEvents()
@@ -116,8 +116,8 @@ def test_switching_folders_replaces_watch_and_ignores_old_changes(viewer):
 
 def test_watch_survives_theme_and_language_rebuild(viewer):
     window, folder, paths = viewer
-    window.toggle_theme()
-    window.toggle_lang()
+    window.window().toggle_theme()
+    window.window().toggle_lang()
     QApplication.instance().processEvents()
     added = folder / "image3.png"
     Image.new("RGB", (90, 60), "blue").save(added)

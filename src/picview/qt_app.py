@@ -5,16 +5,16 @@ import sys
 from pathlib import Path
 
 from PIL import Image, ImageOps
-from PySide6.QtCore import QFileSystemWatcher, QLocale, QMimeData, QPoint, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QEvent, QFileSystemWatcher, QLocale, QMimeData, QPoint, QRectF, QSize, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QDrag, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPolygon, QPalette, QShortcut
 from PySide6.QtWidgets import (
-    QApplication, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow,
-    QMenu, QPushButton, QScrollArea, QSlider, QSplitter, QStyle, QStyleOptionSlider, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
+    QApplication, QCheckBox, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QMainWindow,
+    QMenu, QPushButton, QScrollArea, QSlider, QSplitter, QStackedWidget, QTabBar, QStyle, QStyleOptionSlider, QStyleOptionTab, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
 )
 
 from . import __version__
-from .settings import load_settings, save_settings
-from .utils import image_files, natural_key
+from .settings import load_settings, normalize_tab_state, save_settings
+from .utils import IMAGE_SUFFIXES, image_files, natural_key
 
 
 IMAGE_BACKGROUND = "#e9edf2"
@@ -80,6 +80,9 @@ TEXT = {
 LANGUAGE_MODES = ("system", "zh", "en")
 LANGUAGE_ICONS = {"system": "lang-system", "zh": "中", "en": "En"}
 TEXT["en"].update({
+    "compare": "Compare images", "compare_folder": "Compare this folder", "compare_empty": "Check folder tabs to compare images", "image_tools": "Image tools",
+    "close_tab": "Close tab",
+    "new_tab": "Open folder in a new tab", "empty_tab": "New tab", "folder_missing": "Folder unavailable; waiting for it to return",
     "image_deleted": "The image being viewed was deleted: {name}. Now viewing {next}.",
     "image_deleted_empty": "The image being viewed was deleted: {name}. No images remain in this folder.",
     "lang_system": "Language: follow system (click to switch)",
@@ -87,6 +90,9 @@ TEXT["en"].update({
     "lang_en": "Language: English (click to switch)",
 })
 TEXT["zh"].update({
+    "compare": "比圖", "compare_folder": "勾選此資料夾進行比圖", "compare_empty": "勾選資料夾標籤以比較圖片", "image_tools": "圖片工具",
+    "close_tab": "關閉標籤",
+    "new_tab": "在新標籤開啟資料夾", "empty_tab": "新標籤", "folder_missing": "資料夾不存在，等待重新連線",
     "image_deleted": "正在檢視的圖片已被刪除：{name}。已切換至 {next}。",
     "image_deleted_empty": "正在檢視的圖片已被刪除：{name}。資料夾中已沒有圖片。",
     "lang_system": "語言：跟隨系統（點擊切換）",
@@ -159,6 +165,21 @@ class IconButton(QToolButton):
             else: p.drawLine(10,10,15,15); p.drawLine(15,15,11,15); p.drawLine(15,15,15,11); p.drawLine(26,26,21,21); p.drawLine(21,21,25,21); p.drawLine(21,21,21,25)
         elif self.kind == "fit":
             p.drawRect(9, 9, 18, 18); p.drawRect(13, 14, 10, 8)
+        elif self.kind == "more":
+            p.setBrush(icon_color)
+            for x in (12, 18, 24): p.drawEllipse(QPoint(x, 18), 1, 1)
+        elif self.kind == "compare":
+            p.drawRoundedRect(QRectF(6, 9, 25, 18), 2, 2)
+            for x in (8, 20):
+                p.drawRoundedRect(QRectF(x, 12, 9, 12), 1, 1)
+                landscape = QPainterPath()
+                landscape.moveTo(x + 1, 22)
+                landscape.lineTo(x + 3, 19)
+                landscape.lineTo(x + 5, 21)
+                landscape.lineTo(x + 7, 18)
+                landscape.lineTo(x + 8, 20)
+                p.drawPath(landscape)
+                p.drawEllipse(QRectF(x + 2, 15, 1.5, 1.5))
         elif self.kind == "fullscreen":
             for x,y,dx,dy in ((9,9,1,1),(27,9,-1,1),(9,27,1,-1),(27,27,-1,-1)): p.drawLine(x,y,x+6*dx,y); p.drawLine(x,y,x,y+6*dy)
         elif self.kind == "lang-system":
@@ -362,7 +383,7 @@ class ThumbnailTile(QFrame):
 class ThumbnailPane(QFrame):
     selected = Signal(Path)
     def __init__(self, labels: dict[str, str], parent=None):
-        super().__init__(parent); self.labels=labels; self.files=[]; self.size=THUMBNAIL_BASE_SIZE; self.buttons={}; self.failed_paths=set()
+        super().__init__(parent); self.labels=labels; self.files=[]; self.selected_path=None; self.size=THUMBNAIL_BASE_SIZE; self.buttons={}; self.failed_paths=set()
         self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,6,10,8)
         header=QHBoxLayout(); self.max_button=IconButton("expand",labels["max"]); header.addWidget(self.max_button); header.addStretch(); self.size_label=ScaleValueButton(self.size,72,260,THUMBNAIL_BASE_SIZE,1,"px",labels["edit_thumb"]); header.addWidget(self.size_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,THUMBNAIL_BASE_SIZE); self.slider.setRange(72,260); self.slider.setValue(self.size); self.slider.setFixedSize(SLIDER_WIDTH,30); self.slider.logicalValueChanged.connect(self._resize); self.size_label.valueChosen.connect(self.slider.setValue); header.addWidget(self.slider); layout.addLayout(header)
         self.scroll=QScrollArea(); self.scroll.setWidgetResizable(True); self.scroll.setFrameShape(QFrame.Shape.NoFrame); self.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};"); self.grid_host=QWidget(); self.grid_host.setObjectName("thumbnailGrid"); self.grid_host.setStyleSheet(f"#thumbnailGrid{{background:{PALETTE['pane']};}}"); self.grid=QGridLayout(self.grid_host); self.grid.setAlignment(Qt.AlignmentFlag.AlignTop|Qt.AlignmentFlag.AlignLeft); self.scroll.setWidget(self.grid_host); layout.addWidget(self.scroll)
@@ -407,18 +428,80 @@ class ThumbnailPane(QFrame):
         self.selected.emit(path)
 
 
+class ToolbarSeparator(QFrame):
+    def __init__(self):
+        super().__init__()
+        self.setFixedSize(1, 18)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        color = QColor(PALETTE["edge"])
+        color.setAlpha(110)
+        painter.setPen(color)
+        painter.drawLine(0, 0, 0, self.height() - 1)
+        painter.end()
+
+
+def separate_tools(layout):
+    layout.addSpacing(6)
+    layout.addWidget(ToolbarSeparator())
+    layout.addSpacing(6)
+
+
 class ImagePane(QFrame):
+    interacted = Signal()
+
     def __init__(self, labels, parent=None):
         super().__init__(parent); self.labels=labels; self.path=None; self.frames=[]; self.index=0; self.rotation=0; self.fh=False; self.fv=False; self.zoom=1.0; self.fit_to_pane=False; self.auto_scale=False; self._applying_auto_scale=False; self.display_scale=1.0; self.full_window=None; self.timer=QTimer(self); self.timer.timeout.connect(self.next_frame)
         self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,6,10,8)
+        self.comparison_title = None
+        self.comparison_selected = False
         bar=QHBoxLayout(); self.rotate_b=IconButton("rotate",labels["rotate"]); self.mh=IconButton("mirror-h",labels["mh"]); self.mv=IconButton("mirror-v",labels["mv"]); self.fit_b=IconButton("fit",labels["fit"]); self.fit_b.setCheckable(True); self.fit_b.toggled.connect(self.set_fit); self.max_button=IconButton("expand",labels["max"]); self.full=IconButton("fullscreen",labels["full"])
         for b,fn in ((self.rotate_b,self.rotate),(self.mh,self.mirror_h),(self.mv,self.mirror_v)): b.clicked.connect(fn); bar.addWidget(b)
-        divider=QFrame(); divider.setFixedSize(1,22); divider.setStyleSheet(f"background:{PALETTE['edge']};"); bar.addSpacing(6); bar.addWidget(divider); bar.addSpacing(6)
+        separate_tools(bar)
         self.full.clicked.connect(self.open_full)
         for button in (self.fit_b,self.max_button,self.full): bar.addWidget(button)
         self.filename_label=QLabel(); self.filename_label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.filename_label.setSizePolicy(QSizePolicy.Policy.Ignored,QSizePolicy.Policy.Fixed); bar.addWidget(self.filename_label,1)
-        self.zoom_label=ScaleValueButton(1000,1,4000,1000,10,"%",labels["edit_zoom"]); bar.addWidget(self.zoom_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,1000); self.slider.setRange(1,4000); self.slider.setValue(1000); self.slider.logicalValueChanged.connect(self.set_zoom_percent); self.zoom_label.valueChosen.connect(self.choose_zoom); self.slider.setFixedSize(SLIDER_WIDTH,30); bar.addWidget(self.slider); layout.addLayout(bar)
+        self.zoom_label=ScaleValueButton(1000,1,4000,1000,10,"%",labels["edit_zoom"]); bar.addWidget(self.zoom_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,1000); self.slider.setRange(1,4000); self.slider.setValue(1000); self.slider.logicalValueChanged.connect(self.set_zoom_percent); self.zoom_label.valueChosen.connect(self.choose_zoom); self.slider.setFixedSize(SLIDER_WIDTH,30); bar.addWidget(self.slider)
+        self.toolbar_widget = QWidget(self)
+        self.toolbar_widget.setLayout(bar)
+        bar.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.toolbar_widget)
         self.scroll=QScrollArea(); self.scroll.setWidgetResizable(False); self.scroll.setAlignment(Qt.AlignmentFlag.AlignCenter); self.scroll.setFrameShape(QFrame.Shape.NoFrame); self.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};"); self.label=QLabel(labels["empty"]); self.label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.label.setStyleSheet(f"color:{PALETTE['muted']};background:transparent;"); self.scroll.setWidget(self.label); layout.addWidget(self.scroll)
+        self.toolbar = bar
+        for widget in self.findChildren(QWidget): widget.installEventFilter(self)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self.comparison_selected:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setPen(QPen(QColor("#1677ff"), 2))
+            painter.drawRoundedRect(self.rect().adjusted(1, 1, -2, -2), 10, 10)
+            painter.end()
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.Wheel): self.interacted.emit()
+        return super().eventFilter(watched, event)
+
+    def update_filename(self):
+        name = self.path.name if self.path else ""
+        self.filename_label.setText(f"{self.comparison_title} / {name}" if self.comparison_title else name)
+
+    def set_comparison_mode(self, title=None):
+        self.comparison_title = title
+        comparing = title is not None
+        self.toolbar_widget.setVisible(not comparing)
+        if comparing:
+            self.layout().setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+            self.setMinimumSize(0, 0)
+            self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        else:
+            self.comparison_selected = False
+            self.layout().setSizeConstraint(QLayout.SizeConstraint.SetDefaultConstraint)
+            self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        self.update_filename()
+        self.update()
     @staticmethod
     def read_frames(path):
         frames = []
@@ -453,7 +536,7 @@ class ImagePane(QFrame):
     def load(self,path):
         self.auto_scale=False; self.path=path; self.rotation=0; self.fh=self.fv=False; self.zoom=1.0; self.frames=[]; self.timer.stop(); self.fit_b.setChecked(False)
         self.slider.blockSignals(True); self.slider.setMaximum(4000); self.slider.setValue(1000); self.slider.blockSignals(False); self.zoom_label.set_value(1000)
-        self.filename_label.setText(path.name); self.filename_label.setToolTip(str(path))
+        self.update_filename(); self.filename_label.setToolTip(str(path))
         try:
             self.frames = self.read_frames(path)
             self.index=0; self.auto_scale=True
@@ -468,6 +551,7 @@ class ImagePane(QFrame):
     def clear(self):
         self.auto_scale=False; self.timer.stop(); self.frames=[]; self.path=None; self.fit_b.setChecked(False)
         self.filename_label.clear(); self.filename_label.setToolTip("")
+        self.update_filename()
         self.label.clear(); self.label.setText(self.labels["empty"]); self.label.setFixedSize(self.label.sizeHint())
         if self.full_window is not None: self.open_full()
     def next_frame(self): self.index=(self.index+1)%len(self.frames); self.timer.start(self.frames[self.index][1]); self.render()
@@ -559,16 +643,28 @@ class ImagePane(QFrame):
         w=QMainWindow(self); w.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose); w.destroyed.connect(lambda: setattr(self, "full_window", None)); w.setWindowState(Qt.WindowState.WindowFullScreen); label=QLabel(); label.setAlignment(Qt.AlignmentFlag.AlignCenter); label.setStyleSheet("background:#111820;"); w.setCentralWidget(label); w.keyPressEvent=lambda e: self.open_full() if e.key()==Qt.Key.Key_Escape else None; im=self.image(); label.setPixmap(QPixmap.fromImage(qimage(im))); w.show(); self.full_window=w
 
 
-class PicView(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.settings = load_settings()
-        self.language_mode = self.settings.get("language", "system")
-        if self.language_mode not in LANGUAGE_MODES:
-            self.language_mode = "system"
-        self.lang = resolve_language(self.language_mode)
-        self.t = TEXT[self.lang]
-        self.folder = None; self.files = []; self.saved_sizes = None
+class FolderTab(QWidget):
+    notification = Signal(str)
+    attentionChanged = Signal()
+
+    def __init__(self, labels, parent=None):
+        super().__init__(parent)
+        self.t = labels
+        self.folder = None
+        self.files = []
+        self.saved_sizes = None
+        self.active = False
+        self.comparison_visible = False
+        self.pending_notification = ""
+        self.image_dirty = False
+        self._selection_pending = None
+        self._restore_selected = None
+        self._initial_view = None
+        self._pending_scroll = None
+        self._scroll_restore_attempts = 0
+        self._normal_scroll = None
+        self._layout_pending = False
+        self._sash_fraction = .45
         self._closing = False
         self._pending_image_versions = {}
         self._pending_image_retries = {}
@@ -582,153 +678,244 @@ class PicView(QMainWindow):
         self.folder_refresh_timer.setSingleShot(True)
         self.folder_refresh_timer.setInterval(100)
         self.folder_refresh_timer.timeout.connect(self.refresh_folder)
-        # Also handles missed events and folders that are removed and recreated.
         self.folder_poll_timer = QTimer(self)
         self.folder_poll_timer.setInterval(750)
         self.folder_poll_timer.timeout.connect(self.refresh_folder)
-        self.notification_bar = self.statusBar()
-        self.notification_bar.setVisible(False)
-        self.notification_bar.messageChanged.connect(lambda message: self.notification_bar.setVisible(bool(message)))
-        app=QApplication.instance(); self.system_palette=QPalette(app.palette()); self.theme_mode=self.settings.get("theme","system"); self.theme_mode=self.theme_mode if self.theme_mode in ("system","light","dark") else "system"; self._applying_theme=False
-        if self.theme_mode != "system": app.setPalette(themed_palette(self.system_palette,self.theme_mode))
-        use_system_palette(app)
-        self.setWindowTitle(f"PicView v{__version__}")
-        self.setMinimumSize(720,500); self.resize(1100,780); self.setAcceptDrops(True); self.build(); self.setup_shortcuts(); self.restore()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.split = QSplitter(Qt.Orientation.Vertical)
+        self.split.setChildrenCollapsible(False)
+        self.split.setHandleWidth(7)
+        self.thumbs = ThumbnailPane(labels)
+        self.image = ImagePane(labels)
+        self.split.addWidget(self.thumbs)
+        self.image_slot = QWidget()
+        slot_layout = QVBoxLayout(self.image_slot)
+        slot_layout.setContentsMargins(0, 0, 0, 0)
+        slot_layout.addWidget(self.image)
+        self.split.addWidget(self.image_slot)
+        layout.addWidget(self.split)
+        self.thumbs.selected.connect(self.select_image)
+        self.thumbs.max_button.clicked.connect(lambda: self.maximize("thumb"))
+        self.image.max_button.clicked.connect(self.maximize_image)
+        self.scroll_restore_timer = QTimer(self)
+        self.scroll_restore_timer.setSingleShot(True)
+        self.scroll_restore_timer.setInterval(50)
+        self.scroll_restore_timer.timeout.connect(self.restore_scroll)
+        for bar in (self.thumbs.scroll.verticalScrollBar(), self.image.scroll.horizontalScrollBar(), self.image.scroll.verticalScrollBar()):
+            bar.rangeChanged.connect(lambda *_: self.scroll_restore_timer.start() if self._pending_scroll is not None else None)
+            bar.sliderPressed.connect(self.cancel_scroll_restore)
+            bar.installEventFilter(self)
+        for pane in (self.thumbs, self.image):
+            pane.scroll.viewport().installEventFilter(self)
+            pane.slider.logicalValueChanged.connect(self.cancel_scroll_restore)
 
-    def setup_shortcuts(self):
-        bindings = [
-            (QKeySequence.StandardKey.Open, self.choose),
-            (QKeySequence.StandardKey.Copy, self.copy_selected_file),
-            ("Left", lambda: self.select_relative(-1)),
-            ("Right", lambda: self.select_relative(1)),
-            ("Home", lambda: self.select_boundary(False)),
-            ("End", lambda: self.select_boundary(True)),
-            ("PgUp", lambda: self.select_relative(-1)),
-            ("PgDown", lambda: self.select_relative(1)),
-            ("Space", lambda: self.select_relative(1)),
-            ("Backspace", lambda: self.select_relative(-1)),
-            ("+", lambda: self.image.adjust_zoom(10)),
-            ("=", lambda: self.image.adjust_zoom(10)),
-            ("-", lambda: self.image.adjust_zoom(-10)),
-            ("0", self.image.reset_zoom),
-            ("F11", self.image.open_full),
-        ]
-        self.shortcuts = []
-        for keys, action in bindings:
-            shortcut = QShortcut(QKeySequence(keys), self)
-            shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
-            shortcut.activated.connect(action)
-            self.shortcuts.append(shortcut)
-
-    def select_relative(self, offset):
-        if not self.files: return
-        selected = self.thumbs.selected_path
-        index = self.files.index(selected) if selected in self.files else 0
-        self.thumbs.select(self.files[max(0, min(len(self.files) - 1, index + offset))])
-
-    def select_boundary(self, last):
-        if self.files: self.thumbs.select(self.files[-1 if last else 0])
-
-    def copy_selected_file(self):
-        path = self.thumbs.selected_path
-        if path is None or not path.is_file(): return
-        data = QMimeData()
-        data.setUrls([QUrl.fromLocalFile(str(path))])
-        QApplication.clipboard().setMimeData(data)
-
-    def refresh_system_theme(self, _palette=None) -> None:
-        if self._applying_theme or self.theme_mode != "system": return
-        self.system_palette=QPalette(QApplication.instance().palette())
-        use_system_palette(QApplication.instance())
-        self.rebuild_ui()
-
-    def rebuild_ui(self):
-        selected = getattr(self.thumbs, "selected_path", None)
-        orientation = self.split.orientation()
-        maximized = None if self.saved_sizes is None else ("thumb" if self.image.isHidden() else "image")
-        sizes = self.saved_sizes if self.saved_sizes is not None else self.split.sizes()
-        thumb_size = self.thumbs.size
-        image_zoom = self.image.slider.value()
-        image_fit = self.image.fit_to_pane
-        for shortcut in self.shortcuts:
-            shortcut.setEnabled(False)
-            shortcut.deleteLater()
-        self.build()
-        self.setup_shortcuts()
-        self.saved_sizes = None
-        self.split.setOrientation(orientation)
-        if self.folder:
-            self.open_folder(self.folder, selected)
-        self.thumbs.slider.setValue(thumb_size)
-        if image_fit:
-            self.image.fit_b.setChecked(True)
-        elif self.image.fit_to_pane:
-            self.image.fit_b.setChecked(False)
-        if not image_fit and image_zoom != 1000:
-            self.image.slider.setValue(image_zoom)
-        def restore_layout():
-            self.split.setSizes(sizes)
-            if maximized: self.maximize(maximized)
-        QTimer.singleShot(0, restore_layout)
-
-    def toggle_theme(self):
-        modes=("system","light","dark")
-        self.theme_mode=modes[(modes.index(self.theme_mode)+1)%len(modes)]
-        self.settings["theme"]=self.theme_mode
-        app=QApplication.instance()
-        self._applying_theme=True
-        try: app.setPalette(themed_palette(self.system_palette,self.theme_mode))
-        finally: self._applying_theme=False
-        use_system_palette(app)
-        self.rebuild_ui()
-
-    def build(self):
-        root=QWidget(); root.setObjectName("root"); self.setCentralWidget(root); outer=QVBoxLayout(root); outer.setContentsMargins(8,8,8,8); outer.setSpacing(8)
-        tool=QFrame(); tool.setObjectName("toolbar"); tool.setFixedHeight(42); tool.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed); tl=QHBoxLayout(tool); tl.setContentsMargins(8,6,8,6)
-        for kind,key,fn in (("folder","open",self.choose), ("split-h","vertical",lambda:self.set_orientation(Qt.Orientation.Vertical)), ("split-v","horizontal",lambda:self.set_orientation(Qt.Orientation.Horizontal))):
-            b=IconButton(kind,self.t[key]); b.clicked.connect(fn); tl.addWidget(b)
-        self.language_button = IconButton(LANGUAGE_ICONS[self.language_mode], self.t[f"lang_{self.language_mode}"])
-        self.language_button.setAccessibleName(self.t[f"lang_{self.language_mode}"])
-        self.language_button.clicked.connect(self.toggle_lang)
-        tl.addWidget(self.language_button)
-        self.theme_button=IconButton(f"theme-{self.theme_mode}",self.t[f"theme_{self.theme_mode}"]); self.theme_button.clicked.connect(self.toggle_theme); tl.addWidget(self.theme_button)
-        tl.addStretch(); outer.addWidget(tool)
-        self.split=QSplitter(Qt.Orientation.Vertical); self.split.setChildrenCollapsible(False); self.split.setHandleWidth(7); self.thumbs=ThumbnailPane(self.t); self.image=ImagePane(self.t); self.split.addWidget(self.thumbs); self.split.addWidget(self.image); self.thumbs.selected.connect(self.image.load); self.thumbs.max_button.clicked.connect(lambda:self.maximize("thumb")); self.image.max_button.clicked.connect(lambda:self.maximize("image")); outer.addWidget(self.split)
-        self.setStyleSheet(f"""
-            #root{{background:{PALETTE['surface']};}}
-            #toolbar{{background:transparent;border:0;}}
-            #card{{background:{PALETTE['card']};border:0;border-radius:12px;}}
-            QLabel{{color:{PALETTE['text']};}}
-            QSlider::groove:horizontal{{height:5px;background:{PALETTE['edge']};border-radius:2px}}
-            QSlider::handle:horizontal{{background:{PALETTE['accent']};width:15px;margin:-5px 0;border-radius:7px}}
-            QScrollBar{{background:{PALETTE['surface']};border:0;margin:0;}}
-            QScrollBar:vertical{{width:12px;}}
-            QScrollBar:horizontal{{height:12px;}}
-            QScrollBar::handle{{background:{PALETTE['edge']};border-radius:6px;}}
-            QScrollBar::handle:vertical{{min-height:25px;}}
-            QScrollBar::handle:horizontal{{min-width:25px;}}
-            QScrollBar::add-page,QScrollBar::sub-page{{background:{PALETTE['surface']};}}
-            QScrollBar::add-line,QScrollBar::sub-line{{width:0;height:0;border:0;background:none;}}
-            QScrollArea::corner{{background:{PALETTE['surface']};}}
-        """)
-    def choose(self):
-        d=QFileDialog.getExistingDirectory(self,self.t["open"],str(self.folder) if self.folder else "")
-        if d:self.open_folder(Path(d))
-    def open_folder(self,folder,selected=None):
+    def open_folder(self, folder, selected=None, state=None):
         self.folder_refresh_timer.stop()
         watched = self.folder_watcher.directories() + self.folder_watcher.files()
         if watched: self.folder_watcher.removePaths(watched)
-        self.folder=folder.resolve(); self.files=image_files(self.folder); self.thumbs.set_files(self.files,selected)
+        self._changed_image_paths.clear()
+        self._image_reload_retries = 0
+        self.image.clear()
+        self.folder = folder.resolve()
+        self._initial_view = state
+        self._restore_selected = selected
+        self.files = image_files(self.folder)
+        self._layout_pending = True
+        if state:
+            self.thumbs.slider.setValue(state["thumbnail_size"])
+            orientation = Qt.Orientation.Horizontal if state["orientation"] == "horizontal" else Qt.Orientation.Vertical
+            self.split.setOrientation(orientation)
+            self._sash_fraction = state["sash_fraction"]
+        self.thumbs.set_files(self.files, selected)
         self._pending_image_versions = self.pending_image_versions()
         self._pending_image_retries = dict.fromkeys(self.thumbs.failed_paths, 8)
         self._image_versions = self.image_versions(self.files)
-        self._changed_image_paths.clear()
-        self._image_reload_retries = 0
         self.watch_current_folder()
         self.watch_image_files(self.files)
         self.folder_poll_timer.start()
-        if not self.files: self.image.clear()
-        self.setWindowTitle(f"PicView v{__version__} — {self.folder}")
+        if not self.files:
+            self.image.clear()
+            self.update_empty_message()
+        if self.active or self.comparison_visible: self.activate_image()
+
+    def update_empty_message(self):
+        if not self.files:
+            key = "folder_missing" if self.folder and not self.folder.is_dir() else "empty"
+            self.image.label.setText(self.t[key])
+            self.image.label.setFixedSize(self.image.label.sizeHint())
+
+    def select_image(self, path):
+        if self._initial_view is None: self.cancel_scroll_restore()
+        self._selection_pending = path
+        self.image_dirty = True
+        if self.active or self.comparison_visible: self.activate_image()
+
+    def activate_image(self):
+        path = self.thumbs.selected_path
+        if path is None:
+            self.image.clear()
+            self.update_empty_message()
+            return
+        if self.image.path != path:
+            self.image.load(path)
+            self.image_dirty = not bool(self.image.frames)
+        elif self.image_dirty:
+            self.image_dirty = not self.image.reload_preserving_view()
+        self._selection_pending = None
+        if self._initial_view is not None and self.image.frames:
+            state = self._initial_view
+            self._initial_view = None
+            self.image.rotation = state.get("rotation", 0)
+            self.image.fh = state.get("fh", False)
+            self.image.fv = state.get("fv", False)
+            fit = state.get("fit_to_pane")
+            if fit is not None:
+                self.image.fit_b.setChecked(fit)
+                self.image.auto_scale = False
+            if fit is not True and (fit is False or state["image_zoom"] != 1):
+                self.image.slider.setValue(round(state["image_zoom"] * 1000))
+            self.image.render()
+            self._pending_scroll = {key: state.get(key, 0) for key in ("thumbnail_scroll", "image_scroll_x", "image_scroll_y")}
+            self._scroll_restore_attempts = 0
+            self.scroll_restore_timer.start()
+        if (self.active or self.comparison_visible) and len(self.image.frames) > 1:
+            self.image.timer.start(self.image.frames[self.image.index][1])
+
+    def reload_current_image(self):
+        if not self.active and not self.comparison_visible:
+            self.image_dirty = True
+            return True
+        result = self.image.reload_preserving_view()
+        self.image_dirty = not result
+        return result
+
+    def set_active(self, active):
+        self.active = active
+        if self._closing: return
+        if not active:
+            if not self.comparison_visible: self.image.timer.stop()
+            if self.image.full_window is not None: self.image.open_full()
+            return
+        self.refresh_folder()
+        self.activate_image()
+        if self._layout_pending: QTimer.singleShot(0, self, self.apply_layout)
+        if self._pending_scroll is not None: self.scroll_restore_timer.start()
+
+    def set_comparison_visible(self, visible):
+        self.comparison_visible = visible
+        if self._closing: return
+        if visible:
+            self.refresh_folder()
+            self.activate_image()
+        elif not self.active:
+            self.image.timer.stop()
+
+    def maximize_image(self):
+        window = self.window()
+        if self.comparison_visible and hasattr(window, "comparison_area"):
+            window.comparison_area.maximize_page(self)
+        else:
+            self.maximize("image")
+
+    def cancel_scroll_restore(self):
+        self._pending_scroll = None
+        self.scroll_restore_timer.stop()
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.Wheel, QEvent.Type.MouseButtonPress, QEvent.Type.KeyPress):
+            self.cancel_scroll_restore()
+        return super().eventFilter(watched, event)
+
+    def restore_scroll(self):
+        if self._closing or not self.active or self._pending_scroll is None: return
+        state = self._pending_scroll
+        bars = ((self.thumbs.scroll.verticalScrollBar(), state["thumbnail_scroll"]),
+                (self.image.scroll.horizontalScrollBar(), state["image_scroll_x"]),
+                (self.image.scroll.verticalScrollBar(), state["image_scroll_y"]))
+        if any(value > bar.maximum() for bar, value in bars) and self._scroll_restore_attempts < 10:
+            self._scroll_restore_attempts += 1
+            self.scroll_restore_timer.start()
+            return
+        self._pending_scroll = None
+        self.thumbs.scroll.verticalScrollBar().setValue(state["thumbnail_scroll"])
+        self.image.scroll.horizontalScrollBar().setValue(state["image_scroll_x"])
+        self.image.scroll.verticalScrollBar().setValue(state["image_scroll_y"])
+
+    def apply_layout(self):
+        if self._closing or not self.active or not self._layout_pending: return
+        length = self.split.width() if self.split.orientation() == Qt.Orientation.Horizontal else self.split.height()
+        if length <= 0: return
+        self.split.setSizes([round(length * self._sash_fraction), round(length * (1 - self._sash_fraction))])
+        self._layout_pending = False
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._layout_pending and self.active: QTimer.singleShot(0, self, self.apply_layout)
+
+    def notify(self, message):
+        if self.active:
+            self.pending_notification = ""
+            self.notification.emit(message)
+        else:
+            self.pending_notification = message
+            self.attentionChanged.emit()
+
+    def snapshot(self):
+        sizes = self.saved_sizes if self.saved_sizes is not None else self.split.sizes()
+        fraction = sizes[0] / sum(sizes) if sum(sizes) and not self._layout_pending else self._sash_fraction
+        state = {"folder": str(self.folder) if self.folder else "", "selected_file": str(self.thumbs.selected_path or self._restore_selected or ""),
+                 "orientation": "horizontal" if self.split.orientation() == Qt.Orientation.Horizontal else "vertical",
+                 "sash_fraction": fraction, "thumbnail_size": self.thumbs.size,
+                 "image_zoom": self.image.zoom, "fit_to_pane": self.image.fit_to_pane,
+                 "rotation": self.image.rotation, "fh": self.image.fh, "fv": self.image.fv,
+                 "thumbnail_scroll": self.thumbs.scroll.verticalScrollBar().value(),
+                 "image_scroll_x": self.image.scroll.horizontalScrollBar().value(),
+                 "image_scroll_y": self.image.scroll.verticalScrollBar().value()}
+        if self._initial_view is not None:
+            state.update({key: self._initial_view[key] for key in ("image_zoom", "fit_to_pane", "rotation", "fh", "fv", "thumbnail_scroll", "image_scroll_x", "image_scroll_y") if key in self._initial_view})
+        if self._pending_scroll is not None: state.update(self._pending_scroll)
+        if self.saved_sizes is not None and self._normal_scroll is not None: state.update(self._normal_scroll)
+        return state
+
+    def restyle(self, labels):
+        self.t = labels
+        self.thumbs.labels = labels
+        self.image.labels = labels
+        for pane in (self.thumbs, self.image):
+            pane.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};")
+            pane.max_button.setToolTip(labels["restore" if pane.max_button.kind == "shrink" else "max"])
+        self.thumbs.grid_host.setStyleSheet(f"#thumbnailGrid{{background:{PALETTE['pane']};}}")
+        for tile in self.thumbs.buttons.values(): tile.apply_style()
+        for button, key in ((self.image.rotate_b, "rotate"), (self.image.mh, "mh"), (self.image.mv, "mv"), (self.image.fit_b, "fit"), (self.image.full, "full")):
+            button.setToolTip(labels[key])
+        self.thumbs.size_label.setToolTip(labels["edit_thumb"])
+        self.image.zoom_label.setToolTip(labels["edit_zoom"])
+        self.image.label.setStyleSheet(f"color:{PALETTE['muted']};background:transparent;")
+        for button in self.findChildren(IconButton) + self.image.findChildren(IconButton): button.refresh_icon()
+        if self.comparison_visible: self.image.set_comparison_mode(self.folder.name or str(self.folder))
+        self.update_empty_message()
+
+    def shutdown(self):
+        self._closing = True
+        self.active = False
+        self.folder_refresh_timer.stop()
+        self.folder_poll_timer.stop()
+        self.scroll_restore_timer.stop()
+        self.image.timer.stop()
+        if self.image.full_window is not None: self.image.open_full()
+        self.image.clear()
+        watched = self.folder_watcher.directories() + self.folder_watcher.files()
+        if watched: self.folder_watcher.removePaths(watched)
+
+    @property
+    def notification_bar(self):
+        return self.window().notification_bar
+
+    def closeEvent(self, event):
+        self.shutdown()
+        event.accept()
+
     def watch_current_folder(self):
         if self.folder and self.folder.is_dir() and str(self.folder) not in self.folder_watcher.directories():
             self.folder_watcher.addPath(str(self.folder))
@@ -809,7 +996,7 @@ class PicView(QMainWindow):
             self._pending_image_versions = self.pending_image_versions()
             self._pending_image_retries = {path: self._pending_image_retries[path] for path in self.thumbs.failed_paths}
             if selected in completed and (selected in changed or self._image_reload_retries or not self.image.frames):
-                if self.image.reload_preserving_view(): self._image_reload_retries = 0
+                if self.reload_current_image(): self._image_reload_retries = 0
                 else: self._image_reload_retries = max(0, self._image_reload_retries - 1)
             elif selected in retry_paths:
                 self._image_reload_retries = max(0, self._image_reload_retries - 1)
@@ -820,7 +1007,7 @@ class PicView(QMainWindow):
         if removed:
             selected = next((path for path in files if natural_key(path) > natural_key(previous)), files[0] if files else None)
         elif selected is None and files:
-            selected = files[0]
+            selected = self._restore_selected if self._restore_selected in files else files[0]
         thumbs = self.thumbs
         scroll_position = thumbs.scroll.verticalScrollBar().value()
         self.files = files
@@ -828,10 +1015,12 @@ class PicView(QMainWindow):
         thumbs.set_files(files, selected, emit_selection=reload_image)
         self._image_reload_retries = 0
         if selected == previous and selected in changed and not reload_image:
-            if not self.image.reload_preserving_view(): self._image_reload_retries = 8
+            if not self.reload_current_image(): self._image_reload_retries = 8
         self._pending_image_versions = self.pending_image_versions()
         self._pending_image_retries = {path: self._pending_image_retries.get(path, 8) for path in self.thumbs.failed_paths}
-        if not files: self.image.clear()
+        if not files:
+            self.image.clear()
+            self.update_empty_message()
         def restore_scroll():
             if self._closing or self.thumbs is not thumbs: return
             thumbs.scroll.verticalScrollBar().setValue(scroll_position)
@@ -840,42 +1029,748 @@ class PicView(QMainWindow):
         QTimer.singleShot(0, restore_scroll)
         if removed:
             key = "image_deleted" if selected else "image_deleted_empty"
-            self.notification_bar.showMessage(self.t[key].format(name=previous.name, next=selected.name if selected else ""), 8000)
+            self.notify(self.t[key].format(name=previous.name, next=selected.name if selected else ""))
+
     def set_orientation(self,o):
         if self.split.orientation()==o:return
-        sizes=self.split.sizes(); self.split.setOrientation(o); QTimer.singleShot(0,lambda:self.split.setSizes(sizes))
+        sizes=self.split.sizes(); self.split.setOrientation(o); QTimer.singleShot(0,self,lambda:self.split.setSizes(sizes))
+
     def maximize(self,which):
         if self.saved_sizes is None:
-            self.saved_sizes=self.split.sizes(); hide=self.image if which=="thumb" else self.thumbs; hide.hide(); b=self.thumbs.max_button if which=="thumb" else self.image.max_button; b.set_kind("shrink",self.t["restore"])
+            self._normal_scroll = {"thumbnail_scroll": self.thumbs.scroll.verticalScrollBar().value(), "image_scroll_x": self.image.scroll.horizontalScrollBar().value(), "image_scroll_y": self.image.scroll.verticalScrollBar().value()}
+            self.saved_sizes=self.split.sizes(); hide=self.image_slot if which=="thumb" else self.thumbs; hide.hide(); b=self.thumbs.max_button if which=="thumb" else self.image.max_button; b.set_kind("shrink",self.t["restore"])
         else:
-            self.thumbs.show(); self.image.show(); self.split.setSizes(self.saved_sizes); self.saved_sizes=None; self.thumbs.max_button.set_kind("expand",self.t["max"]); self.image.max_button.set_kind("expand",self.t["max"])
+            self.thumbs.show(); self.image_slot.show(); self.split.setSizes(self.saved_sizes); self.saved_sizes=None; self.thumbs.max_button.set_kind("expand",self.t["max"]); self.image.max_button.set_kind("expand",self.t["max"])
+            self._pending_scroll = self._normal_scroll
+            self._scroll_restore_attempts = 0
+            self._normal_scroll = None
+            self.scroll_restore_timer.start()
+
+    def select_relative(self, offset):
+        if not self.files: return
+        selected = self.thumbs.selected_path
+        index = self.files.index(selected) if selected in self.files else 0
+        self.thumbs.select(self.files[max(0, min(len(self.files) - 1, index + offset))])
+
+    def select_boundary(self, last):
+        if self.files: self.thumbs.select(self.files[-1 if last else 0])
+
+    def copy_selected_file(self):
+        path = self.thumbs.selected_path
+        if path is None or not path.is_file(): return
+        data = QMimeData()
+        data.setUrls([QUrl.fromLocalFile(str(path))])
+        QApplication.clipboard().setMimeData(data)
+
+
+
+class TabFolderControl(QCheckBox):
+    """Paint at native widget resolution, including on high-DPI displays."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.comparing = False
+        self.setFixedSize(28, 20)
+
+    def hitButton(self, pos):
+        return self.comparing and self.rect().contains(pos)
+
+    def mousePressEvent(self, event):
+        if not self.comparing:
+            event.ignore()
+            return
+        super().mousePressEvent(event)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(QColor(PALETTE["text"]), 1.25))
+        painter.save()
+        painter.translate(8, 0)
+        if self.comparing:
+            if self.isChecked():
+                painter.setBrush(QColor("#1677ff"))
+                painter.setPen(QPen(QColor("#1677ff"), 1))
+            painter.drawRoundedRect(QRectF(3.5, 3.5, 13, 13), 2, 2)
+            if self.isChecked():
+                painter.setPen(QPen(QColor("white"), 1.5))
+                painter.drawLine(QPoint(6, 10), QPoint(9, 13))
+                painter.drawLine(QPoint(9, 13), QPoint(14, 7))
+        else:
+            painter.drawPolyline([QPoint(3, 7), QPoint(3, 4), QPoint(8, 4), QPoint(10, 6), QPoint(17, 6), QPoint(17, 8)])
+            painter.drawPolyline([QPoint(3, 8), QPoint(18, 8), QPoint(15, 16), QPoint(2, 16), QPoint(3, 8)])
+        painter.restore()
+        if self.hasFocus():
+            painter.setPen(QPen(QColor("#1677ff"), 1, Qt.PenStyle.DotLine))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRect(self.rect().adjusted(0, 0, -1, -1))
+        painter.end()
+
+
+class ComparisonArea(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.pages = []
+        self.maximized_page = None
+        self.toolbar_image = None
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.header = QFrame()
+        self.header.setObjectName("card")
+        self.header_layout = QVBoxLayout(self.header)
+        self.header_layout.setContentsMargins(10, 6, 10, 6)
+        layout.addWidget(self.header)
+        self.empty = QLabel()
+        self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.split = QSplitter()
+        self.split.setChildrenCollapsible(False)
+        layout.addWidget(self.empty)
+        layout.addWidget(self.split, 1)
+
+    def release_toolbar(self):
+        image = self.toolbar_image
+        if image is not None:
+            image.layout().insertWidget(0, image.toolbar_widget)
+            image.toolbar_widget.setVisible(image.comparison_title is None)
+        self.toolbar_image = None
+
+    def select_toolbar(self, image):
+        if self.toolbar_image is not image:
+            self.release_toolbar()
+            self.toolbar_image = image
+            if image is not None: self.header_layout.addWidget(image.toolbar_widget)
+        self.header.setVisible(image is not None)
+        if image is not None: image.toolbar_widget.show()
+        for page in self.pages:
+            page.image.comparison_selected = page.image is image
+            page.image.update()
+
+    def set_layout_orientation(self, orientation):
+        self.split.setOrientation(Qt.Orientation.Horizontal if orientation == Qt.Orientation.Vertical else Qt.Orientation.Vertical)
+        self.equalize()
+
+    def equalize(self):
+        self.split.setSizes([1000] * len(self.pages))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.equalize()
+
+    def maximize_page(self, page):
+        self.maximized_page = None if self.maximized_page is page else page
+        for item in self.pages:
+            item.image.setVisible(self.maximized_page is None or item is self.maximized_page)
+        self.equalize()
+
+
+class TabCloseButton(QToolButton):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("tabCloseButton")
+        self.setFixedSize(20, 20)
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(QColor(PALETTE["text"] if self.underMouse() else PALETTE["muted"]), 1))
+        center = self.rect().center()
+        painter.drawLine(center + QPoint(-3, -3), center + QPoint(3, 3))
+        painter.drawLine(center + QPoint(-3, 3), center + QPoint(3, -3))
+        painter.end()
+
+
+class FolderTabBar(QTabBar):
+    def tabSizeHint(self, index):
+        size = super().tabSizeHint(index)
+        return QSize(min(200, max(150, size.width())), 36)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        order = [index for index in range(self.count()) if index != self.currentIndex()]
+        if self.currentIndex() >= 0: order.append(self.currentIndex())
+        for index in order:
+            option = QStyleOptionTab()
+            self.initStyleOption(option, index)
+            selected = index == self.currentIndex()
+            if selected:
+                painter.fillRect(option.rect, QColor(PALETTE["card"]))
+                painter.fillRect(option.rect.left(), option.rect.bottom() - 1, option.rect.width(), 2, QColor("#1677ff"))
+            elif option.state & QStyle.StateFlag.State_MouseOver:
+                painter.fillRect(option.rect, QColor(PALETTE["pane"]))
+            font = self.font()
+            font.setBold(False)
+            painter.setFont(font)
+            painter.setPen(QColor(PALETTE["text"] if selected else PALETTE["muted"]))
+            rect = option.rect.adjusted(12, 0, -30, -2)
+            control = self.tabButton(index, QTabBar.ButtonPosition.LeftSide)
+            if control is not None and not control.isHidden():
+                rect.setLeft(max(rect.left(), control.geometry().right() + 8))
+            text = painter.fontMetrics().elidedText(option.text, Qt.TextElideMode.ElideRight, max(0, rect.width()))
+            painter.drawText(rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, text)
+        separator = QColor(PALETTE["edge"])
+        separator.setAlpha(90)
+        painter.setPen(QPen(separator, 1))
+        for index in range(self.count() - 1):
+            rect = self.tabRect(index)
+            painter.drawLine(rect.right(), rect.top() + 3, rect.right(), rect.bottom() - 3)
+        painter.end()
+
+
+class FolderTabs(QWidget):
+    """A compact tab strip with the add button directly after the last tab."""
+    currentChanged = Signal(int)
+    tabCloseRequested = Signal(int)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self.strip = QFrame()
+        self.strip.setObjectName("tabStrip")
+        self.header = QHBoxLayout(self.strip)
+        self.header.setContentsMargins(4, 0, 4, 0)
+        self.header.setSpacing(4)
+        self.bar = FolderTabBar()
+        self._closable = True
+        self.bar.setExpanding(False)
+        self.bar.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.header.addWidget(self.bar)
+        self.header.addStretch(1)
+        self.stack = QStackedWidget()
+        layout.addWidget(self.strip)
+        layout.addWidget(self.stack, 1)
+        self.bar.currentChanged.connect(self.select_index)
+        self.bar.tabMoved.connect(lambda *_: self.stack.setCurrentWidget(self.currentWidget()))
+
+    def tabBar(self): return self.bar
+    def count(self): return self.bar.count()
+    def currentIndex(self): return self.bar.currentIndex()
+    def widget(self, index): return self.bar.tabData(index) if 0 <= index < self.count() else None
+    def currentWidget(self): return self.widget(self.currentIndex())
+    def indexOf(self, widget): return next((index for index in range(self.count()) if self.widget(index) is widget), -1)
+    def setCurrentIndex(self, index): self.bar.setCurrentIndex(index)
+    def setCurrentWidget(self, widget): self.setCurrentIndex(self.indexOf(widget))
+    def setTabsClosable(self, closable):
+        self._closable = bool(closable)
+        for index in range(self.count()):
+            self.bar.tabButton(index, QTabBar.ButtonPosition.RightSide).setVisible(self._closable)
+    def setMovable(self, movable): self.bar.setMovable(movable)
+    def setDocumentMode(self, mode): self.bar.setDocumentMode(mode)
+    def setUsesScrollButtons(self, enabled): self.bar.setUsesScrollButtons(enabled)
+    def setElideMode(self, mode): self.bar.setElideMode(mode)
+    def setTabText(self, index, text): self.bar.setTabText(index, text)
+    def setTabIcon(self, index, icon): self.bar.setTabIcon(index, icon)
+    def tabText(self, index): return self.bar.tabText(index)
+    def setTabToolTip(self, index, text): self.bar.setTabToolTip(index, text)
+    def tabToolTip(self, index): return self.bar.tabToolTip(index)
+
+    def setCornerWidget(self, widget):
+        self.header.insertWidget(1, widget)
+
+    def addTab(self, page, title):
+        first = not self.count()
+        self.stack.addWidget(page)
+        self.bar.blockSignals(True)
+        index = self.bar.addTab(title)
+        self.bar.setTabData(index, page)
+        button = TabCloseButton(self.bar)
+        button.setVisible(self._closable)
+        button.clicked.connect(lambda: self.tabCloseRequested.emit(self.indexOf(page)))
+        self.bar.setTabButton(index, QTabBar.ButtonPosition.RightSide, button)
+        self.bar.blockSignals(False)
+        if first: self.select_index(index)
+        return index
+
+    def select_index(self, index):
+        page = self.widget(index)
+        if page is not None: self.stack.setCurrentWidget(page)
+        self.currentChanged.emit(index)
+
+    def removeTab(self, index):
+        page = self.widget(index)
+        self.bar.blockSignals(True)
+        self.bar.removeTab(index)
+        self.bar.blockSignals(False)
+        if page is not None: self.stack.removeWidget(page)
+        self.select_index(self.currentIndex())
+
+
+class PicView(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.settings = load_settings()
+        self.language_mode = self.settings.get("language", "system")
+        if self.language_mode not in LANGUAGE_MODES: self.language_mode = "system"
+        self.lang = resolve_language(self.language_mode)
+        self.t = TEXT[self.lang]
+        self._closing = False
+        self._previous_tab = None
+        self.compare_enabled = False
+        self.checked_pages = set()
+        self.focused_compare_page = None
+        app = QApplication.instance()
+        self.system_palette = QPalette(app.palette())
+        self.theme_mode = self.settings.get("theme", "system")
+        if self.theme_mode not in ("system", "light", "dark"): self.theme_mode = "system"
+        self._applying_theme = False
+        if self.theme_mode != "system": app.setPalette(themed_palette(self.system_palette, self.theme_mode))
+        use_system_palette(app)
+        self.setMinimumSize(720, 500)
+        self.resize(1100, 780)
+        self.setAcceptDrops(True)
+        self.notification_bar = self.statusBar()
+        self.notification_bar.hide()
+        self.notification_bar.messageChanged.connect(lambda message: self.notification_bar.setVisible(bool(message)))
+        self.build()
+        self.setup_shortcuts()
+        self.restore()
+
+    def current_tab(self):
+        return self.tabs.currentWidget()
+
+    def pages(self):
+        return [self.tabs.widget(index) for index in range(self.tabs.count())]
+
+    def build(self):
+        root = QWidget()
+        root.setObjectName("root")
+        self.setCentralWidget(root)
+        outer = QVBoxLayout(root)
+        outer.setContentsMargins(8, 8, 8, 8)
+        outer.setSpacing(8)
+        tool = QFrame()
+        tool.setObjectName("toolbar")
+        tool.setFixedHeight(42)
+        layout = QHBoxLayout(tool)
+        layout.setContentsMargins(8, 6, 8, 6)
+        self.open_button = IconButton("folder", self.t["open"])
+        self.vertical_button = IconButton("split-h", self.t["vertical"])
+        self.horizontal_button = IconButton("split-v", self.t["horizontal"])
+        self.compare_button = IconButton("compare", self.t["compare"])
+        self.compare_button.setCheckable(True)
+        self.compare_button.toggled.connect(self.set_compare)
+        self.language_button = IconButton(LANGUAGE_ICONS[self.language_mode], self.t[f"lang_{self.language_mode}"])
+        self.theme_button = IconButton(f"theme-{self.theme_mode}", self.t[f"theme_{self.theme_mode}"])
+        for button, action in ((self.open_button, self.choose), (self.vertical_button, lambda: self.set_orientation(Qt.Orientation.Vertical)),
+                               (self.horizontal_button, lambda: self.set_orientation(Qt.Orientation.Horizontal)),
+                               (self.compare_button, lambda: None),
+                               (self.language_button, self.toggle_lang), (self.theme_button, self.toggle_theme)):
+            if button in (self.vertical_button, self.compare_button, self.language_button): separate_tools(layout)
+            button.clicked.connect(action)
+            layout.addWidget(button)
+        layout.addStretch()
+        outer.addWidget(tool)
+        self.tabs = FolderTabs()
+        self.tabs.setTabsClosable(True)
+        self.tabs.setMovable(True)
+        self.tabs.setDocumentMode(True)
+        self.tabs.setUsesScrollButtons(True)
+        self.tabs.setElideMode(Qt.TextElideMode.ElideRight)
+        self.tabs.currentChanged.connect(self.tab_changed)
+        self.tabs.tabCloseRequested.connect(self.close_tab)
+        self.tabs.tabBar().tabMoved.connect(self.tabs_reordered)
+        self.comparison_area = ComparisonArea(root)
+        self.comparison_area.hide()
+        self.add_tab_button = QToolButton()
+        self.add_tab_button.setObjectName("addTabButton")
+        self.add_tab_button.setText("+")
+        self.add_tab_button.setFixedSize(30, 30)
+        self.add_tab_button.setToolTip(self.t["new_tab"])
+        self.add_tab_button.clicked.connect(self.choose)
+        self.tabs.setCornerWidget(self.add_tab_button)
+        outer.addWidget(self.tabs)
+        self.apply_styles()
+
+    def apply_styles(self):
+        strip = PALETTE["surface"]
+        hover = PALETTE["pane"]
+        self.setStyleSheet(f"""
+            #root{{background:{PALETTE['surface']};}}
+            #toolbar{{background:transparent;border:0;}}
+            #card{{background:{PALETTE['card']};border:0;border-radius:12px;}}
+            QLabel{{color:{PALETTE['text']};}}
+            QSlider::groove:horizontal{{height:5px;background:{PALETTE['edge']};border-radius:2px}}
+            QSlider::handle:horizontal{{background:{PALETTE['accent']};width:15px;margin:-5px 0;border-radius:7px}}
+            QScrollBar{{background:{PALETTE['surface']};border:0;margin:0;}}
+            QScrollBar:vertical{{width:12px;}}
+            QScrollBar:horizontal{{height:12px;}}
+            QScrollBar::handle{{background:{PALETTE['edge']};border-radius:6px;}}
+            QScrollBar::handle:vertical{{min-height:25px;}}
+            QScrollBar::handle:horizontal{{min-width:25px;}}
+            QScrollBar::add-page,QScrollBar::sub-page{{background:{PALETTE['surface']};}}
+            QScrollBar::add-line,QScrollBar::sub-line{{width:0;height:0;border:0;background:none;}}
+            QScrollArea::corner{{background:{PALETTE['surface']};}}
+            #tabStrip{{background:{strip};border:0;}}
+            QTabBar{{background:transparent;}}
+            QTabBar::tab{{background:transparent;color:{PALETTE['muted']};border:0;padding:0 12px;margin:0;}}
+            QTabBar::tab:selected{{background:{PALETTE['card']};color:{PALETTE['text']};}}
+            QTabBar::tab:!selected:hover{{background:{hover};}}
+            QTabBar QToolButton{{background:{strip};color:{PALETTE['text']};border:0;border-radius:4px;}}
+            QTabBar QToolButton:hover{{background:{hover};}}
+            #addTabButton{{background:transparent;color:{PALETTE['text']};border:0;border-radius:5px;font-size:20px;}}
+            #addTabButton:hover,#tabCloseButton:hover{{background:{hover};}}
+            #tabCloseButton{{background:transparent;border:0;border-radius:4px;}}
+        """)
+    def add_page(self):
+        page = FolderTab(self.t)
+        page.notification.connect(lambda message, tab=page: self.show_notification(tab, message))
+        page.attentionChanged.connect(self.update_tab_titles)
+        self.tabs.addTab(page, self.t["empty_tab"])
+        control = TabFolderControl(self.tabs.tabBar())
+        control.toggled.connect(lambda checked, tab=page: self.check_compare_page(tab, checked))
+        self.tabs.tabBar().setTabButton(self.tabs.indexOf(page), QTabBar.ButtonPosition.LeftSide, control)
+        page.image.interacted.connect(lambda tab=page: self.focus_compare_page(tab))
+        button = self.tabs.tabBar().tabButton(self.tabs.indexOf(page), QTabBar.ButtonPosition.RightSide)
+        button.setToolTip(self.t["close_tab"])
+        button.setAccessibleName(self.t["close_tab"])
+        return page
+
+    def open_folder(self, folder, selected=None, *, state=None, restoring=False):
+        folder = Path(folder).resolve()
+        if not restoring and not folder.is_dir():
+            self.notification_bar.showMessage(self.t["folder_missing"] + ": " + str(folder), 8000)
+            return None
+        for page in self.pages():
+            if page.folder == folder:
+                self.tabs.setCurrentWidget(page)
+                page.refresh_folder()
+                if selected in page.files: page.thumbs.select(selected)
+                return page
+        page = next((tab for tab in self.pages() if tab.folder is None), None)
+        if page is None: page = self.add_page()
+        page.open_folder(folder, selected, state)
+        if not restoring: self.tabs.setCurrentWidget(page)
+        if page is self.current_tab(): page.set_active(True)
+        self.update_tab_titles()
+        self.update_title()
+        if self.compare_enabled: self.sync_comparison()
+        return page
+
+    def choose(self):
+        folder = QFileDialog.getExistingDirectory(self, self.t["open"], str(self.folder) if self.folder else "")
+        if folder: self.open_folder(Path(folder))
+
+    def tab_changed(self, index):
+        page = self.tabs.widget(index) if index >= 0 else None
+        if self._previous_tab is not None and self._previous_tab is not page:
+            self._previous_tab.set_active(False)
+        self._previous_tab = page
+        self.notification_bar.clearMessage()
+        if page is not None:
+            page.set_active(True)
+            if page.pending_notification:
+                message = page.pending_notification
+                page.pending_notification = ""
+                self.notification_bar.showMessage(message, 8000)
+        self.update_tab_titles()
+        self.update_title()
+        if self.compare_enabled: self.sync_comparison()
+
+    def close_tab(self, index=None):
+        if index is None: index = self.tabs.currentIndex()
+        if index < 0 or index >= self.tabs.count(): return
+        page = self.tabs.widget(index)
+        self.checked_pages.discard(page)
+        if self.compare_enabled: self.sync_comparison()
+        if self.comparison_area.parentWidget() is page.image_slot:
+            self.comparison_area.setParent(self.centralWidget())
+            self.comparison_area.hide()
+        page.shutdown()
+        self.tabs.removeTab(index)
+        page.deleteLater()
+        if not self.tabs.count(): self.add_page()
+        self.update_tab_titles()
+
+    def switch_tab(self, offset):
+        self.tabs.setCurrentIndex((self.tabs.currentIndex() + offset) % self.tabs.count())
+
+    def update_title(self):
+        page = self.current_tab()
+        folder = page.folder if page is not None else None
+        self.setWindowTitle(f"PicView v{__version__}" + (f" — {folder}" if folder else ""))
+
+    def update_tab_titles(self):
+        pages = self.pages()
+        names = [(page.folder.name or str(page.folder)) if page.folder else self.t["empty_tab"] for page in pages]
+        for index, page in enumerate(pages):
+            name = names[index]
+            if page.folder and sum(item.casefold() == name.casefold() for item in names) > 1:
+                name += " — " + str(page.folder.parent)
+            if page.pending_notification: name = "● " + name
+            self.tabs.setTabText(index, name)
+            control = self.tabs.bar.tabButton(index, QTabBar.ButtonPosition.LeftSide)
+            if control is not None:
+                control.comparing = self.compare_enabled
+                control.blockSignals(True)
+                control.setChecked(page in self.checked_pages)
+                control.blockSignals(False)
+                control.setVisible(page.folder is not None)
+                control.setFocusPolicy(Qt.FocusPolicy.StrongFocus if self.compare_enabled else Qt.FocusPolicy.NoFocus)
+                control.setToolTip(self.t["compare_folder"] if self.compare_enabled else self.t["open"])
+                control.setAccessibleName(control.toolTip())
+                control.update()
+            self.tabs.setTabToolTip(index, str(page.folder) if page.folder else self.t["empty"])
+
+    def tabs_reordered(self, *_):
+        self.update_tab_titles()
+        if self.compare_enabled: self.sync_comparison()
+
+    def focus_compare_page(self, page):
+        if page in self.checked_pages:
+            self.focused_compare_page = page
+            self.comparison_area.select_toolbar(page.image)
+
+    def set_compare(self, enabled):
+        if enabled:
+            for page in self.pages():
+                if page.saved_sizes is not None: page.maximize("image")
+        self.compare_enabled = enabled
+        self.compare_button.blockSignals(True)
+        self.compare_button.setChecked(enabled)
+        self.compare_button.blockSignals(False)
+        self.checked_pages = {self.current_tab()} if enabled and self.current_tab() and self.current_tab().folder else set()
+        self.focused_compare_page = None
+        self.sync_comparison()
+        self.update_tab_titles()
+
+    def check_compare_page(self, page, checked):
+        if not self.compare_enabled: return
+        if checked: self.checked_pages.add(page)
+        else: self.checked_pages.discard(page)
+        self.sync_comparison()
+
+    def sync_comparison(self):
+        area = self.comparison_area
+        area.release_toolbar()
+        pages = self.pages()
+        chosen = [page for page in pages if page in self.checked_pages] if self.compare_enabled else []
+        # Return panes to their owners before moving the shared comparison area.
+        area.hide()
+        area.setParent(self.centralWidget())
+        for page in pages:
+            if page.image.parentWidget() is not page.image_slot:
+                page.image_slot.layout().addWidget(page.image)
+            page.image.show()
+            visible = page in chosen
+            page.image.set_comparison_mode((page.folder.name or str(page.folder)) if visible else None)
+            if page.comparison_visible != visible: page.set_comparison_visible(visible)
+        area.pages = chosen
+        area.maximized_page = None
+        if self.compare_enabled and self.current_tab() is not None:
+            host = self.current_tab()
+            host.image.hide()
+            host.image_slot.layout().addWidget(area)
+            area.set_layout_orientation(host.split.orientation())
+            for page in chosen:
+                area.split.addWidget(page.image)
+                page.image.show()
+            for index in range(1, area.split.count()): area.split.handle(index).setEnabled(False)
+            area.empty.setText(self.t["compare_empty"])
+            area.empty.setVisible(not chosen)
+            area.split.setVisible(bool(chosen))
+            if self.focused_compare_page not in chosen:
+                self.focused_compare_page = host if host in chosen else (chosen[0] if chosen else None)
+            area.select_toolbar(self.image_target())
+            area.show()
+            area.equalize()
+            QTimer.singleShot(0, area, area.equalize)
+
+    def image_target(self):
+        if self.compare_enabled:
+            page = self.focused_compare_page
+            if page not in self.checked_pages:
+                page = next((item for item in self.pages() if item in self.checked_pages), None)
+            return page.image if page else None
+        return self.image
+
+    def image_action(self, action, *args):
+        image = self.image_target()
+        if image is not None: getattr(image, action)(*args)
+
+    def advance_or_check(self):
+        focus = QApplication.focusWidget()
+        if isinstance(focus, TabFolderControl) and focus.comparing: focus.toggle()
+        else: self.current_tab().select_relative(1)
+
+    def show_notification(self, page, message):
+        if page is self.current_tab(): self.notification_bar.showMessage(message, 8000)
+
+    def setup_shortcuts(self):
+        bindings = [(QKeySequence.StandardKey.Open, self.choose), (QKeySequence.StandardKey.AddTab, self.choose),
+                    (QKeySequence.StandardKey.Close, lambda: self.close_tab()),
+                    (QKeySequence.StandardKey.NextChild, lambda: self.switch_tab(1)),
+                    (QKeySequence.StandardKey.PreviousChild, lambda: self.switch_tab(-1)),
+                    (QKeySequence.StandardKey.Copy, lambda: self.current_tab().copy_selected_file()),
+                    ("Left", lambda: self.current_tab().select_relative(-1)), ("Right", lambda: self.current_tab().select_relative(1)),
+                    ("Home", lambda: self.current_tab().select_boundary(False)), ("End", lambda: self.current_tab().select_boundary(True)),
+                    ("PgUp", lambda: self.current_tab().select_relative(-1)), ("PgDown", lambda: self.current_tab().select_relative(1)),
+                    ("Space", self.advance_or_check), ("Backspace", lambda: self.current_tab().select_relative(-1)),
+                    ("+", lambda: self.image_action("adjust_zoom", 10)), ("=", lambda: self.image_action("adjust_zoom", 10)),
+                    ("-", lambda: self.image_action("adjust_zoom", -10)), ("0", lambda: self.image_action("reset_zoom")), ("F11", lambda: self.image_action("open_full"))]
+        self.shortcuts = []
+        for keys, action in bindings:
+            shortcut = QShortcut(QKeySequence(keys), self)
+            shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+            shortcut.activated.connect(action)
+            self.shortcuts.append(shortcut)
+
+    def set_orientation(self, orientation):
+        self.current_tab().set_orientation(orientation)
+        if self.compare_enabled:
+            self.comparison_area.set_layout_orientation(orientation)
+
+    def rebuild_ui(self):
+        self.open_button.setToolTip(self.t["open"])
+        self.vertical_button.setToolTip(self.t["vertical"])
+        self.horizontal_button.setToolTip(self.t["horizontal"])
+        self.compare_button.setToolTip(self.t["compare"])
+        self.compare_button.refresh_icon()
+        self.comparison_area.empty.setText(self.t["compare_empty"])
+        self.language_button.set_kind(LANGUAGE_ICONS[self.language_mode], self.t[f"lang_{self.language_mode}"])
+        self.language_button.setAccessibleName(self.language_button.toolTip())
+        self.theme_button.set_kind(f"theme-{self.theme_mode}", self.t[f"theme_{self.theme_mode}"])
+        self.add_tab_button.setToolTip(self.t["new_tab"])
+        self.apply_styles()
+        for page in self.pages(): page.restyle(self.t)
+        if self.compare_enabled:
+            for button in self.comparison_area.header.findChildren(IconButton): button.refresh_icon()
+            self.comparison_area.select_toolbar(self.image_target())
+        for index in range(self.tabs.count()):
+            button = self.tabs.tabBar().tabButton(index, QTabBar.ButtonPosition.RightSide)
+            button.setToolTip(self.t["close_tab"])
+            button.setAccessibleName(self.t["close_tab"])
+            button.update()
+        for button in (self.open_button, self.vertical_button, self.horizontal_button): button.refresh_icon()
+        self.update_tab_titles()
+
+    def restore(self):
+        states = self.settings.get("tabs", [])
+        if not states:
+            legacy = normalize_tab_state(self.settings)
+            states = [legacy] if legacy else []
+        for state in states:
+            selected = Path(state["selected_file"]) if state["selected_file"] else None
+            self.open_folder(Path(state["folder"]), selected, state=state, restoring=True)
+        if not self.tabs.count(): self.add_page()
+        self.tabs.setCurrentIndex(min(self.settings.get("active_tab", 0), self.tabs.count() - 1))
+        self.current_tab().set_active(True)
+        self.update_title()
+
+    def dragEnterEvent(self, event):
+        if event.source() is self:
+            event.ignore()
+            return
+        if event.mimeData().hasUrls(): event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        if event.source() is self:
+            event.ignore()
+            return
+        for url in event.mimeData().urls():
+            if not url.isLocalFile(): continue
+            path = Path(url.toLocalFile())
+            if path.is_dir(): self.open_folder(path)
+            elif path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES: self.open_folder(path.parent, path)
+
+    def closeEvent(self, event):
+        self._closing = True
+        if self.compare_enabled: self.set_compare(False)
+        pages = self.pages()
+        states = [page.snapshot() for page in pages if page.folder is not None]
+        current = self.current_tab()
+        active = sum(page.folder is not None for page in pages[:self.tabs.currentIndex()]) if current and current.folder else 0
+        values = current.snapshot() if current is not None else {}
+        values.update(tabs=states, active_tab=active, language=self.language_mode, theme=self.theme_mode, maximized_pane="")
+        save_settings(values)
+        for page in pages: page.shutdown()
+        event.accept()
+
+    def toggle_theme(self):
+        modes=("system","light","dark")
+        self.theme_mode=modes[(modes.index(self.theme_mode)+1)%len(modes)]
+        self.settings["theme"]=self.theme_mode
+        app=QApplication.instance()
+        self._applying_theme=True
+        try: app.setPalette(themed_palette(self.system_palette,self.theme_mode))
+        finally: self._applying_theme=False
+        use_system_palette(app)
+        self.rebuild_ui()
+
+    def refresh_system_theme(self, _palette=None) -> None:
+        if self._applying_theme or self.theme_mode != "system": return
+        self.system_palette=QPalette(QApplication.instance().palette())
+        use_system_palette(QApplication.instance())
+        self.rebuild_ui()
+
     def toggle_lang(self):
         self.language_mode = LANGUAGE_MODES[(LANGUAGE_MODES.index(self.language_mode) + 1) % len(LANGUAGE_MODES)]
         self.settings["language"] = self.language_mode
         self.lang = resolve_language(self.language_mode)
         self.t = TEXT[self.lang]
         self.rebuild_ui()
-    def dragEnterEvent(self,e):
-        if e.source() is self:
-            e.ignore()
-            return
-        if e.mimeData().hasUrls(): e.acceptProposedAction()
-    def dropEvent(self,e):
-        if e.source() is self:
-            e.ignore()
-            return
-        path=Path(e.mimeData().urls()[0].toLocalFile()); self.open_folder(path if path.is_dir() else path.parent,path if path.is_file() else None)
-    def restore(self):
-        f=Path(self.settings["folder"]) if self.settings.get("folder") else None
-        if f and f.is_dir(): self.open_folder(f,Path(self.settings.get("selected_file","")))
-        QTimer.singleShot(0,lambda:self.split.setSizes([max(100,int(self.height()*float(self.settings.get("sash_fraction",.45)))),max(100,int(self.height()*(1-float(self.settings.get("sash_fraction",.45)))))]))
-    def closeEvent(self,e):
-        self._closing = True
-        self.folder_refresh_timer.stop()
-        self.folder_poll_timer.stop()
-        watched = self.folder_watcher.directories() + self.folder_watcher.files()
-        if watched: self.folder_watcher.removePaths(watched)
-        sizes=self.split.sizes(); fraction=sizes[0]/sum(sizes) if len(sizes)==2 and sum(sizes) else .45; save_settings({"folder":str(self.folder) if self.folder else "","selected_file":str(self.thumbs.selected_path) if getattr(self.thumbs,"selected_path",None) else "","orientation":"vertical" if self.split.orientation()==Qt.Orientation.Vertical else "horizontal","sash_fraction":fraction,"maximized_pane":"","thumbnail_size":self.thumbs.size,"image_zoom":self.image.zoom,"language":self.language_mode,"theme":self.theme_mode}); e.accept()
+
+
+    @property
+    def folder(self):
+        return self.current_tab().folder
+
+    @property
+    def files(self):
+        return self.current_tab().files
+
+    @property
+    def thumbs(self):
+        return self.current_tab().thumbs
+
+    @property
+    def image(self):
+        return self.current_tab().image
+
+    @property
+    def split(self):
+        return self.current_tab().split
+
+    @property
+    def saved_sizes(self):
+        return self.current_tab().saved_sizes
+
+    @property
+    def folder_watcher(self):
+        return self.current_tab().folder_watcher
+
+    @property
+    def folder_refresh_timer(self):
+        return self.current_tab().folder_refresh_timer
+
+    @property
+    def folder_poll_timer(self):
+        return self.current_tab().folder_poll_timer
+
+    def refresh_folder(self, *args):
+        return self.current_tab().refresh_folder(*args)
+
+    def schedule_folder_refresh(self, *args):
+        return self.current_tab().schedule_folder_refresh(*args)
+
+    def schedule_image_refresh(self, *args):
+        return self.current_tab().schedule_image_refresh(*args)
+
+    def pending_image_versions(self, *args):
+        return self.current_tab().pending_image_versions(*args)
+
+    def maximize(self, *args):
+        return self.current_tab().maximize(*args)
+
+    def select_relative(self, *args):
+        return self.current_tab().select_relative(*args)
+
+    def select_boundary(self, *args):
+        return self.current_tab().select_boundary(*args)
+
+    def copy_selected_file(self, *args):
+        return self.current_tab().copy_selected_file(*args)
 
 
 def main():

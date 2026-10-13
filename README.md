@@ -55,13 +55,29 @@ uv run picview
 
 ### Open images
 
-- The window title shows the current version (for example, **PicView v0.0.3**).
+- The window title shows the current version (for example, **PicView v0.0.4**).
 - Click **Open folder**, or drop a folder or image file onto the window.
 - Drag a thumbnail or its filename to send the original image file to another application that accepts file drops.
 - Rotation and mirror controls only affect the current view; image files are never modified.
 - The language button cycles through **Follow system → Chinese (中) → English (En)**. The system icon shows smaller Chinese and English glyphs separated by a diagonal line. It follows the system by default, using Chinese for Chinese locales and English otherwise, and remembers the mode across restarts.
 - The current folder is monitored automatically. New images appear in the thumbnail pane without resetting the current view. If the viewed image is deleted, a notification appears at the bottom and the next image is selected; deleting the last image wraps to the first, and an empty folder clears the image pane.
 - Modified files automatically refresh their thumbnails and the current image, including full screen, while preserving zoom, rotation, mirroring, and scroll position. The last complete image remains visible while a file is still being written.
+
+### Multiple folder tabs
+
+- **Open folder** or **＋** opens a folder in a new tab. Dropping multiple folders opens each one; reopening a folder switches to its existing tab.
+- Drag tabs to reorder them and use their close buttons to close them. Closing the last tab leaves an empty tab.
+- Each tab keeps its own selection, zoom, rotation, mirroring, scroll positions, thumbnail size, and pane layout. Language and theme are shared.
+- All tabs continue monitoring files; background animations pause. A **●** marks a background deletion notification, which appears when switching back.
+- Restarting restores all tabs, their order, and the active tab. Missing folders keep their tabs and resume monitoring when they return.
+- Use the platform's New Tab, Close, Next Tab, and Previous Tab shortcuts; common Windows bindings are `Ctrl+T`, `Ctrl+W`, `Ctrl+Tab`, and `Ctrl+Shift+Tab`.
+
+### Compare images across folders
+
+- Enable **Compare images** to replace tab folder icons with checkboxes. The current folder is checked initially.
+- Check folders to divide the image area equally in tab order: side by side when thumbnails are above the images, and stacked when thumbnails are beside the images. Switch tabs to select each folder's own image from its thumbnails.
+- Comparison panes share one toolbar above the images. Click an image pane to select it, indicated by a blue border. Each pane keeps independent zoom, rotation, mirroring, and scrolling. Visible background images continue updating when files change.
+- Disable comparison to return to normal viewing, keeping each folder's selection and image adjustments.
 
 ### Zoom and thumbnail size
 
