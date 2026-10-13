@@ -125,3 +125,23 @@ def test_shared_toolbar_targets_clicked_pane_and_restores(browser):
     for page in (first, second):
         assert page.image.toolbar_widget.parentWidget() is page.image
         assert not page.image.toolbar_widget.isHidden()
+
+
+def test_duplicate_same_folder_compares_independent_images_and_watches(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    window.set_compare(True)
+    second = window.duplicate_page(first)
+    assert window.checked_pages == {first, second}
+    assert window.comparison_area.pages == [first, second]
+    second.thumbs.select(second.files[1])
+    second.image.rotate()
+    assert first.image.path == first.files[0] and first.image.rotation == 0
+    assert second.image.path == second.files[1] and second.image.rotation == 90
+    second.thumbs.select(second.files[0])
+    path = first.image.path
+    Image.new("RGB", (180, 90), "blue").save(path)
+    wait_until(lambda: all(page.image.frames[0][0].size == (180, 90) for page in (first, second)))
+    path.unlink()
+    wait_until(lambda: all(page.image.path != path for page in (first, second)))
+    assert first.image.path == second.image.path

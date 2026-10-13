@@ -55,7 +55,7 @@ uv run picview
 
 ### Open images
 
-- The window title shows the current version (for example, **PicView v0.0.4**).
+- The window title shows the current version (for example, **PicView v0.0.5**).
 - Click **Open folder**, or drop a folder or image file onto the window.
 - Drag a thumbnail or its filename to send the original image file to another application that accepts file drops.
 - Rotation and mirror controls only affect the current view; image files are never modified.
@@ -65,7 +65,8 @@ uv run picview
 
 ### Multiple folder tabs
 
-- **Open folder** or **＋** opens a folder in a new tab. Dropping multiple folders opens each one; reopening a folder switches to its existing tab.
+- **Open folder** or **＋** opens a folder in a new tab. Dropping multiple folders opens each one. The same folder can be opened in multiple tabs with independent image selections, allowing comparison of images within one folder.
+- Right-click a tab and choose **Duplicate tab** to create a copy beside it, preserving its selection and view settings. In comparison mode, duplicating a checked tab also adds the copy to comparison.
 - Drag tabs to reorder them and use their close buttons to close them. Closing the last tab leaves an empty tab.
 - Each tab keeps its own selection, zoom, rotation, mirroring, scroll positions, thumbnail size, and pane layout. Language and theme are shared.
 - All tabs continue monitoring files; background animations pause. A **●** marks a background deletion notification, which appears when switching back.

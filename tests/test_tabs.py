@@ -8,7 +8,7 @@ from PIL import Image
 from PySide6.QtCore import QMimeData, QPoint, QUrl, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QFileDialog, QTabBar
+from PySide6.QtWidgets import QApplication, QFileDialog, QMenu, QTabBar
 
 from picview.qt_app import FolderTab, PicView
 from picview.settings import load_settings, save_settings
@@ -40,7 +40,7 @@ def browser(tmp_path, monkeypatch):
     app.processEvents()
 
 
-def test_new_tabs_and_duplicate_folder_reuse(browser):
+def test_new_tabs_allow_duplicate_folders(browser):
     window, folders = browser
     assert window.tabs.count() == 1 and window.folder is None
     first = window.open_folder(folders[0])
@@ -49,8 +49,11 @@ def test_new_tabs_and_duplicate_folder_reuse(browser):
     first.image.rotate()
     second = window.open_folder(folders[1])
     assert window.tabs.count() == 2 and window.current_tab() is second
-    assert window.open_folder(folders[0] / ".") is first
-    assert window.tabs.count() == 2 and first.image.rotation == 90
+    third = window.open_folder(folders[0] / ".")
+    assert third is not first and third.folder == first.folder
+    assert window.tabs.count() == 3 and first.image.rotation == 90
+    assert third.image.rotation == 0
+    assert window.tabs.tabText(0) != window.tabs.tabText(2)
 
 
 def test_folder_dialog_cancel_does_not_create_tab(browser, monkeypatch):
@@ -306,14 +309,16 @@ def test_restore_scroll_split_ratio_and_normal_panes(browser):
         restored.deleteLater()
 
 
-def test_reopening_existing_tab_selects_newly_added_image(browser):
+def test_opening_same_folder_with_new_image_creates_independent_tab(browser):
     window, folders = browser
     first = window.open_folder(folders[0])
     window.open_folder(folders[1])
     added = folders[0] / "new.png"
     Image.new("RGB", (120, 80), "blue").save(added)
-    assert window.open_folder(folders[0], added) is first
-    assert first.image.path == added and first.thumbs.selected_path == added
+    opened = window.open_folder(folders[0], added)
+    assert opened is not first
+    assert opened.image.path == added and opened.thumbs.selected_path == added
+    assert first.thumbs.selected_path != added
 
 
 def test_foreground_deletion_supersedes_old_background_notice(browser):
@@ -352,3 +357,77 @@ def test_close_buttons_keep_page_identity_after_reorder(browser):
     assert first._closing
     bar.tabButton(window.tabs.indexOf(third), QTabBar.ButtonPosition.RightSide).click()
     assert window.current_tab() is second and window.tabs.stack.currentWidget() is second
+
+
+def test_duplicate_tab_preserves_view_and_is_independent(browser):
+    window, folders = browser
+    source = window.open_folder(folders[0])
+    source.thumbs.select(source.files[1])
+    source.image.rotate()
+    source.image.mirror_h()
+    source.image.slider.setValue(1500)
+    source.thumbs.slider.setValue(180)
+    window.set_orientation(Qt.Orientation.Horizontal)
+    window.open_folder(folders[1])
+    copied = window.duplicate_page(source)
+    QTest.qWait(100)
+    assert window.pages()[1] is copied and window.current_tab() is copied
+    assert copied.folder == source.folder and copied.image.path == source.image.path
+    assert copied.image.rotation == 90 and copied.image.fh
+    assert copied.image.zoom == source.image.zoom == 1.5
+    assert copied.thumbs.size == 180
+    assert copied.split.orientation() == Qt.Orientation.Horizontal
+    assert window.tabs.tabText(0) == "one (1)"
+    assert window.tabs.tabText(1) == "one (2)"
+    copied.thumbs.select(copied.files[0])
+    copied.image.rotate()
+    assert source.image.path == source.files[1]
+    assert source.image.rotation == 90
+    window.close_tab(window.tabs.indexOf(copied))
+    assert not source._closing and source.folder_poll_timer.isActive()
+
+
+def test_duplicate_folder_tabs_restore_separate_images(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.duplicate_page(first)
+    second.thumbs.select(second.files[1])
+    second.image.rotate()
+    window.close()
+    restored = PicView()
+    restored.show()
+    try:
+        assert restored.tabs.count() == 2
+        assert restored.pages()[0].folder == restored.pages()[1].folder
+        assert restored.current_tab().image.path.name == "image1.png"
+        assert restored.current_tab().image.rotation == 90
+        restored.tabs.setCurrentIndex(0)
+        assert restored.image.path.name == "image0.png"
+        assert restored.image.rotation == 0
+    finally:
+        restored.close()
+        restored.deleteLater()
+
+
+def test_tab_context_menu_targets_right_clicked_tab_after_reorder(browser, monkeypatch):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    window.tabs.bar.moveTab(0, 1)
+    menus = []
+    monkeypatch.setattr(QMenu, "popup", lambda menu, pos: menus.append(menu))
+    window.tabs.bar.customContextMenuRequested.emit(window.tabs.bar.tabRect(window.tabs.indexOf(first)).center())
+    assert window.current_tab() is second
+    assert menus[0].actions()[0].text() == window.t["duplicate_tab"]
+    menus[0].actions()[0].trigger()
+    assert window.current_tab().folder == first.folder
+    assert window.pages() == [second, first, window.current_tab()]
+
+
+def test_empty_tab_context_menu_disables_duplication(browser, monkeypatch):
+    window, _ = browser
+    menus = []
+    monkeypatch.setattr(QMenu, "popup", lambda menu, pos: menus.append(menu))
+    window.show_tab_menu(window.tabs.bar.tabRect(0).center())
+    assert not menus[0].actions()[0].isEnabled()
+    assert window.duplicate_page(window.current_tab()) is None

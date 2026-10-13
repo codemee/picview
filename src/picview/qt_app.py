@@ -82,7 +82,7 @@ LANGUAGE_ICONS = {"system": "lang-system", "zh": "中", "en": "En"}
 TEXT["en"].update({
     "compare": "Compare images", "compare_folder": "Compare this folder", "compare_empty": "Check folder tabs to compare images", "image_tools": "Image tools",
     "close_tab": "Close tab",
-    "new_tab": "Open folder in a new tab", "empty_tab": "New tab", "folder_missing": "Folder unavailable; waiting for it to return",
+    "new_tab": "Open folder in a new tab", "empty_tab": "New tab", "folder_missing": "Folder unavailable; waiting for it to return", "duplicate_tab": "Duplicate tab",
     "image_deleted": "The image being viewed was deleted: {name}. Now viewing {next}.",
     "image_deleted_empty": "The image being viewed was deleted: {name}. No images remain in this folder.",
     "lang_system": "Language: follow system (click to switch)",
@@ -92,7 +92,7 @@ TEXT["en"].update({
 TEXT["zh"].update({
     "compare": "比圖", "compare_folder": "勾選此資料夾進行比圖", "compare_empty": "勾選資料夾標籤以比較圖片", "image_tools": "圖片工具",
     "close_tab": "關閉標籤",
-    "new_tab": "在新標籤開啟資料夾", "empty_tab": "新標籤", "folder_missing": "資料夾不存在，等待重新連線",
+    "new_tab": "在新標籤開啟資料夾", "empty_tab": "新標籤", "folder_missing": "資料夾不存在，等待重新連線", "duplicate_tab": "複製標籤",
     "image_deleted": "正在檢視的圖片已被刪除：{name}。已切換至 {next}。",
     "image_deleted_empty": "正在檢視的圖片已被刪除：{name}。資料夾中已沒有圖片。",
     "lang_system": "語言：跟隨系統（點擊切換）",
@@ -1371,6 +1371,8 @@ class PicView(QMainWindow):
         self.tabs.currentChanged.connect(self.tab_changed)
         self.tabs.tabCloseRequested.connect(self.close_tab)
         self.tabs.tabBar().tabMoved.connect(self.tabs_reordered)
+        self.tabs.tabBar().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tabs.tabBar().customContextMenuRequested.connect(self.show_tab_menu)
         self.comparison_area = ComparisonArea(root)
         self.comparison_area.hide()
         self.add_tab_button = QToolButton()
@@ -1432,12 +1434,6 @@ class PicView(QMainWindow):
         if not restoring and not folder.is_dir():
             self.notification_bar.showMessage(self.t["folder_missing"] + ": " + str(folder), 8000)
             return None
-        for page in self.pages():
-            if page.folder == folder:
-                self.tabs.setCurrentWidget(page)
-                page.refresh_folder()
-                if selected in page.files: page.thumbs.select(selected)
-                return page
         page = next((tab for tab in self.pages() if tab.folder is None), None)
         if page is None: page = self.add_page()
         page.open_folder(folder, selected, state)
@@ -1451,6 +1447,30 @@ class PicView(QMainWindow):
     def choose(self):
         folder = QFileDialog.getExistingDirectory(self, self.t["open"], str(self.folder) if self.folder else "")
         if folder: self.open_folder(Path(folder))
+
+    def show_tab_menu(self, position):
+        bar = self.tabs.tabBar()
+        page = self.tabs.widget(bar.tabAt(position))
+        if page is None: return
+        menu = QMenu(bar)
+        action = menu.addAction(self.t["duplicate_tab"])
+        action.setEnabled(page.folder is not None)
+        action.triggered.connect(lambda: self.duplicate_page(page))
+        menu.aboutToHide.connect(menu.deleteLater)
+        menu.popup(bar.mapToGlobal(position))
+
+    def duplicate_page(self, source):
+        if source not in self.pages() or source.folder is None: return None
+        state = source.snapshot()
+        selected = Path(state["selected_file"]) if state["selected_file"] else None
+        page = self.open_folder(source.folder, selected, state=state, restoring=True)
+        self.tabs.tabBar().moveTab(self.tabs.indexOf(page), self.tabs.indexOf(source) + 1)
+        self.tabs.setCurrentWidget(page)
+        if self.compare_enabled and source in self.checked_pages:
+            self.checked_pages.add(page)
+            self.sync_comparison()
+        self.update_tab_titles()
+        return page
 
     def tab_changed(self, index):
         page = self.tabs.widget(index) if index >= 0 else None
@@ -1496,8 +1516,10 @@ class PicView(QMainWindow):
         names = [(page.folder.name or str(page.folder)) if page.folder else self.t["empty_tab"] for page in pages]
         for index, page in enumerate(pages):
             name = names[index]
-            if page.folder and sum(item.casefold() == name.casefold() for item in names) > 1:
+            if page.folder and len({item.folder for item, title in zip(pages, names) if title.casefold() == name.casefold()}) > 1:
                 name += " — " + str(page.folder.parent)
+            if page.folder and sum(item.folder == page.folder for item in pages) > 1:
+                name += f" ({sum(item.folder == page.folder for item in pages[:index + 1])})"
             if page.pending_notification: name = "● " + name
             self.tabs.setTabText(index, name)
             control = self.tabs.bar.tabButton(index, QTabBar.ButtonPosition.LeftSide)
