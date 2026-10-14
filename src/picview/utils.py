@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 
-IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tif", ".tiff"}
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tif", ".tiff", ".svg"}
 
 
 def is_image_file(path: Path) -> bool:

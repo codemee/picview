@@ -55,10 +55,11 @@ uv run picview
 
 ### Open images
 
-- The window title shows the current version (for example, **PicView v0.0.5**).
+- The window title shows the current version (for example, **PicView v0.0.6**).
 - Click **Open folder**, or drop a folder or image file onto the window.
 - Drag a thumbnail or its filename to send the original image file to another application that accepts file drops.
 - Rotation and mirror controls only affect the current view; image files are never modified.
+- Supports JPEG, PNG, WebP, BMP, GIF, TIFF, and static SVG previews. SVG keeps transparency and renders again at the display resolution when zooming, with comparison, rotation, mirroring, and full-screen support. SVG animations are displayed as static images.
 - The language button cycles through **Follow system → Chinese (中) → English (En)**. The system icon shows smaller Chinese and English glyphs separated by a diagonal line. It follows the system by default, using Chinese for Chinese locales and English otherwise, and remembers the mode across restarts.
 - The current folder is monitored automatically. New images appear in the thumbnail pane without resetting the current view. If the viewed image is deleted, a notification appears at the bottom and the next image is selected; deleting the last image wraps to the first, and an empty folder clears the image pane.
 - Modified files automatically refresh their thumbnails and the current image, including full screen, while preserving zoom, rotation, mirroring, and scroll position. The last complete image remains visible while a file is still being written.

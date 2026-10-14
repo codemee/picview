@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 from PySide6.QtCore import QEvent, QFileSystemWatcher, QLocale, QMimeData, QPoint, QRectF, QSize, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QDrag, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPolygon, QPalette, QShortcut
+from PySide6.QtGui import QColor, QDrag, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPolygon, QPalette, QShortcut, QTransform
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QMainWindow,
     QMenu, QPushButton, QScrollArea, QSlider, QSplitter, QStackedWidget, QTabBar, QStyle, QStyleOptionSlider, QStyleOptionTab, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from . import __version__
 from .settings import load_settings, normalize_tab_state, save_settings
+from .svg import SvgDocument
 from .utils import IMAGE_SUFFIXES, image_files, natural_key
 
 
@@ -107,7 +108,8 @@ def resolve_language(mode: str) -> str:
     return mode
 
 
-def qimage(image: Image.Image) -> QImage:
+def qimage(image: Image.Image | QImage) -> QImage:
+    if isinstance(image, QImage): return image.copy()
     image = image.convert("RGBA")
     return QImage(image.tobytes(), image.width, image.height, QImage.Format.Format_RGBA8888).copy()
 
@@ -391,12 +393,24 @@ class ThumbnailPane(QFrame):
         self.files=files; self.selected_path=selected if selected in files else (files[0] if files else None); self.build()
         if emit_selection and self.selected_path: self.selected.emit(self.selected_path)
     def _resize(self,v): self.size=v; self.size_label.set_value(v); self.build()
+    def preview_pixmap(self, path):
+        if path.suffix.lower() == ".svg":
+            document = SvgDocument(path)
+            size = QSize(*document.size).scaled(self.size, self.size, Qt.AspectRatioMode.KeepAspectRatio)
+            dpr = self.devicePixelRatioF()
+            pixmap = QPixmap.fromImage(document.render((max(1, round(size.width() * dpr)), max(1, round(size.height() * dpr)))))
+            pixmap.setDevicePixelRatio(dpr)
+            return pixmap
+        with Image.open(path) as image:
+            image = ImageOps.exif_transpose(image).convert("RGBA")
+            image.thumbnail((self.size, self.size))
+            return QPixmap.fromImage(qimage(image))
     def build(self):
         while self.grid.count(): item=self.grid.takeAt(0); item.widget().deleteLater() if item.widget() else None
         cols=max(1,self.scroll.viewport().width()//(self.size+20)); self.buttons={}; self.failed_paths=set()
         for i,path in enumerate(self.files):
             try:
-                with Image.open(path) as im: im=ImageOps.exif_transpose(im).convert("RGBA"); im.thumbnail((self.size,self.size)); pix=QPixmap.fromImage(qimage(im.copy()))
+                pix = self.preview_pixmap(path)
                 b=ThumbnailTile(path, pix, self.size, path == self.selected_path)
             except Exception:
                 self.failed_paths.add(path)
@@ -409,10 +423,7 @@ class ThumbnailPane(QFrame):
         for path in paths:
             if path not in self.buttons: continue
             try:
-                with Image.open(path) as image:
-                    image=ImageOps.exif_transpose(image).convert("RGBA")
-                    image.thumbnail((self.size, self.size))
-                    pixmap=QPixmap.fromImage(qimage(image.copy()))
+                pixmap = self.preview_pixmap(path)
             except Exception:
                 self.failed_paths.add(path)
                 continue
@@ -504,6 +515,7 @@ class ImagePane(QFrame):
         self.update()
     @staticmethod
     def read_frames(path):
+        if path.suffix.lower() == ".svg": return [(SvgDocument(path), 100)]
         frames = []
         with Image.open(path) as image:
             for index in range(getattr(image, "n_frames", 1)):
@@ -557,14 +569,26 @@ class ImagePane(QFrame):
     def next_frame(self): self.index=(self.index+1)%len(self.frames); self.timer.start(self.frames[self.index][1]); self.render()
     def image(self):
         im=self.frames[self.index][0]
+        if isinstance(im, SvgDocument): return self.svg_image(self.image_size())
         if self.rotation: im=im.rotate(-self.rotation,expand=True)
         if self.fh: im=ImageOps.mirror(im)
         if self.fv: im=ImageOps.flip(im)
         return im
+    def image_size(self):
+        width, height = self.frames[self.index][0].size
+        return (height, width) if self.rotation % 180 else (width, height)
+
+    def svg_image(self, size):
+        source_size = (size[1], size[0]) if self.rotation % 180 else size
+        image = self.frames[self.index][0].render(source_size)
+        if self.rotation: image = image.transformed(QTransform().rotate(self.rotation), Qt.TransformationMode.SmoothTransformation)
+        if self.fh or self.fv: image = image.transformed(QTransform().scale(-1 if self.fh else 1, -1 if self.fv else 1))
+        return image
+
     def render(self):
         if not self.frames:return
-        im=self.image()
-        scale=min(max(1,self.scroll.viewport().width()-8)/im.width,max(1,self.scroll.viewport().height()-8)/im.height) if self.fit_to_pane else self.zoom
+        width, height = self.image_size()
+        scale=min(max(1,self.scroll.viewport().width()-8)/width,max(1,self.scroll.viewport().height()-8)/height) if self.fit_to_pane else self.zoom
         self.display_scale=scale
         if self.fit_to_pane:
             ticks=max(1,round(scale*1000))
@@ -573,19 +597,28 @@ class ImagePane(QFrame):
             self.slider.setValue(ticks)
             self.slider.blockSignals(False)
             self.zoom_label.set_value(ticks)
-        size=(max(1,round(im.width*scale)),max(1,round(im.height*scale)))
-        if size != im.size: im=im.resize(size,Image.Resampling.LANCZOS)
-        pix=QPixmap.fromImage(qimage(im)); self.label.setPixmap(pix); self.label.setFixedSize(pix.size())
+        size=(max(1,round(width*scale)),max(1,round(height*scale)))
+        svg = isinstance(self.frames[self.index][0], SvgDocument)
+        self.label.setScaledContents(svg)
+        if svg:
+            dpr = self.devicePixelRatioF()
+            pix = QPixmap.fromImage(self.svg_image(tuple(max(1, round(value * dpr)) for value in size)))
+            pix.setDevicePixelRatio(dpr)
+        else:
+            im=self.image()
+            if size != im.size: im=im.resize(size,Image.Resampling.LANCZOS)
+            pix=QPixmap.fromImage(qimage(im))
+        self.label.setPixmap(pix); self.label.setFixedSize(*size)
         if self.full_window is not None:
-            self.full_window.centralWidget().setPixmap(QPixmap.fromImage(qimage(self.image())))
+            self.update_full_image()
     def resizeEvent(self,e): super().resizeEvent(e); QTimer.singleShot(0,self.refresh_after_resize)
     def refresh_after_resize(self):
         self.apply_default_zoom()
         self.render()
     def apply_default_zoom(self):
         if not self.auto_scale or not self.frames or not self.isVisible(): return
-        im=self.image()
-        oversized=im.width>max(1,self.scroll.width()-8) or im.height>max(1,self.scroll.height()-8)
+        width, height = self.image_size()
+        oversized=width>max(1,self.scroll.width()-8) or height>max(1,self.scroll.height()-8)
         if oversized != self.fit_to_pane:
             self._applying_auto_scale=True
             try: self.fit_b.setChecked(oversized)
@@ -640,7 +673,22 @@ class ImagePane(QFrame):
             self.full_window = None
             return
         if not self.frames: return
-        w=QMainWindow(self); w.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose); w.destroyed.connect(lambda: setattr(self, "full_window", None)); w.setWindowState(Qt.WindowState.WindowFullScreen); label=QLabel(); label.setAlignment(Qt.AlignmentFlag.AlignCenter); label.setStyleSheet("background:#111820;"); w.setCentralWidget(label); w.keyPressEvent=lambda e: self.open_full() if e.key()==Qt.Key.Key_Escape else None; im=self.image(); label.setPixmap(QPixmap.fromImage(qimage(im))); w.show(); self.full_window=w
+        w=QMainWindow(self); w.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose); w.destroyed.connect(lambda: setattr(self, "full_window", None)); w.setWindowState(Qt.WindowState.WindowFullScreen); label=QLabel(); label.setAlignment(Qt.AlignmentFlag.AlignCenter); label.setStyleSheet("background:#111820;"); w.setCentralWidget(label); w.keyPressEvent=lambda e: self.open_full() if e.key()==Qt.Key.Key_Escape else None
+        self.full_window=w
+        if isinstance(self.frames[self.index][0], SvgDocument): label.resizeEvent = lambda event: self.update_full_image()
+        w.show(); self.update_full_image()
+
+    def update_full_image(self):
+        if self.full_window is None or not self.frames: return
+        label = self.full_window.centralWidget()
+        if isinstance(self.frames[self.index][0], SvgDocument):
+            size = QSize(*self.image_size()).scaled(label.size(), Qt.AspectRatioMode.KeepAspectRatio)
+            dpr = label.devicePixelRatioF()
+            pixmap = QPixmap.fromImage(self.svg_image((max(1, round(size.width() * dpr)), max(1, round(size.height() * dpr)))))
+            pixmap.setDevicePixelRatio(dpr)
+        else:
+            pixmap = QPixmap.fromImage(qimage(self.image()))
+        label.setPixmap(pixmap)
 
 
 class FolderTab(QWidget):

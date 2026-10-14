@@ -34,6 +34,19 @@ def smoke_test(report_path):
         assert window.image.frames, "Image decoder failed"
         assert not window.image.label.pixmap().isNull(), "Qt failed to render image"
         assert f"v{__version__}" in window.windowTitle()
+        vector = folder / "vector.svg"
+        vector.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 80"><rect x="10" y="10" width="30" height="20" fill="red"/></svg>', encoding="utf-8")
+        window.open_folder(folder, vector)
+        app.processEvents()
+        assert window.image.frames, "Bundled SVG renderer failed to load"
+        window.image.choose_zoom(2000)
+        window.image.rotate()
+        assert not window.image.label.pixmap().isNull(), "SVG rendering failed"
+        window.set_compare(True)
+        window.checked_pages.update(window.pages())
+        window.sync_comparison()
+        app.processEvents()
+        assert len(window.comparison_area.pages) == 2, "SVG comparison failed"
         window.close()
         app.processEvents()
     Path(report_path).write_text(json.dumps({"version": __version__, "ok": True}))
