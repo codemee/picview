@@ -396,7 +396,7 @@ class ThumbnailPane(QFrame):
         cols=max(1,self.scroll.viewport().width()//(self.size+20)); self.buttons={}; self.failed_paths=set()
         for i,path in enumerate(self.files):
             try:
-                with Image.open(path) as im: im=ImageOps.exif_transpose(im).convert("RGB"); im.thumbnail((self.size,self.size)); pix=QPixmap.fromImage(qimage(im.copy()))
+                with Image.open(path) as im: im=ImageOps.exif_transpose(im).convert("RGBA"); im.thumbnail((self.size,self.size)); pix=QPixmap.fromImage(qimage(im.copy()))
                 b=ThumbnailTile(path, pix, self.size, path == self.selected_path)
             except Exception:
                 self.failed_paths.add(path)
@@ -410,7 +410,7 @@ class ThumbnailPane(QFrame):
             if path not in self.buttons: continue
             try:
                 with Image.open(path) as image:
-                    image=ImageOps.exif_transpose(image).convert("RGB")
+                    image=ImageOps.exif_transpose(image).convert("RGBA")
                     image.thumbnail((self.size, self.size))
                     pixmap=QPixmap.fromImage(qimage(image.copy()))
             except Exception:
