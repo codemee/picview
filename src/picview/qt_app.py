@@ -1468,7 +1468,7 @@ class PicView(QMainWindow):
         root.setObjectName("root")
         self.setCentralWidget(root)
         outer = QVBoxLayout(root)
-        outer.setContentsMargins(8, 8, 8, 8)
+        outer.setContentsMargins(8, 0, 8, 8)
         outer.setSpacing(8)
         tool = QFrame()
         tool.setObjectName("toolbar")
