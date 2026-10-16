@@ -19,23 +19,34 @@ from .utils import IMAGE_SUFFIXES, image_files, natural_key
 
 
 IMAGE_BACKGROUND = "#e9edf2"
-DARK_IMAGE_BACKGROUND = "#303a47"
+DARK_IMAGE_BACKGROUND = "#1c1729"
 THUMBNAIL_SELECTED = "#6ec8ff"
-PALETTE = {"surface": "#f4f7f8", "card": "#ffffff", "edge": "#c7d3d8", "accent": THUMBNAIL_SELECTED, "text": "#172a31", "muted": "#526a73", "pane": IMAGE_BACKGROUND}
+PALETTE = {"surface": "#f4f7f8", "card": "#ffffff", "edge": "#c7d3d8", "accent": THUMBNAIL_SELECTED, "text": "#172a31", "muted": "#526a73", "pane": IMAGE_BACKGROUND,
+           "focus": "#1677ff", "selection": THUMBNAIL_SELECTED, "selection_text": "#153047", "active_text": "#ffffff", "hover": "#e2e6ed", "pressed": "#d5dbe4", "warm": "#172a31"}
 SLIDER_WIDTH = 160
 THUMBNAIL_BASE_SIZE = 140
 
 
 def use_system_palette(app: QApplication) -> None:
-    """Use the system palette for surfaces and text while keeping the blue accent."""
+    """Resolve surfaces and state colors, including the Unit-01 dark palette."""
     pal = app.palette()
+    dark = pal.color(QPalette.ColorRole.Window).lightness() < 128
+    if dark: pal = themed_palette(pal, "dark")
     PALETTE.update({
         "surface": pal.color(QPalette.ColorRole.Window).name(),
         "card": pal.color(QPalette.ColorRole.Base).name(),
         "edge": pal.color(QPalette.ColorRole.Mid).name(),
         "text": pal.color(QPalette.ColorRole.Text).name(),
         "muted": pal.color(QPalette.ColorRole.PlaceholderText).name(),
-        "pane": DARK_IMAGE_BACKGROUND if pal.color(QPalette.ColorRole.Window).lightness() < 128 else IMAGE_BACKGROUND,
+        "pane": DARK_IMAGE_BACKGROUND if dark else IMAGE_BACKGROUND,
+        "accent": "#a5ef4b" if dark else THUMBNAIL_SELECTED,
+        "focus": "#a5ef4b" if dark else "#1677ff",
+        "selection": "#3b2a53" if dark else THUMBNAIL_SELECTED,
+        "selection_text": "#f0eaf8" if dark else "#153047",
+        "active_text": "#17220c" if dark else "#ffffff",
+        "hover": "#503c68" if dark else "#e2e6ed",
+        "pressed": "#60477d" if dark else "#d5dbe4",
+        "warm": "#ff9b45" if dark else pal.color(QPalette.ColorRole.Text).name(),
     })
 
 
@@ -45,15 +56,18 @@ def themed_palette(system_palette: QPalette, mode: str) -> QPalette:
         return palette
     if mode == "dark":
         colors = {
-            QPalette.ColorRole.Window: "#202833",
-            QPalette.ColorRole.Base: "#293442",
-            QPalette.ColorRole.AlternateBase: "#303d4c",
-            QPalette.ColorRole.Text: "#edf3f8",
-            QPalette.ColorRole.WindowText: "#edf3f8",
-            QPalette.ColorRole.Button: "#293442",
-            QPalette.ColorRole.ButtonText: "#edf3f8",
-            QPalette.ColorRole.PlaceholderText: "#aab9c7",
-            QPalette.ColorRole.Mid: "#536477",
+            QPalette.ColorRole.Window: "#171321",
+            QPalette.ColorRole.Base: "#251c36",
+            QPalette.ColorRole.AlternateBase: "#302344",
+            QPalette.ColorRole.Text: "#f0eaf8",
+            QPalette.ColorRole.WindowText: "#f0eaf8",
+            QPalette.ColorRole.Button: "#302344",
+            QPalette.ColorRole.ButtonText: "#f0eaf8",
+            QPalette.ColorRole.PlaceholderText: "#b7a7cf",
+            QPalette.ColorRole.Mid: "#70568b",
+            QPalette.ColorRole.ToolTipBase: "#302344",
+            QPalette.ColorRole.ToolTipText: "#f0eaf8",
+            QPalette.ColorRole.Link: "#a5ef4b",
         }
     else:
         colors = {
@@ -67,8 +81,8 @@ def themed_palette(system_palette: QPalette, mode: str) -> QPalette:
             QPalette.ColorRole.PlaceholderText: "#526a73",
             QPalette.ColorRole.Mid: "#c7d3d8",
         }
-    colors[QPalette.ColorRole.Highlight] = THUMBNAIL_SELECTED
-    colors[QPalette.ColorRole.HighlightedText] = "#153047"
+    colors[QPalette.ColorRole.Highlight] = "#a5ef4b" if mode == "dark" else THUMBNAIL_SELECTED
+    colors[QPalette.ColorRole.HighlightedText] = "#17220c" if mode == "dark" else "#153047"
     for role, color in colors.items():
         palette.setColor(role, QColor(color))
     return palette
@@ -79,7 +93,7 @@ TEXT = {
 }
 
 LANGUAGE_MODES = ("system", "zh", "en")
-LANGUAGE_ICONS = {"system": "lang-system", "zh": "中", "en": "En"}
+LANGUAGE_ICONS = {"system": "lang-system", "zh": "中", "en": "A"}
 TEXT["en"].update({
     "compare": "Compare images", "compare_folder": "Compare this folder", "compare_empty": "Check folder tabs to compare images", "image_tools": "Image tools",
     "close_tab": "Close tab",
@@ -114,13 +128,16 @@ def qimage(image: Image.Image | QImage) -> QImage:
     return QImage(image.tobytes(), image.width, image.height, QImage.Format.Format_RGBA8888).copy()
 
 
+def toolbar_hover_color():
+    return PALETTE["hover"]
+
+
 class IconButton(QToolButton):
     """Compact, frameless vector icon button."""
     def __init__(self, icon: str, tip: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.kind = icon
-        self.setToolTip(tip); self.setFixedSize(30, 30); self.setIconSize(self.size())
-        self.setStyleSheet(f"QToolButton{{background:transparent;border:0;border-radius:6px;}}QToolButton:hover{{background:rgba(110,200,255,36);border-radius:6px;}}QToolButton:pressed{{background:rgba(110,200,255,62);border-radius:6px;}}QToolButton:checked{{background:{PALETTE['accent']};border-radius:6px;}}")
+        self.setToolTip(tip); self.setFixedSize(34, 34); self.setIconSize(QSize(20, 20))
         self.toggled.connect(lambda _checked: self.refresh_icon())
         self.refresh_icon()
 
@@ -128,14 +145,31 @@ class IconButton(QToolButton):
         self.kind = icon; self.setToolTip(tip); self.refresh_icon()
 
     def refresh_icon(self) -> None:
+        checked_background = toolbar_hover_color() if self.kind == "fit" else PALETTE["accent"]
+        self.setStyleSheet(f"QToolButton{{background:transparent;border:0;border-radius:6px;padding:4px;}}QToolButton:hover{{background:{toolbar_hover_color()};border-radius:6px;}}QToolButton:pressed{{background:{PALETTE['pressed']};border-radius:6px;}}QToolButton:checked{{background:{checked_background};border-radius:6px;}}")
         icon_size = self.iconSize().width()
         pixel_size = round(icon_size * self.devicePixelRatioF())
         pm = QPixmap(pixel_size, pixel_size)
         pm.setDevicePixelRatio(pixel_size / icon_size)
         pm.fill(Qt.GlobalColor.transparent)
-        icon_color = QColor("#ffffff" if self.isChecked() else PALETTE["text"])
-        p = QPainter(pm); p.setRenderHint(QPainter.RenderHint.Antialiasing); p.setPen(QPen(icon_color, 1))
-        p.translate(-3.5, -3.5)
+        icon_color = QColor(PALETTE["active_text"] if self.isChecked() and self.kind != "fit" else PALETTE["text"])
+        if self.kind == "rotate": icon_color = QColor(PALETTE["warm"])
+        if self.kind.startswith(("lang-", "theme-")) or self.kind in ("中", "A"):
+            icon_color = QColor(PALETTE["muted"])
+        p = QPainter(pm); p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # Map the existing vector coordinates into the 20 px icon canvas.
+        # Leave space inside the icon canvas for the stroke and antialiasing.
+        drawing_scale = .84
+        p.translate(icon_size / 2, icon_size / 2)
+        p.scale(drawing_scale, drawing_scale)
+        p.translate(-18.5 if self.kind == "folder" else -18, -18)
+        p.setPen(QPen(icon_color, 1 / drawing_scale))
+        if self.kind.startswith(("lang-", "theme-")):
+            scale = 1.125 if self.kind == "theme-light" else 18 / 14
+            p.translate(18, 18)
+            p.scale(scale, scale)
+            p.translate(-18, -18)
+            preference_pen = QPen(icon_color, 1 / (scale * drawing_scale))
         r = 9, 9, 18, 18
         if self.kind == "folder":
             back = QPainterPath()
@@ -171,45 +205,48 @@ class IconButton(QToolButton):
             p.setBrush(icon_color)
             for x in (12, 18, 24): p.drawEllipse(QPoint(x, 18), 1, 1)
         elif self.kind == "compare":
-            p.drawRoundedRect(QRectF(6, 9, 25, 18), 2, 2)
-            for x in (8, 20):
-                p.drawRoundedRect(QRectF(x, 12, 9, 12), 1, 1)
+            p.drawRoundedRect(QRectF(8, 10, 20, 16), 1.5, 1.5)
+            p.drawLine(18, 10, 18, 26)
+            for x in (9, 19):
                 landscape = QPainterPath()
-                landscape.moveTo(x + 1, 22)
-                landscape.lineTo(x + 3, 19)
-                landscape.lineTo(x + 5, 21)
-                landscape.lineTo(x + 7, 18)
-                landscape.lineTo(x + 8, 20)
+                landscape.moveTo(x + 1, 23)
+                landscape.lineTo(x + 4, 19)
+                landscape.lineTo(x + 7, 23)
                 p.drawPath(landscape)
-                p.drawEllipse(QRectF(x + 2, 15, 1.5, 1.5))
+                p.drawEllipse(QRectF(x + 2, 14, 1.5, 1.5))
         elif self.kind == "fullscreen":
             for x,y,dx,dy in ((9,9,1,1),(27,9,-1,1),(9,27,1,-1),(27,27,-1,-1)): p.drawLine(x,y,x+6*dx,y); p.drawLine(x,y,x,y+6*dy)
         elif self.kind == "lang-system":
-            p.drawLine(24, 10, 12, 26)
-            for glyph, x, y in ((LANGUAGE_ICONS["zh"], 13, 12), (LANGUAGE_ICONS["en"], 24, 24)):
-                p.save()
-                p.translate(x, y)
-                p.scale(0.65, 0.65)
-                p.drawText(-18, -18, 36, 36, Qt.AlignmentFlag.AlignCenter, glyph)
-                p.restore()
+            p.setPen(preference_pen)
+            p.drawEllipse(QRectF(11, 11, 14, 14))
+            p.drawEllipse(QRectF(15, 11, 6, 14))
+            p.drawLine(QPoint(11, 18), QPoint(25, 18))
+        elif self.kind in ("中", "A"):
+            font = self.font()
+            font.setPixelSize(22 if self.kind == "A" else 20)
+            font.setBold(False)
+            p.setFont(font)
+            p.drawText(QRectF(4, 4, 28, 28), Qt.AlignmentFlag.AlignCenter, self.kind)
         elif self.kind == "theme-system":
-            moon = QPainterPath()
-            moon.moveTo(15, 9)
-            moon.cubicTo(12, 9, 10, 11, 10, 13)
-            moon.cubicTo(10, 15, 12, 17, 15, 16)
-            moon.cubicTo(12, 15, 12, 12, 15, 9)
-            p.drawPath(moon)
-            p.drawLine(24, 10, 12, 26)
-            p.drawEllipse(22, 22, 3, 3)
-            for x1,y1,x2,y2 in ((23,20,23,21),(23,26,23,27),(20,23,21,23),(26,23,27,23),(20,20,21,21),(26,26,27,27),(20,27,21,26),(26,21,27,20)):
-                p.drawLine(x1,y1,x2,y2)
+            half = QPainterPath()
+            half.moveTo(18, 11)
+            half.arcTo(QRectF(11, 11, 14, 14), 90, -180)
+            half.closeSubpath()
+            p.fillPath(half, icon_color)
+            p.setPen(preference_pen)
+            p.drawEllipse(QRectF(11, 11, 14, 14))
         elif self.kind == "theme-light":
-            p.drawEllipse(14, 14, 8, 8)
-            for x1,y1,x2,y2 in ((18,9,18,12),(18,24,18,27),(9,18,12,18),(24,18,27,18),(11,11,13,13),(23,23,25,25),(11,25,13,23),(23,13,25,11)):
-                p.drawLine(x1,y1,x2,y2)
+            p.setPen(preference_pen)
+            p.drawEllipse(QRectF(14.5, 14.5, 7, 7))
+            for x1,y1,x2,y2 in ((18,10,18,12),(18,24,18,26),(10,18,12,18),(24,18,26,18),(12,12,13.5,13.5),(22.5,22.5,24,24),(12,24,13.5,22.5),(22.5,13.5,24,12)):
+                ray = QPainterPath()
+                ray.moveTo(x1, y1); ray.lineTo(x2, y2)
+                p.drawPath(ray)
         elif self.kind == "theme-dark":
-            p.drawArc(10, 9, 17, 18, 65 * 16, 265 * 16)
-            p.drawArc(15, 7, 12, 18, 120 * 16, 150 * 16)
+            outer = QPainterPath(); outer.addEllipse(QRectF(11, 11, 14, 14))
+            cutout = QPainterPath(); cutout.addEllipse(QRectF(15, 8, 14, 14))
+            p.setPen(preference_pen)
+            p.drawPath(outer.subtracted(cutout))
         else:
             p.drawText(0, 0, 36, 36, Qt.AlignmentFlag.AlignCenter, self.kind)
         p.end(); self.setIcon(QIcon(pm))
@@ -285,7 +322,7 @@ class ScaleValueButton(QToolButton):
         self.setMinimumWidth(48)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip(tip)
-        self.setStyleSheet("QToolButton{background:transparent;border:0;border-radius:6px;padding:0 3px;}QToolButton:hover{background:rgba(110,200,255,36);}")
+        self.apply_style()
 
         self.editor_menu = QMenu(self)
         editor = QWidget(self.editor_menu)
@@ -309,6 +346,9 @@ class ScaleValueButton(QToolButton):
         self.spin.lineEdit().returnPressed.connect(self.apply_value)
         self.reset_button.clicked.connect(lambda: self.choose(reference))
         self.set_value(value)
+
+    def apply_style(self):
+        self.setStyleSheet(f"QToolButton{{background:transparent;border:0;border-radius:6px;padding:0 3px;}}QToolButton:hover{{background:{toolbar_hover_color()};}}")
 
     def _format(self, value: int) -> str:
         return f"{value / self.divisor:g}{self.suffix}"
@@ -347,9 +387,10 @@ class ThumbnailTile(QFrame):
         if pixmap: self.preview.setPixmap(pixmap)
         layout.addWidget(self.name); layout.addWidget(self.preview); self.apply_style()
     def apply_style(self) -> None:
-        color = THUMBNAIL_SELECTED if self.selected else PALETTE["card"]
-        text = "#153047" if self.selected else PALETTE["text"]
-        self.setStyleSheet(f"ThumbnailTile{{background:{color};border:0;border-radius:9px;}} QLabel{{background:{color};color:{text};}}")
+        color = PALETTE["selection"] if self.selected else PALETTE["card"]
+        text = PALETTE["selection_text"] if self.selected else PALETTE["text"]
+        border = f"1px solid {PALETTE['accent']}" if self.selected and QColor(PALETTE["surface"]).lightness() < 128 else "0"
+        self.setStyleSheet(f"ThumbnailTile{{background:{color};border:{border};border-radius:9px;}} QLabel{{background:{color};color:{text};}}")
     def mousePressEvent(self, event):
         self._drag_start = None
         if event.button() == Qt.MouseButton.LeftButton:
@@ -384,11 +425,30 @@ class ThumbnailTile(QFrame):
 
 class ThumbnailPane(QFrame):
     selected = Signal(Path)
+    rowRequested = Signal(int)
     def __init__(self, labels: dict[str, str], parent=None):
+        self.columns = 1
         super().__init__(parent); self.labels=labels; self.files=[]; self.selected_path=None; self.size=THUMBNAIL_BASE_SIZE; self.buttons={}; self.failed_paths=set()
-        self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,6,10,8)
-        header=QHBoxLayout(); self.max_button=IconButton("expand",labels["max"]); header.addWidget(self.max_button); header.addStretch(); self.size_label=ScaleValueButton(self.size,72,260,THUMBNAIL_BASE_SIZE,1,"px",labels["edit_thumb"]); header.addWidget(self.size_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,THUMBNAIL_BASE_SIZE); self.slider.setRange(72,260); self.slider.setValue(self.size); self.slider.setFixedSize(SLIDER_WIDTH,30); self.slider.logicalValueChanged.connect(self._resize); self.size_label.valueChosen.connect(self.slider.setValue); header.addWidget(self.slider); layout.addLayout(header)
+        self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,4,10,8); layout.setSpacing(4)
+        header=QHBoxLayout(); header.setSpacing(4); self.max_button=IconButton("expand",labels["max"]); header.addWidget(self.max_button); header.addStretch(); self.size_label=ScaleValueButton(self.size,72,260,THUMBNAIL_BASE_SIZE,1,"px",labels["edit_thumb"]); header.addWidget(self.size_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,THUMBNAIL_BASE_SIZE); self.slider.setRange(72,260); self.slider.setValue(self.size); self.slider.setFixedSize(SLIDER_WIDTH,30); self.slider.logicalValueChanged.connect(self._resize); self.size_label.valueChosen.connect(self.slider.setValue); header.addWidget(self.slider); layout.addLayout(header)
         self.scroll=QScrollArea(); self.scroll.setWidgetResizable(True); self.scroll.setFrameShape(QFrame.Shape.NoFrame); self.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};"); self.grid_host=QWidget(); self.grid_host.setObjectName("thumbnailGrid"); self.grid_host.setStyleSheet(f"#thumbnailGrid{{background:{PALETTE['pane']};}}"); self.grid=QGridLayout(self.grid_host); self.grid.setAlignment(Qt.AlignmentFlag.AlignTop|Qt.AlignmentFlag.AlignLeft); self.scroll.setWidget(self.grid_host); layout.addWidget(self.scroll)
+        for widget in (self.scroll, self.scroll.viewport(), self.grid_host,
+                       self.scroll.verticalScrollBar(), self.scroll.horizontalScrollBar()):
+            widget.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.ShortcutOverride, QEvent.Type.KeyPress):
+            if event.modifiers() == Qt.KeyboardModifier.NoModifier and event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
+                if event.type() == QEvent.Type.KeyPress:
+                    self.rowRequested.emit(-1 if event.key() == Qt.Key.Key_Up else 1)
+                event.accept()
+                return True
+        return super().eventFilter(watched, event)
+
+    def select_clicked(self, path):
+        self.scroll.setFocus(Qt.FocusReason.MouseFocusReason)
+        self.select(path)
+
     def set_files(self, files, selected=None, *, emit_selection=True):
         self.files=files; self.selected_path=selected if selected in files else (files[0] if files else None); self.build()
         if emit_selection and self.selected_path: self.selected.emit(self.selected_path)
@@ -407,7 +467,7 @@ class ThumbnailPane(QFrame):
             return QPixmap.fromImage(qimage(image))
     def build(self):
         while self.grid.count(): item=self.grid.takeAt(0); item.widget().deleteLater() if item.widget() else None
-        cols=max(1,self.scroll.viewport().width()//(self.size+20)); self.buttons={}; self.failed_paths=set()
+        cols=max(1,self.scroll.viewport().width()//(self.size+20)); self.columns=cols; self.buttons={}; self.failed_paths=set()
         for i,path in enumerate(self.files):
             try:
                 pix = self.preview_pixmap(path)
@@ -415,7 +475,7 @@ class ThumbnailPane(QFrame):
             except Exception:
                 self.failed_paths.add(path)
                 b=ThumbnailTile(path, None, self.size, path == self.selected_path)
-            b.clicked_path.connect(self.select)
+            b.clicked_path.connect(self.select_clicked)
             self.grid.addWidget(b,i//cols,i%cols); self.buttons[path]=b
     def resizeEvent(self,event): super().resizeEvent(event); QTimer.singleShot(0,self.build)
     def refresh_previews(self, paths):
@@ -437,6 +497,12 @@ class ThumbnailPane(QFrame):
         for p,b in self.buttons.items(): b.selected = p == path; b.apply_style()
         if path in self.buttons: self.scroll.ensureWidgetVisible(self.buttons[path])
         self.selected.emit(path)
+        QTimer.singleShot(0, self, self.ensure_selection_visible)
+
+    def ensure_selection_visible(self):
+        if self.selected_path in self.buttons:
+            self.grid.activate()
+            self.scroll.ensureWidgetVisible(self.buttons[self.selected_path])
 
 
 class ToolbarSeparator(QFrame):
@@ -464,11 +530,12 @@ class ImagePane(QFrame):
 
     def __init__(self, labels, parent=None):
         super().__init__(parent); self.labels=labels; self.path=None; self.frames=[]; self.index=0; self.rotation=0; self.fh=False; self.fv=False; self.zoom=1.0; self.fit_to_pane=False; self.auto_scale=False; self._applying_auto_scale=False; self.display_scale=1.0; self.full_window=None; self.timer=QTimer(self); self.timer.timeout.connect(self.next_frame)
-        self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,6,10,8)
+        self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,4,10,8); layout.setSpacing(4)
         self.comparison_title = None
         self.comparison_selected = False
         bar=QHBoxLayout(); self.rotate_b=IconButton("rotate",labels["rotate"]); self.mh=IconButton("mirror-h",labels["mh"]); self.mv=IconButton("mirror-v",labels["mv"]); self.fit_b=IconButton("fit",labels["fit"]); self.fit_b.setCheckable(True); self.fit_b.toggled.connect(self.set_fit); self.max_button=IconButton("expand",labels["max"]); self.full=IconButton("fullscreen",labels["full"])
         for b,fn in ((self.rotate_b,self.rotate),(self.mh,self.mirror_h),(self.mv,self.mirror_v)): b.clicked.connect(fn); bar.addWidget(b)
+        bar.setSpacing(4)
         separate_tools(bar)
         self.full.clicked.connect(self.open_full)
         for button in (self.fit_b,self.max_button,self.full): bar.addWidget(button)
@@ -487,7 +554,7 @@ class ImagePane(QFrame):
         if self.comparison_selected:
             painter = QPainter(self)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            painter.setPen(QPen(QColor("#1677ff"), 2))
+            painter.setPen(QPen(QColor(PALETTE["focus"]), 2))
             painter.drawRoundedRect(self.rect().adjusted(1, 1, -2, -2), 10, 10)
             painter.end()
 
@@ -673,7 +740,7 @@ class ImagePane(QFrame):
             self.full_window = None
             return
         if not self.frames: return
-        w=QMainWindow(self); w.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose); w.destroyed.connect(lambda: setattr(self, "full_window", None)); w.setWindowState(Qt.WindowState.WindowFullScreen); label=QLabel(); label.setAlignment(Qt.AlignmentFlag.AlignCenter); label.setStyleSheet("background:#111820;"); w.setCentralWidget(label); w.keyPressEvent=lambda e: self.open_full() if e.key()==Qt.Key.Key_Escape else None
+        w=QMainWindow(self); w.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose); w.destroyed.connect(lambda: setattr(self, "full_window", None)); w.setWindowState(Qt.WindowState.WindowFullScreen); label=QLabel(); label.setAlignment(Qt.AlignmentFlag.AlignCenter); label.setStyleSheet(f"background:{DARK_IMAGE_BACKGROUND if QColor(PALETTE['surface']).lightness() < 128 else '#111820'};"); w.setCentralWidget(label); w.keyPressEvent=lambda e: self.open_full() if e.key()==Qt.Key.Key_Escape else None
         self.full_window=w
         if isinstance(self.frames[self.index][0], SvgDocument): label.resizeEvent = lambda event: self.update_full_image()
         w.show(); self.update_full_image()
@@ -744,6 +811,7 @@ class FolderTab(QWidget):
         self.split.addWidget(self.image_slot)
         layout.addWidget(self.split)
         self.thumbs.selected.connect(self.select_image)
+        self.thumbs.rowRequested.connect(self.select_row)
         self.thumbs.max_button.clicked.connect(lambda: self.maximize("thumb"))
         self.image.max_button.clicked.connect(self.maximize_image)
         self.scroll_restore_timer = QTimer(self)
@@ -939,7 +1007,11 @@ class FolderTab(QWidget):
             button.setToolTip(labels[key])
         self.thumbs.size_label.setToolTip(labels["edit_thumb"])
         self.image.zoom_label.setToolTip(labels["edit_zoom"])
+        self.thumbs.size_label.apply_style()
+        self.image.zoom_label.apply_style()
         self.image.label.setStyleSheet(f"color:{PALETTE['muted']};background:transparent;")
+        if self.image.full_window is not None:
+            self.image.full_window.centralWidget().setStyleSheet(f"background:{DARK_IMAGE_BACKGROUND if QColor(PALETTE['surface']).lightness() < 128 else '#111820'};")
         for button in self.findChildren(IconButton) + self.image.findChildren(IconButton): button.refresh_icon()
         if self.comparison_visible: self.image.set_comparison_mode(self.folder.name or str(self.folder))
         self.update_empty_message()
@@ -1100,6 +1172,15 @@ class FolderTab(QWidget):
         index = self.files.index(selected) if selected in self.files else 0
         self.thumbs.select(self.files[max(0, min(len(self.files) - 1, index + offset))])
 
+    def select_row(self, direction):
+        if not self.files: return
+        selected = self.thumbs.selected_path
+        index = self.files.index(selected) if selected in self.files else 0
+        columns = self.thumbs.columns
+        target_row = index // columns + direction
+        if target_row < 0 or target_row * columns >= len(self.files): return
+        self.thumbs.select(self.files[min(len(self.files) - 1, index + direction * columns)])
+
     def select_boundary(self, last):
         if self.files: self.thumbs.select(self.files[-1 if last else 0])
 
@@ -1136,11 +1217,11 @@ class TabFolderControl(QCheckBox):
         painter.translate(8, 0)
         if self.comparing:
             if self.isChecked():
-                painter.setBrush(QColor("#1677ff"))
-                painter.setPen(QPen(QColor("#1677ff"), 1))
+                painter.setBrush(QColor(PALETTE["focus"]))
+                painter.setPen(QPen(QColor(PALETTE["focus"]), 1))
             painter.drawRoundedRect(QRectF(3.5, 3.5, 13, 13), 2, 2)
             if self.isChecked():
-                painter.setPen(QPen(QColor("white"), 1.5))
+                painter.setPen(QPen(QColor(PALETTE["active_text"]), 1.5))
                 painter.drawLine(QPoint(6, 10), QPoint(9, 13))
                 painter.drawLine(QPoint(9, 13), QPoint(14, 7))
         else:
@@ -1148,7 +1229,7 @@ class TabFolderControl(QCheckBox):
             painter.drawPolyline([QPoint(3, 8), QPoint(18, 8), QPoint(15, 16), QPoint(2, 16), QPoint(3, 8)])
         painter.restore()
         if self.hasFocus():
-            painter.setPen(QPen(QColor("#1677ff"), 1, Qt.PenStyle.DotLine))
+            painter.setPen(QPen(QColor(PALETTE["focus"]), 1, Qt.PenStyle.DotLine))
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRect(self.rect().adjusted(0, 0, -1, -1))
         painter.end()
@@ -1164,8 +1245,9 @@ class ComparisonArea(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self.header = QFrame()
         self.header.setObjectName("card")
+        self.header.setFixedHeight(42)
         self.header_layout = QVBoxLayout(self.header)
-        self.header_layout.setContentsMargins(10, 6, 10, 6)
+        self.header_layout.setContentsMargins(10, 4, 10, 4)
         layout.addWidget(self.header)
         self.empty = QLabel()
         self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1243,7 +1325,7 @@ class FolderTabBar(QTabBar):
             selected = index == self.currentIndex()
             if selected:
                 painter.fillRect(option.rect, QColor(PALETTE["card"]))
-                painter.fillRect(option.rect.left(), option.rect.bottom() - 1, option.rect.width(), 2, QColor("#1677ff"))
+                painter.fillRect(option.rect.left(), option.rect.bottom() - 1, option.rect.width(), 2, QColor(PALETTE["focus"]))
             elif option.state & QStyle.StateFlag.State_MouseOver:
                 painter.fillRect(option.rect, QColor(PALETTE["pane"]))
             font = self.font()
@@ -1392,7 +1474,8 @@ class PicView(QMainWindow):
         tool.setObjectName("toolbar")
         tool.setFixedHeight(42)
         layout = QHBoxLayout(tool)
-        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setSpacing(4)
         self.open_button = IconButton("folder", self.t["open"])
         self.vertical_button = IconButton("split-h", self.t["vertical"])
         self.horizontal_button = IconButton("split-v", self.t["horizontal"])
@@ -1441,6 +1524,7 @@ class PicView(QMainWindow):
             #toolbar{{background:transparent;border:0;}}
             #card{{background:{PALETTE['card']};border:0;border-radius:12px;}}
             QLabel{{color:{PALETTE['text']};}}
+            QStatusBar{{color:{PALETTE['warm']};background:{PALETTE['card']};}}
             QSlider::groove:horizontal{{height:5px;background:{PALETTE['edge']};border-radius:2px}}
             QSlider::handle:horizontal{{background:{PALETTE['accent']};width:15px;margin:-5px 0;border-radius:7px}}
             QScrollBar{{background:{PALETTE['surface']};border:0;margin:0;}}
@@ -1674,6 +1758,7 @@ class PicView(QMainWindow):
                     (QKeySequence.StandardKey.PreviousChild, lambda: self.switch_tab(-1)),
                     (QKeySequence.StandardKey.Copy, lambda: self.current_tab().copy_selected_file()),
                     ("Left", lambda: self.current_tab().select_relative(-1)), ("Right", lambda: self.current_tab().select_relative(1)),
+                    ("Up", lambda: self.current_tab().select_row(-1)), ("Down", lambda: self.current_tab().select_row(1)),
                     ("Home", lambda: self.current_tab().select_boundary(False)), ("End", lambda: self.current_tab().select_boundary(True)),
                     ("PgUp", lambda: self.current_tab().select_relative(-1)), ("PgDown", lambda: self.current_tab().select_relative(1)),
                     ("Space", self.advance_or_check), ("Backspace", lambda: self.current_tab().select_relative(-1)),

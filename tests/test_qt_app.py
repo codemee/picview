@@ -58,7 +58,7 @@ def test_language_button_cycles_and_restores_system_mode(tmp_path, monkeypatch, 
     window.image.slider.setValue(1250)
     window.split.setOrientation(Qt.Orientation.Horizontal)
     assert window.language_button.kind == "lang-system"
-    for mode, language, icon in [("zh", "zh", "中"), ("en", "en", "En"), ("system", system_language, "lang-system")]:
+    for mode, language, icon in [("zh", "zh", "中"), ("en", "en", "A"), ("system", system_language, "lang-system")]:
         window.language_button.click()
         app.processEvents()
         assert window.language_mode == mode
@@ -157,11 +157,11 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     assert window.thumbs.buttons[paths[0]].name.grab().toImage().pixelColor(2, 2).name() == THUMBNAIL_SELECTED
     assert "#toolbar{background:transparent;border:0;}" in window.styleSheet()
     assert f"#card{{background:{PALETTE['card']};border:0;border-radius:12px;}}" in window.styleSheet()
-    assert PALETTE["accent"] in window.image.fit_b.styleSheet()
+    assert "QToolButton:checked{background:#e2e6ed;" in window.image.fit_b.styleSheet()
     assert PALETTE["accent"] in window.styleSheet()
     checked_icon = window.image.fit_b.icon().pixmap(window.image.fit_b.iconSize()).toImage()
     assert any(
-        checked_icon.pixelColor(x, y).alpha() and checked_icon.pixelColor(x, y).name() == "#ffffff"
+        checked_icon.pixelColor(x, y).alpha() and checked_icon.pixelColor(x, y).name() == PALETTE["text"]
         for x in range(checked_icon.width()) for y in range(checked_icon.height())
     )
     assert window.image.slider.value() < 1000

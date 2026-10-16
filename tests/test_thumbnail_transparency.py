@@ -28,7 +28,7 @@ def test_transparent_thumbnail_uses_card_background_in_all_states(browser, mode)
             assert pixmap.toImage().pixelColor(0, 0).alpha() == 0
             assert pixmap.toImage().pixelColor(60, 40).red() == 255
             point = preview.rect().center() - QPoint(pixmap.width() // 2, pixmap.height() // 2) + QPoint(2, 2)
-            background = qt_app.THUMBNAIL_SELECTED if selected else qt_app.PALETTE["card"]
+            background = qt_app.PALETTE["selection"] if selected else qt_app.PALETTE["card"]
             assert preview.grab().toImage().pixelColor(point) == QColor(background)
 
 

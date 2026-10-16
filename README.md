@@ -60,7 +60,7 @@ uv run picview
 - Drag a thumbnail or its filename to send the original image file to another application that accepts file drops.
 - Rotation and mirror controls only affect the current view; image files are never modified.
 - Supports JPEG, PNG, WebP, BMP, GIF, TIFF, and static SVG previews. SVG keeps transparency and renders again at the display resolution when zooming, with comparison, rotation, mirroring, and full-screen support. SVG animations are displayed as static images.
-- The language button cycles through **Follow system → Chinese (中) → English (En)**. The system icon shows smaller Chinese and English glyphs separated by a diagonal line. It follows the system by default, using Chinese for Chinese locales and English otherwise, and remembers the mode across restarts.
+- The language button cycles through **Follow system (globe) → Chinese (中) → English (A)**. It follows the system by default, using Chinese for Chinese locales and English otherwise, and remembers the mode across restarts.
 - The current folder is monitored automatically. New images appear in the thumbnail pane without resetting the current view. If the viewed image is deleted, a notification appears at the bottom and the next image is selected; deleting the last image wraps to the first, and an empty folder clears the image pane.
 - Modified files automatically refresh their thumbnails and the current image, including full screen, while preserving zoom, rotation, mirroring, and scroll position. The last complete image remains visible while a file is still being written.
 
@@ -78,7 +78,7 @@ uv run picview
 
 - Enable **Compare images** to replace tab folder icons with checkboxes. The current folder is checked initially.
 - Check folders to divide the image area equally in tab order: side by side when thumbnails are above the images, and stacked when thumbnails are beside the images. Switch tabs to select each folder's own image from its thumbnails.
-- Comparison panes share one toolbar above the images. Click an image pane to select it, indicated by a blue border. Each pane keeps independent zoom, rotation, mirroring, and scrolling. Visible background images continue updating when files change.
+- Comparison panes share one toolbar above the images. Click an image pane to select it, indicated by an accent-colored border. Each pane keeps independent zoom, rotation, mirroring, and scrolling. Visible background images continue updating when files change.
 - Disable comparison to return to normal viewing, keeping each folder's selection and image adjustments.
 
 ### Zoom and thumbnail size
@@ -98,6 +98,7 @@ uv run picview
 | --- | --- |
 | Previous image | `Left`, `Page Up`, or `Backspace` |
 | Next image | `Right`, `Page Down`, or `Space` |
+| Thumbnail in previous / next row | `Up` / `Down` |
 | First / last image | `Home` / `End` |
 | Open full screen | `F11` |
 | Close full screen | `Esc` |
@@ -106,5 +107,6 @@ uv run picview
 
 ### Theme
 
-- Click the theme button to cycle through **Follow system**, **Light**, and **Dark**.
+- Click the theme button to cycle through **Follow system (half-filled circle)**, **Light (sun)**, and **Dark (moon)**.
+- The dark interface uses a Unit-01-inspired palette: deep purple surfaces, neon green selection indicators and sliders, and small orange tool accents. Image colors remain unchanged.
 - **Follow system** is the default.
