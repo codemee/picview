@@ -53,9 +53,11 @@ uv run picview
 
 ## Usage
 
+- Resize the window down to 260 × 220 px. The main, thumbnail, and image toolbars move tools that no longer fit into **⋯ More tools** and restore them when space returns. Hidden zoom and thumbnail-size sliders remain available through numeric editors in the menu.
+
 ### Open images
 
-- The window title shows the current version (for example, **PicView v0.0.8**).
+- The window title shows the current version (for example, **PicView v0.0.9**).
 - Click **Open folder**, or drop a folder or image file onto the window.
 - Drag a thumbnail or its filename to send the original image file to another application that accepts file drops.
 - Rotation and mirror controls only affect the current view; image files are never modified.
@@ -103,7 +105,15 @@ uv run picview
 | Open full screen | `F11` |
 | Close full screen | `Esc` |
 | Open a folder | System Open shortcut |
+| Open a folder in a new tab | `Ctrl+T` |
+| Close the current tab | `Ctrl+W` |
+| Next / previous tab (wrap around) | `Ctrl+Tab` / `Ctrl+Shift+Tab`, or `Ctrl+Page Down` / `Ctrl+Page Up` |
+| Select tab 1–8 | `Ctrl+1`–`Ctrl+8` |
+| Select the last tab | `Ctrl+9` |
+| Reopen the last closed tab | `Ctrl+Shift+T` (restores position and view; remembers up to 20 tabs during this session) |
 | Copy the selected image file to the clipboard | `Ctrl+C` (Windows / Linux), `Command+C` (macOS) |
+
+On macOS, use `Command` instead of `Ctrl` for new, close, numbered, and reopen tab shortcuts. Tab cycling also supports the platform defaults.
 
 ### Theme
 

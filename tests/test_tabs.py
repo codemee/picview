@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -175,6 +176,87 @@ def test_tab_shortcuts_route_to_active_page(browser):
     assert second.thumbs.selected_path == second.files[0]
     QTest.keySequence(window, QKeySequence(QKeySequence.StandardKey.Close))
     assert window.current_tab() is second and window.tabs.count() == 1
+
+
+@pytest.mark.parametrize("focus", ["thumbnail", "image", "tab"])
+@pytest.mark.parametrize("tab_key", [Qt.Key.Key_Tab, Qt.Key.Key_Backtab])
+def test_literal_close_and_previous_tab_shortcuts(browser, focus, tab_key):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    third = window.open_folder(folders[0])
+
+    def focus_target():
+        page = window.current_tab()
+        target = {"thumbnail": page.thumbs.scroll, "image": page.image.scroll, "tab": window.tabs.tabBar()}[focus]
+        target.setFocus()
+        QTest.qWait(25)
+        return target
+
+    QTest.keyClick(focus_target(), tab_key, Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+    assert window.current_tab() is second
+    modifier = Qt.KeyboardModifier.MetaModifier if sys.platform == "darwin" else Qt.KeyboardModifier.ControlModifier
+    QTest.keyClick(focus_target(), Qt.Key.Key_W, modifier)
+    assert window.tabs.count() == 2
+    assert second not in window.pages() and first in window.pages() and third in window.pages()
+    QTest.keyClick(focus_target(), Qt.Key.Key_Tab, Qt.KeyboardModifier.ControlModifier)
+    assert window.current_tab() is first
+
+
+def test_numbered_tab_shortcuts_follow_visual_order(browser):
+    window, folders = browser
+    pages = [window.open_folder(folders[index % 2]) for index in range(10)]
+    modifier = "Meta" if sys.platform == "darwin" else "Ctrl"
+    window.tabs.tabBar().moveTab(9, 0)
+    window.current_tab().thumbs.scroll.setFocus()
+    QTest.qWait(50)
+    for number in range(1, 10):
+        QTest.keySequence(QApplication.focusWidget(), QKeySequence(f"{modifier}+{number}"))
+        expected = window.tabs.widget(window.tabs.count() - 1 if number == 9 else number - 1)
+        assert window.current_tab() is expected
+    assert window.tabs.widget(0) is pages[9]
+    while window.tabs.count() > 2:
+        window.close_tab(2)
+    QTest.keySequence(window, QKeySequence(f"{modifier}+8"))
+    assert window.tabs.currentIndex() == 1
+
+
+def test_page_tab_shortcuts_wrap_without_changing_images(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    QTest.qWait(50)
+    for key, expected in [("Ctrl+PgDown", first), ("Ctrl+PgUp", second)]:
+        QTest.keySequence(window, QKeySequence(key))
+        assert window.current_tab() is expected
+        assert first.thumbs.selected_path == first.files[0]
+        assert second.thumbs.selected_path == second.files[0]
+
+
+def test_reopen_tab_shortcut_restores_state_position_and_last_tab(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    first.thumbs.select(first.files[1])
+    first.image.rotate()
+    second = window.open_folder(folders[1])
+    window.close_tab(0)
+    modifier = "Meta" if sys.platform == "darwin" else "Ctrl"
+    QTest.qWait(50)
+    QTest.keySequence(window, QKeySequence(f"{modifier}+Shift+T"))
+    restored = window.current_tab()
+    assert restored is not first and restored.folder == folders[0]
+    assert restored.thumbs.selected_path == restored.files[1]
+    assert restored.image.rotation == 90
+    assert window.tabs.widget(0) is restored and window.tabs.widget(1) is second
+    window.close_tab(1)
+    window.close_tab(0)
+    assert window.folder is None
+    QTest.keySequence(window, QKeySequence(f"{modifier}+Shift+T"))
+    assert window.tabs.count() == 1 and window.folder == folders[0]
+    QTest.keySequence(window, QKeySequence(f"{modifier}+Shift+T"))
+    assert window.folder == folders[1]
+    QTest.keySequence(window, QKeySequence(f"{modifier}+Shift+T"))
+    assert window.tabs.count() == 2
 
 
 def test_restore_order_active_tab_and_independent_states(browser):

@@ -1,6 +1,6 @@
 [project]
 name = "picview"
-version = "0.0.8"
+version = "0.0.9"
 description = "A lightweight Windows image folder viewer"
 readme = "README.md"
 requires-python = ">=3.11"
