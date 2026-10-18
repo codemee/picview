@@ -53,70 +53,128 @@ uv run picview
 
 ## 使用方式
 
-- 視窗最小可縮至 260 × 220 px。主工具列、縮圖與單圖工具列會將放不下的工具收進 **⋯ 更多工具**；放寬後自動恢復。縮放與縮圖大小滑桿收起時，可從選單開啟數值編輯器。
+### 視窗與工具列
 
-### 開啟圖片
-
+- 視窗最小可縮至 **260 × 220 px**。
+- 主工具列、縮圖與單圖工具列放不下的工具會收進 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/more-dark.png"><img src="docs/icons/more-light.png" width="34" height="34" alt="更多工具" title="更多工具"></picture>。
+- 放寬視窗後，收起的工具會自動恢復。
+- 滑桿收起時，可從更多工具選單輸入縮放比例或縮圖大小。
 - 視窗標題會顯示目前版本，例如 **PicView v0.0.9**。
-- 點擊 **開啟資料夾**，或將資料夾、圖片檔案拖曳至視窗中。
-- 按住縮圖或其檔名拖曳，可將原始圖片檔案拖放至接受檔案拖放的其他應用程式。
-- 旋轉與鏡射功能只影響目前的檢視畫面，不會修改圖片檔案。
-- 支援 JPEG、PNG、WebP、BMP、GIF、TIFF 與靜態 SVG 預覽。SVG 保留透明背景，縮放時依顯示尺寸重新繪製向量內容，也支援比圖、旋轉、鏡射及全螢幕；SVG 動畫目前以靜態畫面顯示。
-- 語言按鈕依序切換 **跟隨系統（地球）→ 中文（中）→ 英文（A）**。預設跟隨系統，中文系統顯示中文，其餘顯示英文；重開程式會保留選擇。
-- 目前資料夾會自動監看：新增圖檔會出現在縮圖窗格，不會重設正在檢視的圖片。若目前圖片被刪除，視窗底部會顯示通知並切換至排序中的下一張；最後一張被刪除時回到第一張，資料夾清空時則清除大圖。
-- 圖檔內容被修改時，縮圖與目前的大圖（包含全螢幕）會自動更新，並保留縮放、旋轉、鏡射與捲動位置；檔案尚未寫完時先保留上一版畫面。
+
+### 開啟與拖放圖片
+
+- 點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/folder-dark.png"><img src="docs/icons/folder-light.png" width="34" height="34" alt="開啟資料夾" title="開啟資料夾"></picture>，選擇要檢視的資料夾。
+- 將資料夾或圖片檔案拖曳至視窗，也能開啟檢視。
+- 按住縮圖或檔名拖曳，可將原始圖檔拖放至接受檔案的其他應用程式。
+- 旋轉與鏡射只影響檢視畫面，不會修改圖檔。
+
+### 圖片與窗格工具
+
+| 按鈕 | 操作 |
+| --- | --- |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/rotate-dark.png"><img src="docs/icons/rotate-light.png" width="34" height="34" alt="旋轉" title="旋轉"></picture> | 旋轉目前圖片 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/mirror-h-dark.png"><img src="docs/icons/mirror-h-light.png" width="34" height="34" alt="水平鏡射" title="水平鏡射"></picture> | 水平鏡射目前圖片 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/mirror-v-dark.png"><img src="docs/icons/mirror-v-light.png" width="34" height="34" alt="垂直鏡射" title="垂直鏡射"></picture> | 垂直鏡射目前圖片 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/fit-dark.png"><img src="docs/icons/fit-light.png" width="34" height="34" alt="符合窗格" title="符合窗格"></picture> | 切換符合窗格與原始大小 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/expand-dark.png"><img src="docs/icons/expand-light.png" width="34" height="34" alt="最大化窗格" title="最大化窗格"></picture> | 最大化縮圖或單圖窗格 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/shrink-dark.png"><img src="docs/icons/shrink-light.png" width="34" height="34" alt="還原窗格" title="還原窗格"></picture> | 還原窗格布局 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/fullscreen-dark.png"><img src="docs/icons/fullscreen-light.png" width="34" height="34" alt="全螢幕" title="全螢幕"></picture> | 開啟目前圖片的全螢幕檢視 |
+
+### 支援格式
+
+- 點陣圖片：JPEG、PNG、WebP、BMP、GIF、TIFF。
+- 向量圖片：靜態 SVG。
+- SVG 保留透明背景，縮放時會依顯示尺寸重新繪製。
+- SVG 支援比圖、旋轉、鏡射及全螢幕。
+- SVG 動畫目前以靜態畫面顯示。
+
+### 資料夾監看與自動更新
+
+- 所有已開啟的資料夾都會自動監看檔案變更。
+- 新增圖檔：自動加入縮圖窗格，保留目前檢視的圖片。
+- 修改圖檔：自動更新縮圖、單圖及全螢幕畫面。
+- 更新時保留縮放、旋轉、鏡射與捲動位置。
+- 檔案尚未寫完時，先保留上一版完整畫面。
+- 目前圖片被刪除：底部顯示通知，並移到排序中的下一張。
+- 最後一張被刪除：回到第一張；資料夾清空時，清除大圖。
+- 背景標籤的圖片被刪除：標籤顯示 **●**，切回後顯示通知。
+- 背景標籤的動畫會暫停。
 
 ### 多資料夾標籤
 
-- **開啟資料夾** 或標籤列的 **＋** 會在新標籤開啟資料夾；拖入多個資料夾也會逐一開啟。同一資料夾可開啟多個標籤，各自選圖，方便比較同資料夾內的不同圖片。
-- 在標籤上按滑鼠右鍵選擇 **複製標籤**，會在原標籤旁建立副本並複製選圖與檢視狀態。比圖模式中，複製已勾選的標籤也會將副本加入比圖。
-- 標籤可拖曳排序，以關閉按鈕關閉；關閉最後一個標籤後保留空白標籤。
-- 每個標籤獨立保留圖片選取、縮放、旋轉、鏡射、捲動、縮圖大小與窗格布局；語言與配色共用。
-- 所有標籤持續監看檔案變更，背景動畫暫停。背景圖片被刪除時，標籤出現 **●**，切回後顯示通知。
-- 重開會還原所有標籤、順序與目前標籤；暫時不存在的資料夾保留標籤，重新出現後自動恢復。
-- 使用系統的「新增標籤／關閉／下一個標籤／上一個標籤」快捷鍵；Windows 常用 `Ctrl+T`、`Ctrl+W`、`Ctrl+Tab`、`Ctrl+Shift+Tab`。
+- 點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/folder-dark.png"><img src="docs/icons/folder-light.png" width="34" height="34" alt="開啟資料夾" title="開啟資料夾"></picture> 或標籤列的 **＋**，在新標籤開啟資料夾。
+- 一次拖入多個資料夾，會逐一開啟標籤。
+- 同一資料夾可開啟多個標籤，各自選圖，方便比較不同圖片。
+- 在標籤上按右鍵 → **複製標籤**，在原標籤旁建立副本。
+- 副本會保留原標籤的選圖與檢視狀態。
+- 比圖模式中，複製已勾選的標籤，副本也會加入比圖。
+- 拖曳標籤可調整順序。
+- 點擊標籤的關閉按鈕可關閉；關閉最後一頁後，會保留空白標籤。
+- 各標籤獨立保留選圖、縮放、旋轉、鏡射、捲動、縮圖大小與窗格布局。
+- 語言與配色由所有標籤共用。
+- 重開程式會還原所有標籤、順序與目前標籤。
+- 暫時不存在的資料夾會保留標籤，重新出現後自動恢復。
+- 標籤快捷鍵請見下方「鍵盤快捷鍵」。
 
-### 比較不同資料夾的圖片
+### 比較圖片
 
-- 啟用工具列的 **比圖**，標籤上的資料夾圖示會改為核取方塊，預設勾選目前資料夾。
-- 勾選要比較的標籤，單圖區域依標籤順序等分：上下版面中左右並排，左右版面中上下排列。切換標籤後，從縮圖選擇該資料夾自己的圖片。
-- 比較窗格共用上方工具列，點擊圖片窗格後以重點色外框標示操作目標。各窗格仍獨立縮放、旋轉、鏡射及捲動；比較中的背景圖片也會即時更新。
-- 再次點擊 **比圖** 回到一般檢視，保留各資料夾的選圖與圖片操作狀態。
+- 點擊工具列的 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/compare-dark.png"><img src="docs/icons/compare-light.png" width="34" height="34" alt="比圖" title="比圖"></picture>，啟用比較模式。
+- 標籤的資料夾圖示會變成核取方塊，預設勾選目前標籤。
+- 勾選要比較的標籤，單圖區域會依標籤順序等分。
+- <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/split-h-dark.png"><img src="docs/icons/split-h-light.png" width="34" height="34" alt="上下版面" title="上下版面"></picture> 上下版面：比較圖片左右並排。
+- <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/split-v-dark.png"><img src="docs/icons/split-v-light.png" width="34" height="34" alt="左右版面" title="左右版面"></picture> 左右版面：比較圖片上下排列。
+- 切換到各標籤，從縮圖選擇該資料夾要比較的圖片。
+- 比較窗格共用上方工具列。
+- 點擊圖片窗格，指定工具列的操作目標；該窗格會顯示重點色外框。
+- 各窗格可獨立縮放、旋轉、鏡射及捲動。
+- 比較中的背景圖片也會即時更新。
+- 再次點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/compare-dark.png"><img src="docs/icons/compare-light.png" width="34" height="34" alt="比圖" title="比圖"></picture>，回到一般檢視並保留各標籤的選圖與操作狀態。
 
 ### 縮放與縮圖大小
 
-- 圖片大小未超出窗格時，以原始像素大小（100%）顯示；較大的圖片會縮放至符合窗格。
-- 點擊 **符合窗格**，即可在符合窗格與原始大小之間切換。
-- 使用縮放滑桿或 `+` / `-` 調整顯示比例；按 `0` 回到 100%。
-- 點擊任一滑桿左側的數值，即可輸入精確的縮放百分比或縮圖大小。
-- 在數值輸入視窗中：
-  - 按 `Enter` 套用。
-  - 按 `Esc` 或點擊視窗外部取消。
-  - 使用重設按鈕，將顯示比例還原為 100%，或將縮圖大小還原為 140 像素。
+- 圖片未超出窗格時，以原始大小 **100%** 顯示。
+- 較大的圖片會自動縮放至符合窗格。
+- 點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/fit-dark.png"><img src="docs/icons/fit-light.png" width="34" height="34" alt="符合窗格" title="符合窗格"></picture>，切換符合窗格與原始大小。
+- 拖曳縮放滑桿，或按 <kbd>+</kbd> / <kbd>-</kbd>，調整顯示比例。
+- 按 <kbd>0</kbd> 回到 **100%**。
+- 點擊滑桿左側的數值，輸入精確的縮放百分比或縮圖大小。
+- 在數值輸入視窗按 <kbd>Enter</kbd> 套用。
+- 按 <kbd>Esc</kbd> 或點擊視窗外部取消。
+- 點擊重設按鈕，還原 **100%** 縮放或 **140 px** 縮圖大小。
 
 ### 鍵盤快捷鍵
 
 | 操作 | 快捷鍵 |
 | --- | --- |
-| 上一張圖片 | `Left`（左方向鍵）、`Page Up` 或 `Backspace` |
-| 下一張圖片 | `Right`（右方向鍵）、`Page Down` 或 `Space`（空白鍵） |
-| 上一列／下一列縮圖 | `Up`（上方向鍵）／`Down`（下方向鍵） |
-| 第一張／最後一張圖片 | `Home` / `End` |
-| 開啟全螢幕 | `F11` |
-| 關閉全螢幕 | `Esc` |
+| 上一張圖片 | <kbd>Left</kbd>（左方向鍵）、<kbd>Page Up</kbd> 或 <kbd>Backspace</kbd> |
+| 下一張圖片 | <kbd>Right</kbd>（右方向鍵）、<kbd>Page Down</kbd> 或 <kbd>Space</kbd>（空白鍵） |
+| 上一列／下一列縮圖 | <kbd>Up</kbd>（上方向鍵）／<kbd>Down</kbd>（下方向鍵） |
+| 第一張／最後一張圖片 | <kbd>Home</kbd> / <kbd>End</kbd> |
+| 開啟全螢幕 | <kbd>F11</kbd> |
+| 關閉全螢幕 | <kbd>Esc</kbd> |
 | 開啟資料夾 | 系統的「開啟」快捷鍵 |
-| 在新標籤開啟資料夾 | `Ctrl+T` |
-| 關閉目前標籤 | `Ctrl+W` |
-| 下一個／上一個標籤（循環切換） | `Ctrl+Tab` / `Ctrl+Shift+Tab`，或 `Ctrl+Page Down` / `Ctrl+Page Up` |
-| 切換到第 1～8 個標籤 | `Ctrl+1`～`Ctrl+8` |
-| 切換到最後一個標籤 | `Ctrl+9` |
-| 重新開啟剛關閉的標籤 | `Ctrl+Shift+T`（還原位置與檢視狀態，保留最近 20 筆，限本次執行） |
-| 將選取的圖片檔案複製到剪貼簿 | `Ctrl+C`（Windows / Linux）、`Command+C`（macOS） |
+| 在新標籤開啟資料夾 | <kbd>Ctrl</kbd>+<kbd>T</kbd> |
+| 關閉目前標籤 | <kbd>Ctrl</kbd>+<kbd>W</kbd> |
+| 下一個／上一個標籤（循環切換） | <kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd>，或 <kbd>Ctrl</kbd>+<kbd>Page Down</kbd> / <kbd>Ctrl</kbd>+<kbd>Page Up</kbd> |
+| 切換到第 1～8 個標籤 | <kbd>Ctrl</kbd>+<kbd>1</kbd>～<kbd>Ctrl</kbd>+<kbd>8</kbd> |
+| 切換到最後一個標籤 | <kbd>Ctrl</kbd>+<kbd>9</kbd> |
+| 重新開啟剛關閉的標籤 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>（還原位置與檢視狀態，保留最近 20 筆，限本次執行） |
+| 將選取的圖片檔案複製到剪貼簿 | <kbd>Ctrl</kbd>+<kbd>C</kbd>（Windows / Linux）、<kbd>Command</kbd>+<kbd>C</kbd>（macOS） |
 
-macOS 的新增、關閉、數字切換與重新開啟標籤使用 `Command` 取代 `Ctrl`；前後切換也支援系統預設快捷鍵。
+- macOS 的新增、關閉、數字切換與重新開啟標籤：使用 <kbd>Command</kbd> 取代 <kbd>Ctrl</kbd>。
+- 前後切換標籤也支援系統預設快捷鍵。
+
+### 語言
+
+- 點擊語言按鈕，依序切換 **跟隨系統 → 中文 → 英文**。
+- 圖示依序為 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/lang-system-dark.png"><img src="docs/icons/lang-system-light.png" width="34" height="34" alt="語言跟隨系統" title="語言跟隨系統"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/lang-zh-dark.png"><img src="docs/icons/lang-zh-light.png" width="34" height="34" alt="中文" title="中文"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/lang-en-dark.png"><img src="docs/icons/lang-en-light.png" width="34" height="34" alt="英文" title="英文"></picture>。
+- 預設跟隨系統：中文系統顯示中文，其餘顯示英文。
+- 重開程式會保留語言選擇。
 
 ### 配色
 
-- 點擊配色按鈕，依序切換 **跟隨系統（半明半暗圓形）**、**淺色（太陽）** 與 **深色（月亮）**。
-- 深色介面採初號機風格：深紫色窗格、螢光綠選取提示與滑桿，以及少量橘色工具點綴。圖片本身的顏色不會改變。
+- 點擊配色按鈕，依序切換 **跟隨系統 → 淺色 → 深色**。
+- 圖示依序為 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/theme-system-dark.png"><img src="docs/icons/theme-system-light.png" width="34" height="34" alt="配色跟隨系統" title="配色跟隨系統"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/theme-light-dark.png"><img src="docs/icons/theme-light-light.png" width="34" height="34" alt="淺色" title="淺色"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/theme-dark-dark.png"><img src="docs/icons/theme-dark-light.png" width="34" height="34" alt="深色" title="深色"></picture>。
 - 預設為 **跟隨系統**。
+- 深色介面採初號機風格：深紫色窗格、螢光綠選取提示與滑桿，以及少量橘色工具點綴。
+- 圖片本身的顏色不會改變。
