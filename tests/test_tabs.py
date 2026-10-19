@@ -6,7 +6,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 from PIL import Image
-from PySide6.QtCore import QMimeData, QPoint, QUrl, Qt
+from PySide6.QtCore import QEventLoop, QMimeData, QPoint, QTimer, QUrl, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QFileDialog, QMenu, QTabBar
@@ -18,8 +18,10 @@ from picview.settings import load_settings, save_settings
 def wait_until(condition):
     deadline = time.monotonic() + 3
     while not condition() and time.monotonic() < deadline:
-        QTest.qWait(25)
-        time.sleep(0.001)  # QtTest can hold the GIL while waiting.
+        # A real event loop releases the GIL for background Python decoders.
+        loop = QEventLoop()
+        QTimer.singleShot(25, loop.quit)
+        loop.exec()
     assert condition()
 
 
