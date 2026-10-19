@@ -17,6 +17,7 @@ def test_transparent_thumbnail_uses_card_background_in_all_states(browser, mode)
     if mode == "P": image = image.convert("P", palette=Image.Palette.ADAPTIVE)
     image.save(path)
     page = window.open_folder(folders[0])
+    wait_until(lambda: not page.thumbs.buttons[path].preview.pixmap().isNull())
     for theme in ("light", "dark"):
         window.theme_mode = "system" if theme == "light" else "light"
         window.toggle_theme()

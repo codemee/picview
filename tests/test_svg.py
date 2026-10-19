@@ -17,7 +17,7 @@ def test_svg_thumbnail_zoom_transforms_and_fullscreen(browser):
     write_svg(path)
     assert path in image_files(folders[0])
     page = window.open_folder(folders[0], path)
-    QTest.qWait(100)
+    wait_until(lambda: not page.thumbs.buttons[path].preview.pixmap().isNull())
     assert isinstance(page.image.frames[0][0], SvgDocument)
     assert not page.image.timer.isActive()
     assert not page.image.frames[0][0].renderer.isAnimationEnabled()
