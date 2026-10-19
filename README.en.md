@@ -9,8 +9,8 @@ Image folder viewer built with Qt.
 ### Desktop downloads
 
 - Download desktop builds from [GitHub Releases](https://github.com/codemee/picview/releases) when attached to a release. Python and uv are not required.
-- **Windows x64:** run `PicView-<version>-windows-x64.exe` directly.
-- **macOS Apple Silicon:** open `PicView-<version>-macos-arm64.dmg`, then drag **PicView.app** into **Applications**.
+- **Windows x64**: run `PicView-<version>-windows-x64.exe` directly.
+- **macOS Apple Silicon**: open `PicView-<version>-macos-arm64.dmg`, then drag **PicView.app** into **Applications**.
 - Desktop builds currently have no Windows publisher signature or Apple Developer ID notarization, so the operating system may prompt or block the first launch.
 
 ### With uv
