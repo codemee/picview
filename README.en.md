@@ -1,8 +1,20 @@
 # PicView
 
-Image folder viewer built with Qt.
+An image folder viewer built with Qt, focused on **fast loading** and **image comparison**.
 
 [繁體中文](https://github.com/codemee/picview/blob/main/README.md)
+
+## Highlights
+
+### Fast loading
+
+- Load the current image and prioritize visible thumbnails while the rest load progressively in the background, reducing the wait when opening a folder.
+- Keep thumbnails in memory for reuse across tabs and layout changes, avoiding repeated decoding without saving thumbnail files to disk.
+
+### Image comparison
+
+- Check tabs to compare images side by side, across different folders or multiple tabs of the same folder.
+- Select images, zoom, rotate, mirror, and scroll each comparison pane independently to inspect details and differences.
 
 ## Install and run
 
