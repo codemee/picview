@@ -74,6 +74,7 @@ def test_background_compared_image_updates_and_deletion(browser):
     Image.new("RGB", (180, 90), "blue").save(path)
     wait_until(lambda: first.image.frames[0][0].size == (180, 90))
     assert first.image.frames[0][0].getpixel((0, 0))[:3] == (0, 0, 255)
+    wait_until(lambda: first.thumbs.buttons[path].preview.pixmap().toImage().pixelColor(0, 0).name() == "#0000ff")
     pixel = first.thumbs.buttons[path].preview.pixmap().toImage().pixelColor(0, 0)
     assert (pixel.red(), pixel.green(), pixel.blue()) == (0, 0, 255)
     path.unlink()

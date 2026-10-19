@@ -2,7 +2,7 @@
 
 Image folder viewer built with Qt.
 
-[繁體中文](README.md)
+[繁體中文](https://github.com/codemee/picview/blob/main/README.md)
 
 ## Install and run
 
@@ -56,14 +56,17 @@ uv run picview
 ### Window and toolbars
 
 - Resize the window down to **260 × 220 px**.
-- Tools that no longer fit move into <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/more-dark.png"><img src="docs/icons/more-light.png" width="34" height="34" alt="More tools" title="More tools"></picture> on the main, thumbnail, and image toolbars.
+- Tools that no longer fit move into <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="More tools" title="More tools"></picture> on the main, thumbnail, and image toolbars.
 - Widen the window to restore the hidden tools automatically.
+- Visible thumbnails load first; the rest are decoded progressively in the background.
+- Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
+- Resizing panes rearranges existing thumbnails without decoding every image again.
 - When sliders are hidden, use the overflow menu to enter zoom or thumbnail-size values.
-- The window title shows the current version, for example **PicView v0.0.9**.
+- The window title shows the current version, for example **PicView v0.0.10**.
 
 ### Open and drag images
 
-- Click <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/folder-dark.png"><img src="docs/icons/folder-light.png" width="34" height="34" alt="Open folder" title="Open folder"></picture> to choose a folder to view.
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-light.png" width="34" height="34" alt="Open folder" title="Open folder"></picture> to choose a folder to view.
 - Drop a folder or image file onto the window to open it.
 - Drag a thumbnail or its filename to send the original file to another application that accepts file drops.
 - Rotation and mirroring only affect the view; they do not modify image files.
@@ -72,13 +75,13 @@ uv run picview
 
 | Button | Action |
 | --- | --- |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/rotate-dark.png"><img src="docs/icons/rotate-light.png" width="34" height="34" alt="Rotate" title="Rotate"></picture> | Rotate the current image |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/mirror-h-dark.png"><img src="docs/icons/mirror-h-light.png" width="34" height="34" alt="Mirror horizontally" title="Mirror horizontally"></picture> | Mirror the current image horizontally |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/mirror-v-dark.png"><img src="docs/icons/mirror-v-light.png" width="34" height="34" alt="Mirror vertically" title="Mirror vertically"></picture> | Mirror the current image vertically |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/fit-dark.png"><img src="docs/icons/fit-light.png" width="34" height="34" alt="Fit to pane" title="Fit to pane"></picture> | Toggle fitted and original image size |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/expand-dark.png"><img src="docs/icons/expand-light.png" width="34" height="34" alt="Maximize pane" title="Maximize pane"></picture> | Maximize the thumbnail or image pane |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/shrink-dark.png"><img src="docs/icons/shrink-light.png" width="34" height="34" alt="Restore pane" title="Restore pane"></picture> | Restore the pane layout |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/fullscreen-dark.png"><img src="docs/icons/fullscreen-light.png" width="34" height="34" alt="Full screen" title="Full screen"></picture> | Open the current image in full screen |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/rotate-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/rotate-light.png" width="34" height="34" alt="Rotate" title="Rotate"></picture> | Rotate the current image |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mirror-h-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mirror-h-light.png" width="34" height="34" alt="Mirror horizontally" title="Mirror horizontally"></picture> | Mirror the current image horizontally |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mirror-v-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mirror-v-light.png" width="34" height="34" alt="Mirror vertically" title="Mirror vertically"></picture> | Mirror the current image vertically |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fit-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fit-light.png" width="34" height="34" alt="Fit to pane" title="Fit to pane"></picture> | Toggle fitted and original image size |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/expand-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/expand-light.png" width="34" height="34" alt="Maximize pane" title="Maximize pane"></picture> | Maximize the thumbnail or image pane |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shrink-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shrink-light.png" width="34" height="34" alt="Restore pane" title="Restore pane"></picture> | Restore the pane layout |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fullscreen-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fullscreen-light.png" width="34" height="34" alt="Full screen" title="Full screen"></picture> | Open the current image in full screen |
 
 ### Supported formats
 
@@ -102,7 +105,7 @@ uv run picview
 
 ### Multiple folder tabs
 
-- Click <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/folder-dark.png"><img src="docs/icons/folder-light.png" width="34" height="34" alt="Open folder" title="Open folder"></picture> or **＋** to open a folder in a new tab.
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-light.png" width="34" height="34" alt="Open folder" title="Open folder"></picture> or **＋** to open a folder in a new tab.
 - Drop multiple folders to open a tab for each one.
 - Open the same folder in multiple tabs to select and compare different images independently.
 - Right-click a tab → **Duplicate tab** to create a copy beside it.
@@ -118,23 +121,23 @@ uv run picview
 
 ### Compare images
 
-- Click <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/compare-dark.png"><img src="docs/icons/compare-light.png" width="34" height="34" alt="Compare images" title="Compare images"></picture> to enable comparison mode.
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/compare-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/compare-light.png" width="34" height="34" alt="Compare images" title="Compare images"></picture> to enable comparison mode.
 - Tab folder icons become checkboxes; the current tab is checked initially.
 - Check the tabs to compare; the image area divides equally in tab order.
-- <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/split-h-dark.png"><img src="docs/icons/split-h-light.png" width="34" height="34" alt="Stacked layout" title="Stacked layout"></picture> With thumbnails above the images, comparison panes appear side by side.
-- <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/split-v-dark.png"><img src="docs/icons/split-v-light.png" width="34" height="34" alt="Side-by-side layout" title="Side-by-side layout"></picture> With thumbnails beside the images, comparison panes are stacked.
+- <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-h-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-h-light.png" width="34" height="34" alt="Stacked layout" title="Stacked layout"></picture> With thumbnails above the images, comparison panes appear side by side.
+- <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-v-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-v-light.png" width="34" height="34" alt="Side-by-side layout" title="Side-by-side layout"></picture> With thumbnails beside the images, comparison panes are stacked.
 - Switch to each tab and select its image from the thumbnails.
 - Comparison panes share one toolbar above the images.
 - Click an image pane to make it the toolbar's target; an accent-colored border marks it.
 - Zoom, rotate, mirror, and scroll each pane independently.
 - Visible background images continue updating when files change.
-- Click <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/compare-dark.png"><img src="docs/icons/compare-light.png" width="34" height="34" alt="Compare images" title="Compare images"></picture> again to return to normal viewing and keep each tab's selection and adjustments.
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/compare-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/compare-light.png" width="34" height="34" alt="Compare images" title="Compare images"></picture> again to return to normal viewing and keep each tab's selection and adjustments.
 
 ### Zoom and thumbnail size
 
 - Images that fit the pane open at their original size, **100%**.
 - Larger images are scaled to fit the pane automatically.
-- Click <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/fit-dark.png"><img src="docs/icons/fit-light.png" width="34" height="34" alt="Fit to pane" title="Fit to pane"></picture> to toggle between fitted and original size.
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fit-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fit-light.png" width="34" height="34" alt="Fit to pane" title="Fit to pane"></picture> to toggle between fitted and original size.
 - Drag the zoom slider or press <kbd>+</kbd> / <kbd>-</kbd> to adjust the view.
 - Press <kbd>0</kbd> to return to **100%**.
 - Click the value to the left of a slider to enter an exact zoom percentage or thumbnail size.
@@ -167,14 +170,14 @@ uv run picview
 ### Language
 
 - Click the language button to cycle through **Follow system → Chinese → English**.
-- The icons are <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/lang-system-dark.png"><img src="docs/icons/lang-system-light.png" width="34" height="34" alt="Follow system language" title="Follow system language"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/lang-zh-dark.png"><img src="docs/icons/lang-zh-light.png" width="34" height="34" alt="Chinese" title="Chinese"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/lang-en-dark.png"><img src="docs/icons/lang-en-light.png" width="34" height="34" alt="English" title="English"></picture>.
+- The icons are <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-system-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-system-light.png" width="34" height="34" alt="Follow system language" title="Follow system language"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-zh-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-zh-light.png" width="34" height="34" alt="Chinese" title="Chinese"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-en-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-en-light.png" width="34" height="34" alt="English" title="English"></picture>.
 - The default is **Follow system**: Chinese for Chinese locales and English otherwise.
 - Your language choice is remembered across restarts.
 
 ### Theme
 
 - Click the theme button to cycle through **Follow system → Light → Dark**.
-- The icons are <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/theme-system-dark.png"><img src="docs/icons/theme-system-light.png" width="34" height="34" alt="Follow system theme" title="Follow system theme"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/theme-light-dark.png"><img src="docs/icons/theme-light-light.png" width="34" height="34" alt="Light" title="Light"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="docs/icons/theme-dark-dark.png"><img src="docs/icons/theme-dark-light.png" width="34" height="34" alt="Dark" title="Dark"></picture>.
+- The icons are <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-system-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-system-light.png" width="34" height="34" alt="Follow system theme" title="Follow system theme"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-light-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-light-light.png" width="34" height="34" alt="Light" title="Light"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-dark-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-dark-light.png" width="34" height="34" alt="Dark" title="Dark"></picture>.
 - The default is **Follow system**.
 - The dark theme uses a Unit-01-inspired palette: deep purple surfaces, neon green indicators and sliders, and orange tool accents.
 - Image colors remain unchanged.

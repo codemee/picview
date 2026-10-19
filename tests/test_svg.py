@@ -86,7 +86,8 @@ def test_invalid_svg_and_large_intrinsic_dimensions(browser):
     invalid.write_text("not an svg", encoding="utf-8")
     with pytest.raises(ValueError): SvgDocument(invalid)
     page = window.open_folder(folders[0], invalid)
-    assert not page.image.frames and invalid in page.thumbs.failed_paths
+    wait_until(lambda: invalid in page.thumbs.failed_paths)
+    assert not page.image.frames
     huge = folders[0] / "huge.svg"
     huge.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100000 100000"><rect width="100000" height="100000" fill="red"/></svg>', encoding="utf-8")
     document = SvgDocument(huge)

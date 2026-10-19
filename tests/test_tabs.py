@@ -19,6 +19,7 @@ def wait_until(condition):
     deadline = time.monotonic() + 3
     while not condition() and time.monotonic() < deadline:
         QTest.qWait(25)
+        time.sleep(0.001)  # QtTest can hold the GIL while waiting.
     assert condition()
 
 
@@ -102,7 +103,8 @@ def test_background_modification_is_loaded_on_activation(browser):
     Image.new("RGB", (120, 80), "blue").save(first.files[0])
     wait_until(lambda: first.thumbs.buttons[first.files[0]].preview.pixmap().toImage().pixelColor(0, 0).name() == "#0000ff")
     assert window.current_tab() is second
-    assert first.image.frames is original_frames and first.image_dirty
+    wait_until(lambda: first.image_dirty)
+    assert first.image.frames is original_frames
     window.tabs.setCurrentWidget(first)
     assert first.image.frames[0][0].getpixel((0, 0)) == (0, 0, 255, 255)
     assert first.image.slider.value() == 1500

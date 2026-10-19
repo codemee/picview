@@ -16,7 +16,7 @@ For an existing PyPI project, add the same publisher under the project's Publish
 
 ## Release
 
-1. Update the version in `pyproject.toml` and `src/picview/__init__.py`, then run `uv lock`.
+1. Update the version in `pyproject.toml`, `src/picview/__init__.py`, and the examples in `README.md` and `README.en.md`, then run `uv lock`.
 2. Commit and push the changes.
 3. Publish a GitHub Release with a matching tag, such as `v0.0.2`.
 4. The `Publish to PyPI` workflow tests the Windows application, builds and validates the distributions, and uploads them using Trusted Publishing.
@@ -26,6 +26,13 @@ For an existing PyPI project, add the same publisher under the project's Publish
 - Manual runs publish the version in the selected Git ref. Always use a ref containing the intended release contents.
 - PyPI release files cannot be replaced with different contents. Use a new version for subsequent code changes.
 - No long-lived PyPI API token is required.
+
+## Documentation
+
+- `README.md` is the default Traditional Chinese guide and the PyPI project description. Keep `README.en.md` in sync; `README.zh-TW.md` preserves the former Chinese documentation link.
+- Update usage instructions and release notes when behavior changes.
+- Keep image and language links in the published README absolute so they also resolve on PyPI.
+- Regenerate light/dark button images with `uv run python scripts/export_doc_icons.py` when icon shapes change. Keep their button backgrounds and HTML `<kbd>` keycaps readable in dark Markdown viewers.
 
 ## Desktop releases
 

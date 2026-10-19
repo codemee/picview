@@ -10,6 +10,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from picview.qt_app import PicView, ThumbnailTile
+from test_tabs import wait_until
 
 
 @pytest.fixture
@@ -22,7 +23,7 @@ def drag_setup(tmp_path, monkeypatch):
     window = PicView()
     window.show()
     window.open_folder(tmp_path, path)
-    app.processEvents()
+    wait_until(lambda: not window.thumbs.buttons[path].preview.pixmap().isNull())
     drags = []
     class FakeDrag:
         def __init__(self, source):

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 from . import __version__
 from .settings import load_settings, normalize_tab_state, save_settings
 from .svg import SvgDocument
+from .thumbnails import THUMBNAILS
 from .utils import IMAGE_SUFFIXES, image_files, natural_key
 
 
@@ -439,6 +440,17 @@ class ThumbnailPane(QFrame):
         self.setMinimumSize(54, 50)
         layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         self.scroll.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self._loaded = {}
+        self._pending_paths = set()
+        self._jobs = {}
+        self._stopped = False
+        self.preview_timer = QTimer(self)
+        self.preview_timer.setInterval(10)
+        self.preview_timer.timeout.connect(self.load_previews)
+        self.layout_timer = QTimer(self)
+        self.layout_timer.setSingleShot(True)
+        self.layout_timer.timeout.connect(self.build)
+        self.scroll.verticalScrollBar().valueChanged.connect(self.schedule_previews)
         self.toolbar_overflow = ToolbarOverflow(self, header, [self.slider, self.size_label, self.max_button],
             lambda: self.labels["more_tools"], {self.slider: self.size_label},
             lambda: self.width() - layout.contentsMargins().left() - layout.contentsMargins().right())
@@ -463,44 +475,121 @@ class ThumbnailPane(QFrame):
         self.files=files; self.selected_path=selected if selected in files else (files[0] if files else None); self.build()
         if emit_selection and self.selected_path: self.selected.emit(self.selected_path)
     def _resize(self,v): self.size=v; self.size_label.set_value(v); self.build()
-    def preview_pixmap(self, path):
-        if path.suffix.lower() == ".svg":
-            document = SvgDocument(path)
-            size = QSize(*document.size).scaled(self.size, self.size, Qt.AspectRatioMode.KeepAspectRatio)
-            dpr = self.devicePixelRatioF()
-            pixmap = QPixmap.fromImage(document.render((max(1, round(size.width() * dpr)), max(1, round(size.height() * dpr)))))
-            pixmap.setDevicePixelRatio(dpr)
-            return pixmap
-        with Image.open(path) as image:
-            image = ImageOps.exif_transpose(image).convert("RGBA")
-            image.thumbnail((self.size, self.size))
-            return QPixmap.fromImage(qimage(image))
     def build(self):
-        while self.grid.count(): item=self.grid.takeAt(0); item.widget().deleteLater() if item.widget() else None
-        cols=max(1,self.scroll.viewport().width()//(self.size+20)); self.columns=cols; self.buttons={}; self.failed_paths=set()
-        for i,path in enumerate(self.files):
-            try:
-                pix = self.preview_pixmap(path)
-                b=ThumbnailTile(path, pix, self.size, path == self.selected_path)
-            except Exception:
-                self.failed_paths.add(path)
-                b=ThumbnailTile(path, None, self.size, path == self.selected_path)
-            b.clicked_path.connect(self.select_clicked)
-            self.grid.addWidget(b,i//cols,i%cols); self.buttons[path]=b
-    def resizeEvent(self,event): super().resizeEvent(event); QTimer.singleShot(0,self.build)
-    def refresh_previews(self, paths):
-        completed = set()
-        for path in paths:
+        if self._stopped: return
+        wanted = set(self.files)
+        for path in list(self.buttons):
+            if path not in wanted:
+                tile = self.buttons.pop(path)
+                self.grid.removeWidget(tile)
+                tile.deleteLater()
+                self._loaded.pop(path, None)
+        self.failed_paths.intersection_update(wanted)
+        self._pending_paths.intersection_update(wanted)
+        cols = max(1, self.scroll.viewport().width() // (self.size + 20))
+        signature = (cols, self.size, tuple(self.files))
+        rearrange = signature != getattr(self, "_layout_signature", None)
+        self._layout_signature = signature
+        self.columns = cols
+        for index, path in enumerate(self.files):
+            tile = self.buttons.get(path)
+            new = tile is None
+            if new:
+                tile = ThumbnailTile(path, None, self.size, path == self.selected_path)
+                tile.clicked_path.connect(self.select_clicked)
+                self.buttons[path] = tile
+            selected = path == self.selected_path
+            if tile.selected != selected:
+                tile.selected = selected
+                tile.apply_style()
+            resized = tile.width() != self.size + 12
+            if resized:
+                tile.setFixedSize(self.size + 12, self.size + 38)
+                tile.preview.setFixedHeight(self.size)
+            if new or rearrange or resized:
+                self.grid.addWidget(tile, index // cols, index % cols)
+            if self._loaded.get(path) != THUMBNAILS.key(path, self.size, self.devicePixelRatioF()):
+                self._pending_paths.add(path)
+        self.schedule_previews()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "layout_timer"): self.layout_timer.start(0)
+
+    def schedule_previews(self, *_):
+        if not self._stopped and not self.preview_timer.isActive() and (self._pending_paths or self._jobs):
+            self.preview_timer.start()
+
+    def preview_order(self):
+        # Prioritize the viewport and one nearby row, then decode the rest.
+        row_height = self.size + 38 + max(0, self.grid.verticalSpacing())
+        first_row = max(0, self.scroll.verticalScrollBar().value() // row_height - 1)
+        last_row = (self.scroll.verticalScrollBar().value() + self.scroll.viewport().height()) // row_height + 2
+        visible = self.files[first_row * self.columns:last_row * self.columns]
+        priority = list(dict.fromkeys(visible + ([self.selected_path] if self.selected_path else [])))
+        seen = set(priority)
+        return [path for path in priority + [p for p in self.files if p not in seen] if path in self._pending_paths]
+
+    def apply_preview(self, key, image):
+        path = key[0]
+        if path not in self.buttons: return
+        self.buttons[path].preview.setPixmap(QPixmap.fromImage(image))
+        self._loaded[path] = key
+        self.failed_paths.discard(path)
+        self._pending_paths.discard(path)
+
+    def load_previews(self):
+        if self._stopped: return
+        THUMBNAILS.collect()
+        for key, future in list(self._jobs.items()):
+            if not future.done(): continue
+            del self._jobs[key]
+            path = key[0]
             if path not in self.buttons: continue
-            try:
-                pixmap = self.preview_pixmap(path)
-            except Exception:
-                self.failed_paths.add(path)
+            if key != THUMBNAILS.key(path, self.size, self.devicePixelRatioF()):
+                self._pending_paths.add(path)
                 continue
-            self.buttons[path].preview.setPixmap(pixmap)
-            self.failed_paths.discard(path)
-            completed.add(path)
-        return completed
+            if future.cancelled():
+                self._pending_paths.add(path)
+            elif future.exception() is not None:
+                self.failed_paths.add(path)
+                self._pending_paths.discard(path)
+            else:
+                self.apply_preview(key, future.result())
+        if len(self._jobs) >= 2: return
+        busy = {key[0] for key in self._jobs}
+        applied = 0
+        for path in self.preview_order():
+            if path in busy: continue
+            key = THUMBNAILS.key(path, self.size, self.devicePixelRatioF())
+            image = THUMBNAILS.get(key)
+            if image is not None:
+                self.apply_preview(key, image)
+                applied += 1
+                if applied >= 12: break
+            elif len(self._jobs) < 2:
+                self._jobs[key] = THUMBNAILS.request(key)
+            else:
+                break
+        if not self._pending_paths and not self._jobs: self.preview_timer.stop()
+
+    def refresh_previews(self, paths):
+        requested = set(paths).intersection(self.buttons)
+        for path in requested:
+            THUMBNAILS.invalidate(path)
+            self._pending_paths.add(path)
+        self.schedule_previews()
+        # Full-image reloads can proceed independently of thumbnail decoding.
+        return requested
+
+    def shutdown(self):
+        self._stopped = True
+        self.preview_timer.stop()
+        self.layout_timer.stop()
+        self._pending_paths.clear()
+        for future in self._jobs.values(): future.cancel()
+        self._jobs.clear()
+
     def select(self,path):
         if path not in self.files: return
         self.selected_path=path
@@ -1152,6 +1241,7 @@ class FolderTab(QWidget):
         self.folder_poll_timer.stop()
         self.scroll_restore_timer.stop()
         self.image.timer.stop()
+        self.thumbs.shutdown()
         if self.image.full_window is not None: self.image.open_full()
         self.image.clear()
         watched = self.folder_watcher.directories() + self.folder_watcher.files()
@@ -1243,7 +1333,7 @@ class FolderTab(QWidget):
             for path in retry_paths:
                 self._pending_image_retries[path] = max(0, self._pending_image_retries.get(path, 8) - 1)
             self._pending_image_versions = self.pending_image_versions()
-            self._pending_image_retries = {path: self._pending_image_retries[path] for path in self.thumbs.failed_paths}
+            self._pending_image_retries = {path: self._pending_image_retries.get(path, 8) for path in self.thumbs.failed_paths}
             if selected in completed and (selected in changed or self._image_reload_retries or not self.image.frames):
                 if self.reload_current_image(): self._image_reload_retries = 0
                 else: self._image_reload_retries = max(0, self._image_reload_retries - 1)

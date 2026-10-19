@@ -15,6 +15,7 @@ def wait_until(condition, timeout=3000):
     deadline = time.monotonic() + timeout / 1000
     while not condition() and time.monotonic() < deadline:
         QTest.qWait(25)
+        time.sleep(0.001)  # QtTest can hold the GIL while waiting.
     assert condition()
 
 
@@ -31,7 +32,7 @@ def viewer(tmp_path, monkeypatch):
     window.show()
     window.open_folder(folder)
     app.processEvents()
-    QTest.qWait(50)
+    wait_until(lambda: not window.thumbs._pending_paths and not window.thumbs._jobs)
     yield window.current_tab(), folder, paths
     window.close()
     window.deleteLater()
@@ -175,25 +176,25 @@ def test_close_stops_folder_monitoring(viewer):
 
 
 def test_locked_thumbnail_retries_without_rebuilding_other_tiles(viewer, monkeypatch):
-    import picview.qt_app as ui
+    import picview.thumbnails as thumbnails
     window, folder, paths = viewer
     added = folder / "locked.png"
     Image.new("RGB", (90, 60), "blue").save(added)
-    original_open = ui.Image.open
+    original_decode = thumbnails.thumbnail_image
     locked = True
     def open_image(path, *args, **kwargs):
         if path == added and locked:
             raise OSError("file is still being copied")
-        return original_open(path, *args, **kwargs)
-    monkeypatch.setattr(ui.Image, "open", open_image)
+        return original_decode(path, *args, **kwargs)
+    monkeypatch.setattr(thumbnails, "thumbnail_image", open_image)
     window.refresh_folder()
-    assert added in window.thumbs.failed_paths
+    wait_until(lambda: added in window.thumbs.failed_paths)
     versions = window.pending_image_versions()
     tile = window.thumbs.buttons[paths[0]]
     frames = window.image.frames
     locked = False
     window.refresh_folder()
-    assert added not in window.thumbs.failed_paths
+    wait_until(lambda: added not in window.thumbs.failed_paths)
     assert window.thumbs.buttons[paths[0]] is tile
     assert window.image.frames is frames
     assert versions[added] == (added.stat().st_size, added.stat().st_mtime_ns)
@@ -259,7 +260,7 @@ def test_atomic_replacement_reinstates_file_watch(viewer):
         os.replace(temporary, path)
         wait_until(lambda: window.image.frames[0][0].getpixel((0, 0)) == rgb)
         assert str(path) in window.folder_watcher.files()
-        assert thumbnail_color(window, path) == ("#0000ff" if color == "blue" else "#008000")
+        wait_until(lambda: thumbnail_color(window, path) == ("#0000ff" if color == "blue" else "#008000"))
 
 
 def test_partial_overwrite_keeps_last_complete_image(viewer):
@@ -270,10 +271,10 @@ def test_partial_overwrite_keeps_last_complete_image(viewer):
     window.refresh_folder()
     assert window.image.frames is frames
     assert thumbnail_color(window, path) == "#ff0000"
-    assert path in window.thumbs.failed_paths
+    wait_until(lambda: path in window.thumbs.failed_paths)
     Image.new("RGB", (120, 80), "blue").save(path)
     wait_until(lambda: window.image.frames[0][0].getpixel((0, 0)) == (0, 0, 255, 255))
-    assert thumbnail_color(window, path) == "#0000ff"
+    wait_until(lambda: thumbnail_color(window, path) == "#0000ff")
     assert path not in window.thumbs.failed_paths
 
 
@@ -289,7 +290,7 @@ def test_same_size_overwrite_is_detected_by_polling(viewer):
     Image.new("RGB", (120, 80), "blue").save(path)
     assert path.stat().st_size == size
     wait_until(lambda: window.image.frames[0][0].getpixel((0, 0)) == (0, 0, 255, 255))
-    assert thumbnail_color(window, path) == "#0000ff"
+    wait_until(lambda: thumbnail_color(window, path) == "#0000ff")
 
 
 def test_modification_and_addition_in_same_update(viewer):
@@ -298,7 +299,7 @@ def test_modification_and_addition_in_same_update(viewer):
     Image.new("RGB", (120, 80), "blue").save(paths[0])
     Image.new("RGB", (120, 80), "green").save(added)
     wait_until(lambda: added in window.thumbs.buttons and window.image.frames[0][0].getpixel((0, 0)) == (0, 0, 255, 255))
-    assert thumbnail_color(window, paths[0]) == "#0000ff"
+    wait_until(lambda: thumbnail_color(window, paths[0]) == "#0000ff")
     assert window.thumbs.selected_path == paths[0]
 
 
@@ -313,7 +314,7 @@ def test_full_image_decode_failure_retries_without_new_file_change(viewer, monke
     monkeypatch.setattr(window.image, "read_frames", read)
     Image.new("RGB", (120, 80), "blue").save(paths[0])
     window.refresh_folder()
-    assert thumbnail_color(window, paths[0]) == "#0000ff"
+    wait_until(lambda: thumbnail_color(window, paths[0]) == "#0000ff")
     assert window.image.frames is frames
     locked = False
     window.refresh_folder()
@@ -327,7 +328,7 @@ def test_file_change_event_updates_without_waiting_for_poll(viewer):
     window.folder_watcher.directoryChanged.disconnect(window.schedule_folder_refresh)
     Image.new("RGB", (120, 80), "blue").save(paths[0])
     wait_until(lambda: window.image.frames[0][0].getpixel((0, 0)) == (0, 0, 255, 255))
-    assert thumbnail_color(window, paths[0]) == "#0000ff"
+    wait_until(lambda: thumbnail_color(window, paths[0]) == "#0000ff")
 
 
 def test_modified_image_preserves_fit_and_updates_fullscreen(viewer):
