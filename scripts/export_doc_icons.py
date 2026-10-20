@@ -19,7 +19,7 @@ ICONS = {
     "folder": "folder", "split-h": "split-h", "split-v": "split-v",
     "compare": "compare", "rotate": "rotate", "mirror-h": "mirror-h",
     "mirror-v": "mirror-v", "fit": "fit", "expand": "expand",
-    "shrink": "shrink", "fullscreen": "fullscreen", "more": "more",
+    "shrink": "shrink", "fullscreen": "fullscreen", "more": "more", "background": "background",
     "lang-system": "lang-system", "lang-zh": "中", "lang-en": "A",
     "theme-system": "theme-system", "theme-light": "theme-light",
     "theme-dark": "theme-dark",

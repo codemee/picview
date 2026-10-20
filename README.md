@@ -74,7 +74,7 @@ uv run picview
 - 縮圖使用共用的記憶體快取（上限 64 MiB），不另存縮圖檔案。
 - 調整窗格大小只重新排列縮圖，不會重新解碼所有圖片。
 - 滑桿收起時，可從更多工具選單輸入縮放比例或縮圖大小。
-- 視窗標題會顯示目前版本，例如 **PicView v0.0.10**。
+- 視窗標題會顯示目前版本，例如 **PicView v0.0.11**。
 
 ### 開啟與拖放圖片
 
@@ -156,6 +156,17 @@ uv run picview
 - 在數值輸入視窗按 <kbd>Enter</kbd> 套用。
 - 按 <kbd>Esc</kbd> 或點擊視窗外部取消。
 - 點擊重設按鈕，還原 **100%** 縮放或 **140 px** 縮圖大小。
+
+### 透明圖片的背景色
+
+- 點擊單圖工具列的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/background-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/background-light.png" width="34" height="34" alt="圖片背景色" title="圖片背景色"></picture>，展開背景色面板。
+- 選擇 **預設（跟隨主題）**，沿用目前配色主題的圖片背景。
+- 可改選白、黑、灰、淺灰、米、淺藍、淺綠或淺粉色，讓透明圖片的細節更容易辨識。
+- 另提供深灰、灰藍、深藍、深綠、深紫、深紅、深棕與深青色背景，方便檢視淺色圖片。
+- 16 種背景色以四欄色塊排列，顏色名稱以滑鼠提示顯示；「預設」保留文字，底色反映目前主題的預設背景色。
+- 背景色立即套用到單圖與全螢幕，不會修改圖檔或縮圖背景。
+- 各標籤與比圖窗格可獨立設定；複製標籤與重開程式會保留選擇。
+- 工具列空間不足時，可從 **⋯ 更多工具** 開啟背景色面板。
 
 ### 鍵盤快捷鍵
 

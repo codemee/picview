@@ -74,7 +74,7 @@ uv run picview
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - When sliders are hidden, use the overflow menu to enter zoom or thumbnail-size values.
-- The window title shows the current version, for example **PicView v0.0.10**.
+- The window title shows the current version, for example **PicView v0.0.11**.
 
 ### Open and drag images
 
@@ -156,6 +156,17 @@ uv run picview
 - In the value popup, press <kbd>Enter</kbd> to apply.
 - Press <kbd>Esc</kbd> or click outside to cancel.
 - Click reset to restore **100%** zoom or **140 px** thumbnails.
+
+### Background colors for transparent images
+
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/background-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/background-light.png" width="34" height="34" alt="Image background" title="Image background"></picture> in the image toolbar to open the background color panel.
+- Choose **Default (follow theme)** to use the current theme's image background.
+- Choose white, black, gray, light gray, cream, light blue, light green, or light pink to make transparent image details easier to see.
+- Dark gray, slate, dark blue, dark green, dark purple, dark red, dark brown, and dark teal backgrounds help inspect light-colored images.
+- The 16 background colors appear in four columns of swatches, with color names in tooltips. The default option keeps its text and previews the current theme's default background color.
+- The background applies immediately to image and full-screen views, without changing image files or thumbnail backgrounds.
+- Tabs and comparison panes keep independent choices, preserved when duplicating tabs or restarting.
+- When the toolbar is narrow, open the background panel from **⋯ More tools**.
 
 ### Keyboard shortcuts
 

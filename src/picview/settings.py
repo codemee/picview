@@ -6,6 +6,13 @@ import os
 from pathlib import Path
 from typing import Any
 
+IMAGE_BACKGROUND_COLORS = {
+    "default": None, "white": "#ffffff", "black": "#000000",
+    "gray": "#808080", "light_gray": "#d9d9d9", "cream": "#fff1d6",
+    "blue": "#dceeff", "green": "#e3f4df", "pink": "#ffe4e8",
+    "dark_gray": "#30343b", "slate": "#465568", "dark_blue": "#14243b", "dark_green": "#18362b",
+    "dark_purple": "#30223d", "dark_red": "#45232c", "dark_brown": "#3d3026", "dark_teal": "#0f3440",
+}
 
 DEFAULT_SETTINGS: dict[str, Any] = {
     "version": 1,
@@ -16,6 +23,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "maximized_pane": "",
     "thumbnail_size": 140,
     "image_zoom": 1.0,
+    "image_background": "default",
     "language": "system",
     "theme": "system",
     "tabs": [],
@@ -38,6 +46,8 @@ def normalize_tab_state(value: Any) -> dict[str, Any] | None:
     for key in ("fh", "fv"):
         state[key] = value.get(key) is True
     state["fit_to_pane"] = value.get("fit_to_pane") if isinstance(value.get("fit_to_pane"), bool) else None
+    background = value.get("image_background", "default")
+    state["image_background"] = background if isinstance(background, str) and background in IMAGE_BACKGROUND_COLORS else "default"
     for key in ("thumbnail_scroll", "image_scroll_x", "image_scroll_y"):
         item = value.get(key, 0)
         state[key] = max(0, item) if isinstance(item, int) and not isinstance(item, bool) else 0

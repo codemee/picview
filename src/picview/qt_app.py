@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import __version__
-from .settings import load_settings, normalize_tab_state, save_settings
+from .settings import IMAGE_BACKGROUND_COLORS, load_settings, normalize_tab_state, save_settings
 from .svg import SvgDocument
 from .thumbnails import THUMBNAILS
 from .utils import IMAGE_SUFFIXES, image_files, natural_key
@@ -96,6 +96,11 @@ TEXT = {
 LANGUAGE_MODES = ("system", "zh", "en")
 LANGUAGE_ICONS = {"system": "lang-system", "zh": "中", "en": "A"}
 TEXT["en"].update({
+    "background": "Image background", "bg_default": "Default (follow theme)",
+    "bg_white": "White", "bg_black": "Black", "bg_gray": "Gray", "bg_light_gray": "Light gray",
+    "bg_cream": "Cream", "bg_blue": "Light blue", "bg_green": "Light green", "bg_pink": "Light pink",
+    "bg_dark_gray": "Dark gray", "bg_slate": "Slate", "bg_dark_blue": "Dark blue", "bg_dark_green": "Dark green",
+    "bg_dark_purple": "Dark purple", "bg_dark_red": "Dark red", "bg_dark_brown": "Dark brown", "bg_dark_teal": "Dark teal",
     "more_tools": "More tools",
     "compare": "Compare images", "compare_folder": "Compare this folder", "compare_empty": "Check folder tabs to compare images", "image_tools": "Image tools",
     "close_tab": "Close tab",
@@ -107,6 +112,11 @@ TEXT["en"].update({
     "lang_en": "Language: English (click to switch)",
 })
 TEXT["zh"].update({
+    "background": "圖片背景色", "bg_default": "預設（跟隨主題）",
+    "bg_white": "白色", "bg_black": "黑色", "bg_gray": "灰色", "bg_light_gray": "淺灰色",
+    "bg_cream": "米色", "bg_blue": "淺藍色", "bg_green": "淺綠色", "bg_pink": "淺粉色",
+    "bg_dark_gray": "深灰色", "bg_slate": "灰藍色", "bg_dark_blue": "深藍色", "bg_dark_green": "深綠色",
+    "bg_dark_purple": "深紫色", "bg_dark_red": "深紅色", "bg_dark_brown": "深棕色", "bg_dark_teal": "深青色",
     "more_tools": "更多工具",
     "compare": "比圖", "compare_folder": "勾選此資料夾進行比圖", "compare_empty": "勾選資料夾標籤以比較圖片", "image_tools": "圖片工具",
     "close_tab": "關閉標籤",
@@ -204,6 +214,10 @@ class IconButton(QToolButton):
             else: p.drawLine(10,10,15,15); p.drawLine(15,15,11,15); p.drawLine(15,15,15,11); p.drawLine(26,26,21,21); p.drawLine(21,21,25,21); p.drawLine(21,21,21,25)
         elif self.kind == "fit":
             p.drawRect(9, 9, 18, 18); p.drawRect(13, 14, 10, 8)
+        elif self.kind == "background":
+            p.fillRect(QRectF(9, 9, 9, 9), icon_color)
+            p.fillRect(QRectF(18, 18, 9, 9), icon_color)
+            p.drawRect(9, 9, 18, 18)
         elif self.kind == "more":
             p.setBrush(icon_color)
             for x in (12, 18, 24): p.drawEllipse(QPoint(x, 18), 1, 1)
@@ -739,12 +753,37 @@ class ImagePane(QFrame):
         self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,4,10,8); layout.setSpacing(4)
         self.comparison_title = None
         self.comparison_selected = False
+        self.background_mode = "default"
         bar=QHBoxLayout(); self.rotate_b=IconButton("rotate",labels["rotate"]); self.mh=IconButton("mirror-h",labels["mh"]); self.mv=IconButton("mirror-v",labels["mv"]); self.fit_b=IconButton("fit",labels["fit"]); self.fit_b.setCheckable(True); self.fit_b.toggled.connect(self.set_fit); self.max_button=IconButton("expand",labels["max"]); self.full=IconButton("fullscreen",labels["full"])
         for b,fn in ((self.rotate_b,self.rotate),(self.mh,self.mirror_h),(self.mv,self.mirror_v)): b.clicked.connect(fn); bar.addWidget(b)
         bar.setSpacing(4)
         separate_tools(bar)
         self.full.clicked.connect(self.open_full)
         for button in (self.fit_b,self.max_button,self.full): bar.addWidget(button)
+        separate_tools(bar)
+        self.background_button = IconButton("background", labels["background"])
+        self.background_button.clicked.connect(self.show_background_menu)
+        bar.addWidget(self.background_button)
+        self.background_menu = QMenu(self)
+        self.background_panel = QWidget()
+        choices = QGridLayout(self.background_panel)
+        choices.setContentsMargins(8, 8, 8, 8)
+        choices.setSpacing(4)
+        self.background_choices = {}
+        for index, mode in enumerate(IMAGE_BACKGROUND_COLORS):
+            button = QPushButton()
+            button.setCheckable(True)
+            button.clicked.connect(lambda checked=False, mode=mode: self.choose_background(mode))
+            self.background_choices[mode] = button
+            if mode == "default":
+                button.setMinimumHeight(34)
+                choices.addWidget(button, 0, 0, 1, 4)
+            else:
+                button.setFixedSize(40, 30)
+                choices.addWidget(button, 1 + (index - 1) // 4, (index - 1) % 4)
+        background_action = QWidgetAction(self.background_menu)
+        background_action.setDefaultWidget(self.background_panel)
+        self.background_menu.addAction(background_action)
         self.filename_label=QLabel(); self.filename_label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.filename_label.setSizePolicy(QSizePolicy.Policy.Ignored,QSizePolicy.Policy.Fixed); bar.addWidget(self.filename_label,1)
         self.zoom_label=ScaleValueButton(1000,1,4000,1000,10,"%",labels["edit_zoom"]); bar.addWidget(self.zoom_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,1000); self.slider.setRange(1,4000); self.slider.setValue(1000); self.slider.logicalValueChanged.connect(self.set_zoom_percent); self.zoom_label.valueChosen.connect(self.choose_zoom); self.slider.setFixedSize(SLIDER_WIDTH,30); bar.addWidget(self.slider)
         self.toolbar_widget = QWidget(self)
@@ -756,13 +795,50 @@ class ImagePane(QFrame):
         self.setMinimumSize(54, 50)
         layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         self.toolbar_overflow = ToolbarOverflow(self.toolbar_widget, bar,
-            [self.slider, self.zoom_label, self.full, self.max_button, self.mv, self.mh, self.rotate_b, self.fit_b],
+            [self.slider, self.zoom_label, self.background_button, self.full, self.max_button, self.mv, self.mh, self.rotate_b, self.fit_b],
             lambda: self.labels["more_tools"], {self.slider: self.zoom_label})
         layout.addWidget(self.toolbar_widget)
         self.scroll=QScrollArea(); self.scroll.setWidgetResizable(False); self.scroll.setAlignment(Qt.AlignmentFlag.AlignCenter); self.scroll.setFrameShape(QFrame.Shape.NoFrame); self.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};"); self.label=QLabel(labels["empty"]); self.label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.label.setStyleSheet(f"color:{PALETTE['muted']};background:transparent;"); self.scroll.setWidget(self.label); layout.addWidget(self.scroll)
         self.scroll.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         self.toolbar = bar
+        self.apply_background()
         for widget in self.findChildren(QWidget): widget.installEventFilter(self)
+
+    def background_color(self):
+        return IMAGE_BACKGROUND_COLORS[self.background_mode] or PALETTE["pane"]
+
+    def apply_background(self):
+        color = self.background_color()
+        self.scroll.viewport().setStyleSheet(f"background:{color};")
+        if self.full_window is not None:
+            self.full_window.centralWidget().setStyleSheet(f"background:{color};")
+        self.background_button.setToolTip(self.labels["background"])
+        self.background_button.setAccessibleName(self.labels["background"])
+        self.background_panel.setStyleSheet(f"background:{PALETTE['card']};")
+        for mode, button in self.background_choices.items():
+            swatch = IMAGE_BACKGROUND_COLORS[mode] or PALETTE["pane"]
+            text = "#ffffff" if QColor(swatch).lightness() < 128 else "#172a31"
+            name = self.labels[f"bg_{mode}"]
+            button.setText(name if mode == "default" else "")
+            button.setAccessibleName(name)
+            button.setToolTip(name if mode == "default" else f"{name} ({swatch})")
+            button.setChecked(mode == self.background_mode)
+            button.setStyleSheet(
+                f"QPushButton{{background:{swatch};color:{text};border:1px solid {PALETTE['edge']};border-radius:4px;padding:3px 6px;}}"
+                f"QPushButton:hover,QPushButton:checked{{border:2px solid {PALETTE['focus']};padding:2px 5px;}}")
+
+    def set_background(self, mode):
+        self.background_mode = mode if isinstance(mode, str) and mode in IMAGE_BACKGROUND_COLORS else "default"
+        self.apply_background()
+
+    def choose_background(self, mode):
+        self.set_background(mode)
+        self.background_menu.hide()
+
+    def show_background_menu(self):
+        self.apply_background()
+        anchor = self.background_button if self.background_button.isVisible() else self.toolbar_overflow.more_button
+        QTimer.singleShot(0, self, lambda: self.background_menu.popup(anchor.mapToGlobal(QPoint(0, anchor.height()))))
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -956,8 +1032,9 @@ class ImagePane(QFrame):
             self.full_window = None
             return
         if not self.frames: return
-        w=QMainWindow(self); w.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose); w.destroyed.connect(lambda: setattr(self, "full_window", None)); w.setWindowState(Qt.WindowState.WindowFullScreen); label=QLabel(); label.setAlignment(Qt.AlignmentFlag.AlignCenter); label.setStyleSheet(f"background:{DARK_IMAGE_BACKGROUND if QColor(PALETTE['surface']).lightness() < 128 else '#111820'};"); w.setCentralWidget(label); w.keyPressEvent=lambda e: self.open_full() if e.key()==Qt.Key.Key_Escape else None
+        w=QMainWindow(self); w.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose); w.destroyed.connect(lambda: setattr(self, "full_window", None)); w.setWindowState(Qt.WindowState.WindowFullScreen); label=QLabel(); label.setAlignment(Qt.AlignmentFlag.AlignCenter); label.setStyleSheet(f"background:{self.background_color()};"); w.setCentralWidget(label); w.keyPressEvent=lambda e: self.open_full() if e.key()==Qt.Key.Key_Escape else None
         self.full_window=w
+        self.apply_background()
         if isinstance(self.frames[self.index][0], SvgDocument): label.resizeEvent = lambda event: self.update_full_image()
         w.show(); self.update_full_image()
 
@@ -1057,6 +1134,7 @@ class FolderTab(QWidget):
         self.files = image_files(self.folder)
         self._layout_pending = True
         if state:
+            self.image.set_background(state.get("image_background", "default"))
             self.thumbs.slider.setValue(state["thumbnail_size"])
             orientation = Qt.Orientation.Horizontal if state["orientation"] == "horizontal" else Qt.Orientation.Vertical
             self.split.setOrientation(orientation)
@@ -1202,6 +1280,7 @@ class FolderTab(QWidget):
                  "orientation": "horizontal" if self.split.orientation() == Qt.Orientation.Horizontal else "vertical",
                  "sash_fraction": fraction, "thumbnail_size": self.thumbs.size,
                  "image_zoom": self.image.zoom, "fit_to_pane": self.image.fit_to_pane,
+                 "image_background": self.image.background_mode,
                  "rotation": self.image.rotation, "fh": self.image.fh, "fv": self.image.fv,
                  "thumbnail_scroll": self.thumbs.scroll.verticalScrollBar().value(),
                  "image_scroll_x": self.image.scroll.horizontalScrollBar().value(),
@@ -1217,8 +1296,9 @@ class FolderTab(QWidget):
         self.thumbs.labels = labels
         self.image.labels = labels
         for pane in (self.thumbs, self.image):
-            pane.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};")
             pane.max_button.setToolTip(labels["restore" if pane.max_button.kind == "shrink" else "max"])
+        self.thumbs.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};")
+        self.image.apply_background()
         self.thumbs.grid_host.setStyleSheet(f"#thumbnailGrid{{background:{PALETTE['pane']};}}")
         for tile in self.thumbs.buttons.values(): tile.apply_style()
         for button, key in ((self.image.rotate_b, "rotate"), (self.image.mh, "mh"), (self.image.mv, "mv"), (self.image.fit_b, "fit"), (self.image.full, "full")):
@@ -1228,8 +1308,6 @@ class FolderTab(QWidget):
         self.thumbs.size_label.apply_style()
         self.image.zoom_label.apply_style()
         self.image.label.setStyleSheet(f"color:{PALETTE['muted']};background:transparent;")
-        if self.image.full_window is not None:
-            self.image.full_window.centralWidget().setStyleSheet(f"background:{DARK_IMAGE_BACKGROUND if QColor(PALETTE['surface']).lightness() < 128 else '#111820'};")
         for button in self.findChildren(IconButton) + self.image.findChildren(IconButton): button.refresh_icon()
         if self.comparison_visible: self.image.set_comparison_mode(self.folder.name or str(self.folder))
         self.update_empty_message()
