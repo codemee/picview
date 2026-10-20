@@ -640,11 +640,12 @@ def separate_tools(layout):
 
 class ToolbarOverflow(QObject):
     """Keep the existing controls and expose hidden ones through a live menu."""
-    def __init__(self, host, layout, hide_order, title, slider_editors=None, available_width=None):
+    def __init__(self, host, layout, hide_order, title, slider_editors=None, available_width=None, flex_widgets=()):
         super().__init__(host)
         self.host, self.layout = host, layout
         self.hide_order, self.title = hide_order, title
         self.slider_editors = slider_editors or {}
+        self.flex_widgets = set(flex_widgets)
         self.available_width = available_width or (lambda: host.width() - layout.contentsMargins().left() - layout.contentsMargins().right())
         self.items = [layout.itemAt(index) for index in range(layout.count())]
         self.widgets = [item.widget() for item in self.items if item.widget() is not None]
@@ -676,11 +677,18 @@ class ToolbarOverflow(QObject):
     def decoration_state(self, visible):
         shown = set()
         spaces = dict(self.spaces)
+        pending = []
+        has_content = False
+        for index, item in enumerate(self.items):
+            widget = item.widget()
+            if isinstance(widget, ToolbarSeparator):
+                pending.append(index)
+            elif widget in visible:
+                if has_content and pending: shown.add(self.items[pending[-1]].widget())
+                has_content = True
+                pending.clear()
         for index in self.separators:
-            before = any(isinstance(item.widget(), QToolButton) and item.widget() in visible for item in self.items[:index])
-            after = any(isinstance(item.widget(), QToolButton) and item.widget() in visible for item in self.items[index + 1:])
-            if before and after: shown.add(self.items[index].widget())
-            else:
+            if self.items[index].widget() not in shown:
                 for neighbor in (index - 1, index + 1):
                     if neighbor in spaces: spaces[neighbor] = 0
         return shown, spaces
@@ -688,7 +696,8 @@ class ToolbarOverflow(QObject):
     def required_width(self, visible, more):
         separators, spaces = self.decoration_state(visible)
         shown = [widget for widget in self.widgets if widget in visible or widget in separators]
-        widths = [0 if widget.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Ignored else
+        widths = [widget.minimumWidth() if widget in self.flex_widgets else
+                  0 if widget.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Ignored else
                   min(widget.maximumWidth(), max(widget.minimumWidth(), widget.sizeHint().width())) for widget in shown]
         count = len(shown) + int(more)
         return sum(widths) + sum(spaces.values()) + (self.more_button.width() if more else 0) + max(0, count - 1) * self.layout.spacing()
@@ -1610,7 +1619,10 @@ class TabCloseButton(QToolButton):
 class FolderTabBar(QTabBar):
     def tabSizeHint(self, index):
         size = super().tabSizeHint(index)
-        return QSize(min(200, max(150, size.width())), 36)
+        return QSize(min(200, max(150, size.width())), 42)
+
+    def minimumTabSizeHint(self, index):
+        return QSize(108 if self.width() < 182 else 150, 42)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -1656,6 +1668,8 @@ class FolderTabs(QWidget):
         layout.setSpacing(0)
         self.strip = QFrame()
         self.strip.setObjectName("tabStrip")
+        self.strip.setFixedHeight(42)
+        self.strip.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.header = QHBoxLayout(self.strip)
         self.header.setContentsMargins(4, 0, 4, 0)
         self.header.setSpacing(4)
@@ -1769,13 +1783,14 @@ class PicView(QMainWindow):
         self.setCentralWidget(root)
         outer = QVBoxLayout(root)
         outer.setContentsMargins(8, 0, 8, 8)
-        outer.setSpacing(8)
+        outer.setSpacing(0)
         outer.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         tool = QFrame()
         tool.setObjectName("toolbar")
         tool.setFixedHeight(42)
         layout = QHBoxLayout(tool)
-        layout.setContentsMargins(8, 4, 8, 4)
+        # Full-height tabs meet the content; 34 px tools center in the 42 px row.
+        layout.setContentsMargins(8, 0, 8, 0)
         layout.setSpacing(4)
         self.open_button = IconButton("folder", self.t["open"])
         self.vertical_button = IconButton("split-h", self.t["vertical"])
@@ -1785,17 +1800,7 @@ class PicView(QMainWindow):
         self.compare_button.toggled.connect(self.set_compare)
         self.language_button = IconButton(LANGUAGE_ICONS[self.language_mode], self.t[f"lang_{self.language_mode}"])
         self.theme_button = IconButton(f"theme-{self.theme_mode}", self.t[f"theme_{self.theme_mode}"])
-        for button, action in ((self.open_button, self.choose), (self.vertical_button, lambda: self.set_orientation(Qt.Orientation.Vertical)),
-                               (self.horizontal_button, lambda: self.set_orientation(Qt.Orientation.Horizontal)),
-                               (self.compare_button, lambda: None),
-                               (self.language_button, self.toggle_lang), (self.theme_button, self.toggle_theme)):
-            if button in (self.vertical_button, self.compare_button, self.language_button): separate_tools(layout)
-            button.clicked.connect(action)
-            layout.addWidget(button)
-        layout.addStretch()
-        self.toolbar_overflow = ToolbarOverflow(tool, layout,
-            [self.theme_button, self.language_button, self.compare_button, self.horizontal_button, self.vertical_button, self.open_button],
-            lambda: self.t["more_tools"])
+        self.main_toolbar = tool
         outer.addWidget(tool)
         self.tabs = FolderTabs()
         self.tabs.setTabsClosable(True)
@@ -1817,8 +1822,34 @@ class PicView(QMainWindow):
         self.add_tab_button.setToolTip(self.t["new_tab"])
         self.add_tab_button.clicked.connect(self.choose)
         self.tabs.setCornerWidget(self.add_tab_button)
-        outer.addWidget(self.tabs)
+        self.tabs.layout().removeWidget(self.tabs.strip)
+        layout.addWidget(self.tabs.strip, 1)
+        for button, action in ((self.open_button, self.choose), (self.vertical_button, lambda: self.set_orientation(Qt.Orientation.Vertical)),
+                               (self.horizontal_button, lambda: self.set_orientation(Qt.Orientation.Horizontal)),
+                               (self.compare_button, lambda: None)):
+            if button in (self.vertical_button, self.compare_button): separate_tools(layout)
+            button.clicked.connect(action)
+            layout.addWidget(button)
+        separate_tools(layout)
+        for button, action in ((self.language_button, self.toggle_lang), (self.theme_button, self.toggle_theme)):
+            button.clicked.connect(action)
+            layout.addWidget(button)
+        self.toolbar_overflow = ToolbarOverflow(tool, layout,
+            [self.theme_button, self.language_button, self.horizontal_button, self.vertical_button, self.compare_button, self.open_button],
+            lambda: self.t["more_tools"], available_width=self.main_toolbar_width, flex_widgets=(self.tabs.strip,))
+        outer.addWidget(self.tabs, 1)
         self.apply_styles()
+
+    def main_toolbar_width(self):
+        margins = self.main_toolbar.layout().contentsMargins()
+        width = self.main_toolbar.width() - margins.left() - margins.right()
+        # Reserve room for up to roughly three tabs. Beyond that, scroll tabs
+        # rather than continuing to hide tools as more folders are opened.
+        target = min(420, max(1, self.tabs.count()) * 150 + 42)
+        reserved = min(target, max(190, round(width * .6)), max(120, width - 38))
+        if self.tabs.strip.minimumWidth() != reserved:
+            self.tabs.strip.setMinimumWidth(reserved)
+        return width
 
     def apply_styles(self):
         strip = PALETTE["surface"]
@@ -1985,6 +2016,7 @@ class PicView(QMainWindow):
                 control.setAccessibleName(control.toolTip())
                 control.update()
             self.tabs.setTabToolTip(index, str(page.folder) if page.folder else self.t["empty"])
+        self.toolbar_overflow.timer.start(0)
 
     def tabs_reordered(self, *_):
         self.update_tab_titles()

@@ -68,13 +68,15 @@ uv run picview
 ### Window and toolbars
 
 - Resize the window down to **260 × 220 px**.
+- Tools and folder tabs share one row: folder tabs on the left; open, layout, comparison, language, and theme tools grouped on the right.
+- The selected tab meets the content pane directly, removing the gap between the former rows and leaving more room for images.
 - Tools that no longer fit move into <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="More tools" title="More tools"></picture> on the main, thumbnail, and image toolbars.
 - Widen the window to restore the hidden tools automatically.
 - Visible thumbnails load first; the rest are decoded progressively in the background.
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - When sliders are hidden, use the overflow menu to enter zoom or thumbnail-size values.
-- The window title shows the current version, for example **PicView v0.0.11**.
+- The window title shows the current version, for example **PicView v0.0.12**.
 
 ### Open and drag images
 
@@ -124,6 +126,8 @@ uv run picview
 - The copy preserves the original tab's image selection and view settings.
 - In comparison mode, duplicating a checked tab also adds the copy to comparison.
 - Drag tabs to reorder them.
+- Secondary tools collapse first when space is limited; excess tabs scroll horizontally and long names are shortened.
+- The current tab stays visible when opening tabs, switching tabs, or resizing the window.
 - Use a tab's close button to close it; closing the last tab leaves an empty tab.
 - Each tab keeps its own selection, zoom, rotation, mirroring, scrolling, thumbnail size, and pane layout.
 - Language and theme are shared across all tabs.
