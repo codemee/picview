@@ -1,5 +1,9 @@
 from PySide6.QtCore import QPoint
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QToolButton
+import pytest
+
+from picview.qt_app import FolderTabBar
 
 from test_tabs import browser, wait_until
 
@@ -17,6 +21,25 @@ def current_tab_visible(window):
               if button.isVisible() and button.objectName().startswith("Scroll")]
     right = min((button.x() for button in arrows), default=bar.width())
     return rect.left() >= 0 and rect.right() < right
+
+
+@pytest.mark.parametrize("count", [2, 3, 4])
+def test_tabs_absorb_one_pixel_overflow_without_obscuring_current_tab(browser, count):
+    bar = FolderTabBar()
+    bar.setExpanding(False)
+    bar.setUsesScrollButtons(True)
+    for index in range(count): bar.addTab(f"Folder {index}")
+    bar.setCurrentIndex(count - 1)
+    bar.resize(count * 150 - 1, 34)
+    bar.show()
+    try:
+        QTest.qWait(50)
+        assert bar.tabRect(count - 1).right() < bar.width()
+        assert not any(button.isVisible() for button in bar.findChildren(QToolButton)
+                       if button.objectName().startswith("Scroll"))
+    finally:
+        bar.close()
+        bar.deleteLater()
 
 
 def test_tabs_share_thumbnail_header_below_main_toolbar(browser):

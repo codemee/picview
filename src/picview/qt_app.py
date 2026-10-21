@@ -1684,7 +1684,12 @@ class FolderTabBar(QTabBar):
         return QSize(min(200, max(150, size.width())), 34)
 
     def minimumTabSizeHint(self, index):
-        return QSize(108 if self.width() < 182 else 150, 34)
+        width = 108 if self.width() < 182 else 150
+        # Qt shows arrows for a one-pixel overflow but treats the last tab as
+        # fully visible. Absorb that pixel in the first tab instead.
+        if index == 0 and self.count() * width == self.width() + 1:
+            width -= 1
+        return QSize(width, 34)
 
     def paintEvent(self, event):
         painter = QPainter(self)
