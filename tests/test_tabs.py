@@ -44,6 +44,74 @@ def browser(tmp_path, monkeypatch):
     app.processEvents()
 
 
+def test_shortcut_tooltips_follow_language_and_new_tabs(browser):
+    window, folders = browser
+    for folder in folders:
+        page = window.open_folder(folder)
+        window.toggle_lang()
+        window.toggle_lang()
+        for button, key in ((window.open_button, QKeySequence.StandardKey.Open),
+                            (window.add_tab_button, QKeySequence.StandardKey.AddTab),
+                            (window.tabs.bar.tabButton(window.tabs.currentIndex(), QTabBar.ButtonPosition.RightSide), QKeySequence.StandardKey.Close)):
+            assert QKeySequence(key).toString(QKeySequence.SequenceFormat.NativeText) in button.toolTip()
+        for tab in window.pages():
+            assert tab.image.full.toolTip() == f"{window.t['full']} (F11)"
+            assert tab.image.zoom_label.toolTip() == f"{window.t['edit_zoom']} (+ / - / 0)"
+            assert tab.image.zoom_label.reset_button.toolTip() == "100% (0)"
+        assert page.image.rotate_b.toolTip() == f"{window.t['rotate']} ({QKeySequence('Alt+C').toString(QKeySequence.SequenceFormat.NativeText)})"
+
+
+@pytest.mark.parametrize("compare", [False, True])
+def test_alt_image_and_layout_shortcuts_target_active_view(browser, compare):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    target, other = second.image, first.image
+    if compare:
+        window.set_compare(True)
+        window.check_compare_page(first, True)
+        window.focus_compare_page(first)
+        target, other = first.image, second.image
+    second.thumbs.scroll.setFocus()
+    target.slider.setValue(1500)
+    QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_F, Qt.KeyboardModifier.AltModifier)
+    assert target.fit_to_pane and target.fit_b.isChecked()
+    QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_F, Qt.KeyboardModifier.AltModifier)
+    assert not target.fit_to_pane and not target.fit_b.isChecked()
+    QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_C, Qt.KeyboardModifier.AltModifier)
+    QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_V, Qt.KeyboardModifier.AltModifier)
+    QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_H, Qt.KeyboardModifier.AltModifier)
+    assert target.rotation == 90 and target.fv and target.fh
+    assert other.rotation == 0 and not other.fv and not other.fh
+    modifiers = Qt.KeyboardModifier.AltModifier | Qt.KeyboardModifier.ShiftModifier
+    QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_H, modifiers)
+    assert second.split.orientation() == Qt.Orientation.Horizontal
+    QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_V, modifiers)
+    assert second.split.orientation() == Qt.Orientation.Vertical
+    assert target.fv and target.fh  # Layout shortcuts do not also mirror.
+
+
+def test_tabs_share_the_active_thumbnail_toolbar(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    for page in (first, second, first):
+        window.tabs.setCurrentWidget(page)
+        QTest.qWait(50)
+        assert window.tabs.strip.parentWidget() is page.thumbs.tab_slot
+        assert window.tabs.strip.isVisible()
+        assert window.tabs.strip.height() == 34
+        strip_top = window.tabs.strip.mapToGlobal(QPoint()).y()
+        tools_top = page.thumbs.max_button.mapToGlobal(QPoint()).y()
+        assert strip_top == tools_top
+        assert window.main_toolbar not in window.tabs.strip.parentWidget().findChildren(type(window.main_toolbar))
+    window.close_tab(window.tabs.indexOf(first))
+    assert window.tabs.strip.parentWidget() is second.thumbs.tab_slot
+    window.close_tab()
+    assert window.tabs.strip.parentWidget() is window.thumbs.tab_slot
+    assert window.tabs.strip.isVisible()
+
+
 def test_new_tabs_allow_duplicate_folders(browser):
     window, folders = browser
     assert window.tabs.count() == 1 and window.folder is None

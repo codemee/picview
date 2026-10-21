@@ -2,6 +2,7 @@ from test_tabs import browser, wait_until
 
 from PIL import Image
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QTabBar
 
@@ -95,7 +96,8 @@ def test_comparison_maximize_and_theme(browser):
     assert first.image.isVisible() and second.image.isVisible()
     window.toggle_theme()
     window.toggle_lang()
-    assert first.image.rotate_b.toolTip() == window.t["rotate"]
+    assert first.image.rotate_b.toolTip().startswith(window.t["rotate"])
+    assert QKeySequence("Alt+C").toString(QKeySequence.SequenceFormat.NativeText) in first.image.rotate_b.toolTip()
     assert control(window, first).isChecked()
 
 

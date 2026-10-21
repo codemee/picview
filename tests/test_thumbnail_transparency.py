@@ -29,8 +29,13 @@ def test_transparent_thumbnail_uses_card_background_in_all_states(browser, mode)
             assert pixmap.toImage().pixelColor(0, 0).alpha() == 0
             assert pixmap.toImage().pixelColor(60, 40).red() == 255
             point = preview.rect().center() - QPoint(pixmap.width() // 2, pixmap.height() // 2) + QPoint(2, 2)
-            background = qt_app.PALETTE["selection"] if selected else qt_app.PALETTE["card"]
+            background = qt_app.PALETTE["selection"] if selected else qt_app.PALETTE["thumbnail_card"]
             assert preview.grab().toImage().pixelColor(point) == QColor(background)
+            if not selected:
+                tile_image = page.thumbs.buttons[path].grab().toImage()
+                assert background not in (qt_app.PALETTE["card"], qt_app.PALETTE["pane"])
+                assert tile_image.pixelColor(tile_image.width() // 2, 0) == QColor(qt_app.PALETTE["thumbnail_edge"])
+    window.toggle_theme()  # Restore the system palette for subsequent windows.
 
 
 def test_modified_thumbnail_keeps_full_and_partial_transparency(browser):

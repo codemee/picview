@@ -68,8 +68,11 @@ uv run picview
 ### Window and toolbars
 
 - Resize the window down to **260 × 220 px**.
-- Tools and folder tabs share one row: folder tabs on the left; open, layout, comparison, language, and theme tools grouped on the right.
-- The selected tab meets the content pane directly, removing the gap between the former rows and leaving more room for images.
+- The main toolbar occupies its own row, with open, layout, comparison, language, and theme tools grouped on the left.
+- Folder tabs sit inside the thumbnail pane, sharing a row with the thumbnail tools on the right. The tab strip follows the active thumbnail pane.
+- Fit, maximize pane, and full screen sit on the right, before the zoom value and slider. The shared comparison toolbar uses the same order.
+- Hover over buttons or zoom controls to see their assigned keyboard shortcuts. The overflow menu also shows the corresponding keys.
+- Thumbnail cards use distinct backgrounds and thin borders in both light and dark themes, keeping their boundaries visible while scrolling.
 - Toggle tools such as comparison and fit-to-pane use the hover background and theme accent-colored icons to indicate their active state, keeping the original stroke widths.
 - Tools that no longer fit move into <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="More tools" title="More tools"></picture> on the main, thumbnail, and image toolbars.
 - Widen the window to restore the hidden tools automatically.
@@ -77,7 +80,7 @@ uv run picview
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - When sliders are hidden, use the overflow menu to enter zoom or thumbnail-size values.
-- The window title shows the current version, for example **PicView v0.1.0**.
+- The window title shows the current version, for example **PicView v0.1.1**.
 
 ### Open and drag images
 
@@ -183,6 +186,10 @@ uv run picview
 | Next image | <kbd>Right</kbd>, <kbd>Page Down</kbd>, or <kbd>Space</kbd> |
 | Thumbnail in previous / next row | <kbd>Up</kbd> / <kbd>Down</kbd> |
 | First / last image | <kbd>Home</kbd> / <kbd>End</kbd> |
+| Toggle fit to pane | <kbd>Alt</kbd>+<kbd>F</kbd> |
+| Rotate clockwise | <kbd>Alt</kbd>+<kbd>C</kbd> |
+| Mirror vertically / horizontally | <kbd>Alt</kbd>+<kbd>V</kbd> / <kbd>Alt</kbd>+<kbd>H</kbd> |
+| Top / bottom or left / right layout | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> / <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> |
 | Open full screen | <kbd>F11</kbd> |
 | Close full screen | <kbd>Esc</kbd> |
 | Open a folder | System Open shortcut |

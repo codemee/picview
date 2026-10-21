@@ -68,8 +68,11 @@ uv run picview
 ### 視窗與工具列
 
 - 視窗最小可縮至 **260 × 220 px**。
-- 主工具列與資料夾標籤共用一列：左側為資料夾標籤，右側集中放置開啟、版面、比圖、語言與配色工具。
-- 選取標籤直接銜接下方窗格，移除原本兩列之間的留白，將空間留給圖片。
+- 主工具列獨立一列，靠左集中放置開啟、版面、比圖、語言與配色工具。
+- 資料夾標籤位於縮圖窗格內，與右側的縮圖工具共用一列；切換標籤時會跟隨目前的縮圖窗格。
+- 單圖窗格的符合窗格、最大化窗格與全螢幕工具位於右側縮放比例與滑桿之前；比圖模式的共用工具列也採用相同排列。
+- 將滑鼠停在按鈕或縮放控制上，可從提示查看已設定的快捷鍵；收合選單也會顯示對應按鍵。
+- 淺色與深色配色的縮圖卡片皆採用獨立底色與細邊框，捲動時也能清楚辨識卡片邊界。
 - 比圖、符合窗格等狀態按鈕以 hover 底色與主題強調色圖示表示啟用，線條粗細不變。
 - 主工具列、縮圖與單圖工具列放不下的工具會收進 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="更多工具" title="更多工具"></picture>。
 - 放寬視窗後，收起的工具會自動恢復。
@@ -77,7 +80,7 @@ uv run picview
 - 縮圖使用共用的記憶體快取（上限 64 MiB），不另存縮圖檔案。
 - 調整窗格大小只重新排列縮圖，不會重新解碼所有圖片。
 - 滑桿收起時，可從更多工具選單輸入縮放比例或縮圖大小。
-- 視窗標題會顯示目前版本，例如 **PicView v0.1.0**。
+- 視窗標題會顯示目前版本，例如 **PicView v0.1.1**。
 
 ### 開啟與拖放圖片
 
@@ -183,6 +186,10 @@ uv run picview
 | 下一張圖片 | <kbd>Right</kbd>（右方向鍵）、<kbd>Page Down</kbd> 或 <kbd>Space</kbd>（空白鍵） |
 | 上一列／下一列縮圖 | <kbd>Up</kbd>（上方向鍵）／<kbd>Down</kbd>（下方向鍵） |
 | 第一張／最後一張圖片 | <kbd>Home</kbd> / <kbd>End</kbd> |
+| 切換符合窗格（Fit） | <kbd>Alt</kbd>+<kbd>F</kbd> |
+| 順時針旋轉 | <kbd>Alt</kbd>+<kbd>C</kbd> |
+| 上下／左右鏡射 | <kbd>Alt</kbd>+<kbd>V</kbd> / <kbd>Alt</kbd>+<kbd>H</kbd> |
+| 上下／左右版面 | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> / <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> |
 | 開啟全螢幕 | <kbd>F11</kbd> |
 | 關閉全螢幕 | <kbd>Esc</kbd> |
 | 開啟資料夾 | 系統的「開啟」快捷鍵 |

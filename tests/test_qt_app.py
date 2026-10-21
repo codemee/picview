@@ -103,15 +103,15 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     widgets = [toolbar.itemAt(i).widget() for i in range(toolbar.count()) if toolbar.itemAt(i).widget() and not toolbar.itemAt(i).widget().isHidden()]
     assert widgets[:3] == [window.image.rotate_b, window.image.mh, window.image.mv]
     assert widgets[3].width() == 1
-    assert widgets[4:7] == [window.image.fit_b, window.image.max_button, window.image.full]
-    assert widgets[-3:] == [window.image.filename_label, window.image.zoom_label, window.image.slider]
+    assert widgets[4:6] == [window.image.background_button, window.image.filename_label]
+    assert widgets[-5:] == [window.image.fit_b, window.image.max_button, window.image.full, window.image.zoom_label, window.image.slider]
     assert window.image.slider.width() == window.thumbs.slider.width()
     for slider in (window.image.slider, window.thumbs.slider):
         assert abs(slider.reference_x() - slider.width() / 2) <= 2
         assert slider.height() == 30
     thumbnail_toolbar = window.thumbs.layout().itemAt(0).layout()
     thumbnail_widgets = [thumbnail_toolbar.itemAt(i).widget() for i in range(thumbnail_toolbar.count()) if thumbnail_toolbar.itemAt(i).widget() and not thumbnail_toolbar.itemAt(i).widget().isHidden()]
-    assert thumbnail_widgets[0] is window.thumbs.max_button
+    assert thumbnail_widgets[:2] == [window.thumbs.tab_slot, window.thumbs.max_button]
     assert thumbnail_widgets[-2] is window.thumbs.size_label
     assert window.thumbs.size_label.text() == "140px"
     window.thumbs.size_label.click()

@@ -23,9 +23,20 @@ IMAGE_BACKGROUND = "#e9edf2"
 DARK_IMAGE_BACKGROUND = "#1c1729"
 THUMBNAIL_SELECTED = "#6ec8ff"
 PALETTE = {"surface": "#f4f7f8", "card": "#ffffff", "edge": "#c7d3d8", "accent": THUMBNAIL_SELECTED, "text": "#172a31", "muted": "#526a73", "pane": IMAGE_BACKGROUND,
+           "thumbnail_card": "#f6f8fb", "thumbnail_edge": "#cbd3df",
            "focus": "#1677ff", "selection": THUMBNAIL_SELECTED, "selection_text": "#153047", "active_text": "#ffffff", "hover": "#e2e6ed", "pressed": "#d5dbe4", "warm": "#172a31"}
 SLIDER_WIDTH = 160
 THUMBNAIL_BASE_SIZE = 140
+
+
+def shortcut_tooltip(text, *bindings):
+    keys = []
+    for binding in bindings:
+        sequence = QKeySequence(binding)
+        key = sequence.toString(QKeySequence.SequenceFormat.NativeText)
+        if key and key not in keys:
+            keys.append(key)
+    return f"{text} ({' / '.join(keys)})" if keys else text
 
 
 def use_system_palette(app: QApplication) -> None:
@@ -36,6 +47,8 @@ def use_system_palette(app: QApplication) -> None:
     PALETTE.update({
         "surface": pal.color(QPalette.ColorRole.Window).name(),
         "card": pal.color(QPalette.ColorRole.Base).name(),
+        "thumbnail_card": "#302344" if dark else "#f6f8fb",
+        "thumbnail_edge": "#70568b" if dark else "#cbd3df",
         "edge": pal.color(QPalette.ColorRole.Mid).name(),
         "text": pal.color(QPalette.ColorRole.Text).name(),
         "muted": pal.color(QPalette.ColorRole.PlaceholderText).name(),
@@ -406,9 +419,11 @@ class ThumbnailTile(QFrame):
         if pixmap: self.preview.setPixmap(pixmap)
         layout.addWidget(self.name); layout.addWidget(self.preview); self.apply_style()
     def apply_style(self) -> None:
-        color = PALETTE["selection"] if self.selected else PALETTE["card"]
+        color = PALETTE["selection"] if self.selected else PALETTE["thumbnail_card"]
         text = PALETTE["selection_text"] if self.selected else PALETTE["text"]
         border = f"1px solid {PALETTE['accent']}" if self.selected and QColor(PALETTE["surface"]).lightness() < 128 else "0"
+        if not self.selected:
+            border = f"1px solid {PALETTE['thumbnail_edge']}"
         self.setStyleSheet(f"ThumbnailTile{{background:{color};border:{border};border-radius:9px;}} QLabel{{background:{color};color:{text};}}")
     def mousePressEvent(self, event):
         self._drag_start = None
@@ -450,6 +465,15 @@ class ThumbnailPane(QFrame):
         super().__init__(parent); self.labels=labels; self.files=[]; self.selected_path=None; self.size=THUMBNAIL_BASE_SIZE; self.buttons={}; self.failed_paths=set()
         self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,4,10,8); layout.setSpacing(4)
         header=QHBoxLayout(); header.setSpacing(4); self.max_button=IconButton("expand",labels["max"]); header.addWidget(self.max_button); header.addStretch(); self.size_label=ScaleValueButton(self.size,72,260,THUMBNAIL_BASE_SIZE,1,"px",labels["edit_thumb"]); header.addWidget(self.size_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,THUMBNAIL_BASE_SIZE); self.slider.setRange(72,260); self.slider.setValue(self.size); self.slider.setFixedSize(SLIDER_WIDTH,30); self.slider.logicalValueChanged.connect(self._resize); self.size_label.valueChosen.connect(self.slider.setValue); header.addWidget(self.slider); layout.addLayout(header)
+        self.tab_slot = QWidget()
+        self.tab_slot.setObjectName("thumbnailTabSlot")
+        self.tab_slot.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.tab_slot.setFixedHeight(34)
+        self.tab_slot.setMaximumWidth(0)
+        tab_layout = QHBoxLayout(self.tab_slot)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        header.insertWidget(0, self.tab_slot, 1)
+        header.takeAt(2)  # The tab slot supplies the flexible space.
         self.scroll=QScrollArea(); self.scroll.setWidgetResizable(True); self.scroll.setFrameShape(QFrame.Shape.NoFrame); self.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};"); self.grid_host=QWidget(); self.grid_host.setObjectName("thumbnailGrid"); self.grid_host.setStyleSheet(f"#thumbnailGrid{{background:{PALETTE['pane']};}}"); self.grid=QGridLayout(self.grid_host); self.grid.setAlignment(Qt.AlignmentFlag.AlignTop|Qt.AlignmentFlag.AlignLeft); self.scroll.setWidget(self.grid_host); layout.addWidget(self.scroll)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.setMinimumSize(54, 50)
@@ -468,10 +492,20 @@ class ThumbnailPane(QFrame):
         self.scroll.verticalScrollBar().valueChanged.connect(self.schedule_previews)
         self.toolbar_overflow = ToolbarOverflow(self, header, [self.slider, self.size_label, self.max_button],
             lambda: self.labels["more_tools"], {self.slider: self.size_label},
-            lambda: self.width() - layout.contentsMargins().left() - layout.contentsMargins().right())
+            self.toolbar_width, flex_widgets=(self.tab_slot,))
         for widget in (self.scroll, self.scroll.viewport(), self.grid_host,
                        self.scroll.verticalScrollBar(), self.scroll.horizontalScrollBar()):
             widget.installEventFilter(self)
+
+    def toolbar_width(self):
+        margins = self.layout().contentsMargins()
+        width = self.width() - margins.left() - margins.right()
+        if self.tab_slot.layout().count():
+            strip = self.tab_slot.layout().itemAt(0).widget()
+            target = min(420, max(1, strip.findChild(QTabBar).count()) * 150 + 42)
+            reserved = max(0, min(target, max(190, round(width * .6)), width - 38))
+            self.tab_slot.setMinimumWidth(reserved)
+        return width
 
     def eventFilter(self, watched, event):
         if event.type() in (QEvent.Type.ShortcutOverride, QEvent.Type.KeyPress):
@@ -769,8 +803,6 @@ class ImagePane(QFrame):
         bar.setSpacing(4)
         separate_tools(bar)
         self.full.clicked.connect(self.open_full)
-        for button in (self.fit_b,self.max_button,self.full): bar.addWidget(button)
-        separate_tools(bar)
         self.background_button = IconButton("background", labels["background"])
         self.background_button.clicked.connect(self.show_background_menu)
         bar.addWidget(self.background_button)
@@ -795,6 +827,7 @@ class ImagePane(QFrame):
         background_action.setDefaultWidget(self.background_panel)
         self.background_menu.addAction(background_action)
         self.filename_label=QLabel(); self.filename_label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.filename_label.setSizePolicy(QSizePolicy.Policy.Ignored,QSizePolicy.Policy.Fixed); bar.addWidget(self.filename_label,1)
+        for button in (self.fit_b,self.max_button,self.full): bar.addWidget(button)
         self.zoom_label=ScaleValueButton(1000,1,4000,1000,10,"%",labels["edit_zoom"]); bar.addWidget(self.zoom_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,1000); self.slider.setRange(1,4000); self.slider.setValue(1000); self.slider.logicalValueChanged.connect(self.set_zoom_percent); self.zoom_label.valueChosen.connect(self.choose_zoom); self.slider.setFixedSize(SLIDER_WIDTH,30); bar.addWidget(self.slider)
         self.toolbar_widget = QWidget(self)
         self.toolbar_widget.setLayout(bar)
@@ -811,8 +844,18 @@ class ImagePane(QFrame):
         self.scroll=QScrollArea(); self.scroll.setWidgetResizable(False); self.scroll.setAlignment(Qt.AlignmentFlag.AlignCenter); self.scroll.setFrameShape(QFrame.Shape.NoFrame); self.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};"); self.label=QLabel(labels["empty"]); self.label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.label.setStyleSheet(f"color:{PALETTE['muted']};background:transparent;"); self.scroll.setWidget(self.label); layout.addWidget(self.scroll)
         self.scroll.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         self.toolbar = bar
+        self.update_shortcut_tooltips()
         self.apply_background()
         for widget in self.findChildren(QWidget): widget.installEventFilter(self)
+
+    def update_shortcut_tooltips(self):
+        for button, label, keys in ((self.fit_b, "fit", "Alt+F"), (self.rotate_b, "rotate", "Alt+C"),
+                                    (self.mv, "mv", "Alt+V"), (self.mh, "mh", "Alt+H")):
+            button.setToolTip(shortcut_tooltip(self.labels[label], keys))
+        self.full.setToolTip(shortcut_tooltip(self.labels["full"], "F11"))
+        self.zoom_label.setToolTip(shortcut_tooltip(self.labels["edit_zoom"], "+", "-", "0"))
+        self.slider.setToolTip(shortcut_tooltip(self.labels["zoom"], "+", "-", "0"))
+        self.zoom_label.reset_button.setToolTip(shortcut_tooltip("100%", "0"))
 
     def background_color(self):
         return IMAGE_BACKGROUND_COLORS[self.background_mode] or PALETTE["pane"]
@@ -1007,6 +1050,9 @@ class ImagePane(QFrame):
         self.zoom = ticks / 1000
         self.zoom_label.set_value(ticks)
         self.render()
+    def toggle_fit(self):
+        self.fit_b.click()
+
     def set_fit(self, checked):
         if checked and not self.frames:
             self.fit_b.blockSignals(True); self.fit_b.setChecked(False); self.fit_b.blockSignals(False)
@@ -1329,6 +1375,7 @@ class FolderTab(QWidget):
             button.setToolTip(labels[key])
         self.thumbs.size_label.setToolTip(labels["edit_thumb"])
         self.image.zoom_label.setToolTip(labels["edit_zoom"])
+        self.image.update_shortcut_tooltips()
         self.thumbs.size_label.apply_style()
         self.image.zoom_label.apply_style()
         self.image.label.setStyleSheet(f"color:{PALETTE['muted']};background:transparent;")
@@ -1634,10 +1681,10 @@ class TabCloseButton(QToolButton):
 class FolderTabBar(QTabBar):
     def tabSizeHint(self, index):
         size = super().tabSizeHint(index)
-        return QSize(min(200, max(150, size.width())), 42)
+        return QSize(min(200, max(150, size.width())), 34)
 
     def minimumTabSizeHint(self, index):
-        return QSize(108 if self.width() < 182 else 150, 42)
+        return QSize(108 if self.width() < 182 else 150, 34)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -1683,10 +1730,10 @@ class FolderTabs(QWidget):
         layout.setSpacing(0)
         self.strip = QFrame()
         self.strip.setObjectName("tabStrip")
-        self.strip.setFixedHeight(42)
+        self.strip.setFixedHeight(34)
         self.strip.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.header = QHBoxLayout(self.strip)
-        self.header.setContentsMargins(4, 0, 4, 0)
+        self.header.setContentsMargins(0, 0, 0, 0)
         self.header.setSpacing(4)
         self.bar = FolderTabBar()
         self._closable = True
@@ -1804,12 +1851,11 @@ class PicView(QMainWindow):
         tool.setObjectName("toolbar")
         tool.setFixedHeight(42)
         layout = QHBoxLayout(tool)
-        # Full-height tabs meet the content; 34 px tools center in the 42 px row.
-        layout.setContentsMargins(8, 0, 8, 0)
+        layout.setContentsMargins(8, 4, 8, 4)
         layout.setSpacing(4)
-        self.open_button = IconButton("folder", self.t["open"])
-        self.vertical_button = IconButton("split-h", self.t["vertical"])
-        self.horizontal_button = IconButton("split-v", self.t["horizontal"])
+        self.open_button = IconButton("folder", shortcut_tooltip(self.t["open"], QKeySequence.StandardKey.Open))
+        self.vertical_button = IconButton("split-h", shortcut_tooltip(self.t["vertical"], "Alt+Shift+V"))
+        self.horizontal_button = IconButton("split-v", shortcut_tooltip(self.t["horizontal"], "Alt+Shift+H"))
         self.compare_button = IconButton("compare", self.t["compare"])
         self.compare_button.setCheckable(True)
         self.compare_button.toggled.connect(self.set_compare)
@@ -1834,11 +1880,10 @@ class PicView(QMainWindow):
         self.add_tab_button.setObjectName("addTabButton")
         self.add_tab_button.setText("+")
         self.add_tab_button.setFixedSize(30, 30)
-        self.add_tab_button.setToolTip(self.t["new_tab"])
+        self.add_tab_button.setToolTip(shortcut_tooltip(self.t["new_tab"], QKeySequence.StandardKey.AddTab))
         self.add_tab_button.clicked.connect(self.choose)
         self.tabs.setCornerWidget(self.add_tab_button)
         self.tabs.layout().removeWidget(self.tabs.strip)
-        layout.addWidget(self.tabs.strip, 1)
         for button, action in ((self.open_button, self.choose), (self.vertical_button, lambda: self.set_orientation(Qt.Orientation.Vertical)),
                                (self.horizontal_button, lambda: self.set_orientation(Qt.Orientation.Horizontal)),
                                (self.compare_button, lambda: None)):
@@ -1851,23 +1896,27 @@ class PicView(QMainWindow):
             layout.addWidget(button)
         self.toolbar_overflow = ToolbarOverflow(tool, layout,
             [self.theme_button, self.language_button, self.horizontal_button, self.vertical_button, self.compare_button, self.open_button],
-            lambda: self.t["more_tools"], available_width=self.main_toolbar_width, flex_widgets=(self.tabs.strip,))
+            lambda: self.t["more_tools"])
+        layout.addStretch(1)
         outer.addWidget(self.tabs, 1)
         self.apply_styles()
 
-    def main_toolbar_width(self):
-        margins = self.main_toolbar.layout().contentsMargins()
-        width = self.main_toolbar.width() - margins.left() - margins.right()
-        # Reserve room for up to roughly three tabs. Beyond that, scroll tabs
-        # rather than continuing to hide tools as more folders are opened.
-        target = min(420, max(1, self.tabs.count()) * 150 + 42)
-        reserved = min(target, max(190, round(width * .6)), max(120, width - 38))
-        if self.tabs.strip.minimumWidth() != reserved:
-            self.tabs.strip.setMinimumWidth(reserved)
-        return width
+    def mount_tab_strip(self, page):
+        strip = self.tabs.strip
+        old_slot = strip.parentWidget()
+        slot = page.thumbs.tab_slot
+        if old_slot is not slot:
+            if old_slot is not None and old_slot.objectName() == "thumbnailTabSlot":
+                old_slot.layout().removeWidget(strip)
+                old_slot.setMinimumWidth(0)
+                old_slot.setMaximumWidth(0)
+            slot.setMaximumWidth(16777215)
+            slot.layout().addWidget(strip)
+            strip.show()
+        page.thumbs.toolbar_overflow.update()
 
     def apply_styles(self):
-        strip = PALETTE["surface"]
+        strip = PALETTE["card"]
         hover = PALETTE["pane"]
         self.setStyleSheet(f"""
             #root{{background:{PALETTE['surface']};}}
@@ -1907,7 +1956,7 @@ class PicView(QMainWindow):
         self.tabs.tabBar().setTabButton(self.tabs.indexOf(page), QTabBar.ButtonPosition.LeftSide, control)
         page.image.interacted.connect(lambda tab=page: self.focus_compare_page(tab))
         button = self.tabs.tabBar().tabButton(self.tabs.indexOf(page), QTabBar.ButtonPosition.RightSide)
-        button.setToolTip(self.t["close_tab"])
+        button.setToolTip(shortcut_tooltip(self.t["close_tab"], QKeySequence.StandardKey.Close))
         button.setAccessibleName(self.t["close_tab"])
         return page
 
@@ -1961,6 +2010,7 @@ class PicView(QMainWindow):
         self._previous_tab = page
         self.notification_bar.clearMessage()
         if page is not None:
+            self.mount_tab_strip(page)
             page.set_active(True)
             if page.pending_notification:
                 message = page.pending_notification
@@ -2128,6 +2178,11 @@ class PicView(QMainWindow):
                     ("Home", lambda: self.current_tab().select_boundary(False)), ("End", lambda: self.current_tab().select_boundary(True)),
                     ("PgUp", lambda: self.current_tab().select_relative(-1)), ("PgDown", lambda: self.current_tab().select_relative(1)),
                     ("Space", self.advance_or_check), ("Backspace", lambda: self.current_tab().select_relative(-1)),
+                    ("Alt+F", lambda: self.image_action("toggle_fit")),
+                    ("Alt+C", lambda: self.image_action("rotate")),
+                    ("Alt+V", lambda: self.image_action("mirror_v")), ("Alt+H", lambda: self.image_action("mirror_h")),
+                    ("Alt+Shift+V", lambda: self.set_orientation(Qt.Orientation.Vertical)),
+                    ("Alt+Shift+H", lambda: self.set_orientation(Qt.Orientation.Horizontal)),
                     ("+", lambda: self.image_action("adjust_zoom", 10)), ("=", lambda: self.image_action("adjust_zoom", 10)),
                     ("-", lambda: self.image_action("adjust_zoom", -10)), ("0", lambda: self.image_action("reset_zoom")), ("F11", lambda: self.image_action("open_full"))]
         modifier = "Meta" if sys.platform == "darwin" else "Ctrl"
@@ -2157,16 +2212,16 @@ class PicView(QMainWindow):
             self.comparison_area.set_layout_orientation(orientation)
 
     def rebuild_ui(self):
-        self.open_button.setToolTip(self.t["open"])
-        self.vertical_button.setToolTip(self.t["vertical"])
-        self.horizontal_button.setToolTip(self.t["horizontal"])
+        self.open_button.setToolTip(shortcut_tooltip(self.t["open"], QKeySequence.StandardKey.Open))
+        self.vertical_button.setToolTip(shortcut_tooltip(self.t["vertical"], "Alt+Shift+V"))
+        self.horizontal_button.setToolTip(shortcut_tooltip(self.t["horizontal"], "Alt+Shift+H"))
         self.compare_button.setToolTip(self.t["compare"])
         self.compare_button.refresh_icon()
         self.comparison_area.empty.setText(self.t["compare_empty"])
         self.language_button.set_kind(LANGUAGE_ICONS[self.language_mode], self.t[f"lang_{self.language_mode}"])
         self.language_button.setAccessibleName(self.language_button.toolTip())
         self.theme_button.set_kind(f"theme-{self.theme_mode}", self.t[f"theme_{self.theme_mode}"])
-        self.add_tab_button.setToolTip(self.t["new_tab"])
+        self.add_tab_button.setToolTip(shortcut_tooltip(self.t["new_tab"], QKeySequence.StandardKey.AddTab))
         self.apply_styles()
         for page in self.pages(): page.restyle(self.t)
         if self.compare_enabled:
@@ -2174,7 +2229,7 @@ class PicView(QMainWindow):
             self.comparison_area.select_toolbar(self.image_target())
         for index in range(self.tabs.count()):
             button = self.tabs.tabBar().tabButton(index, QTabBar.ButtonPosition.RightSide)
-            button.setToolTip(self.t["close_tab"])
+            button.setToolTip(shortcut_tooltip(self.t["close_tab"], QKeySequence.StandardKey.Close))
             button.setAccessibleName(self.t["close_tab"])
             button.update()
         for button in (self.open_button, self.vertical_button, self.horizontal_button): button.refresh_icon()
