@@ -162,7 +162,7 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     assert PALETTE["accent"] in window.styleSheet()
     checked_icon = window.image.fit_b.icon().pixmap(window.image.fit_b.iconSize()).toImage()
     assert any(
-        checked_icon.pixelColor(x, y).alpha() and checked_icon.pixelColor(x, y).name() == PALETTE["text"]
+        checked_icon.pixelColor(x, y).alpha() and checked_icon.pixelColor(x, y).name() == PALETTE["focus"]
         for x in range(checked_icon.width()) for y in range(checked_icon.height())
     )
     assert window.image.slider.value() < 1000

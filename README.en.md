@@ -70,13 +70,14 @@ uv run picview
 - Resize the window down to **260 × 220 px**.
 - Tools and folder tabs share one row: folder tabs on the left; open, layout, comparison, language, and theme tools grouped on the right.
 - The selected tab meets the content pane directly, removing the gap between the former rows and leaving more room for images.
+- Toggle tools such as comparison and fit-to-pane use the hover background and theme accent-colored icons to indicate their active state, keeping the original stroke widths.
 - Tools that no longer fit move into <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="More tools" title="More tools"></picture> on the main, thumbnail, and image toolbars.
 - Widen the window to restore the hidden tools automatically.
 - Visible thumbnails load first; the rest are decoded progressively in the background.
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - When sliders are hidden, use the overflow menu to enter zoom or thumbnail-size values.
-- The window title shows the current version, for example **PicView v0.0.12**.
+- The window title shows the current version, for example **PicView v0.1.0**.
 
 ### Open and drag images
 
@@ -156,6 +157,8 @@ uv run picview
 - Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fit-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fit-light.png" width="34" height="34" alt="Fit to pane" title="Fit to pane"></picture> to toggle between fitted and original size.
 - Drag the zoom slider or press <kbd>+</kbd> / <kbd>-</kbd> to adjust the view.
 - Press <kbd>0</kbd> to return to **100%**.
+- Full screen scales oversized images down proportionally to fit, without cropping. Smaller images stay centered at their original size.
+- Leaving full screen preserves the pane's zoom, rotation, and mirroring settings.
 - Click the value to the left of a slider to enter an exact zoom percentage or thumbnail size.
 - In the value popup, press <kbd>Enter</kbd> to apply.
 - Press <kbd>Esc</kbd> or click outside to cancel.

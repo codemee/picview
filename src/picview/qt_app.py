@@ -158,17 +158,17 @@ class IconButton(QToolButton):
         self.kind = icon; self.setToolTip(tip); self.refresh_icon()
 
     def refresh_icon(self) -> None:
-        checked_background = toolbar_hover_color() if self.kind == "fit" else PALETTE["accent"]
-        self.setStyleSheet(f"QToolButton{{background:transparent;border:0;border-radius:6px;padding:4px;}}QToolButton:hover{{background:{toolbar_hover_color()};border-radius:6px;}}QToolButton:pressed{{background:{PALETTE['pressed']};border-radius:6px;}}QToolButton:checked{{background:{checked_background};border-radius:6px;}}QToolButton::menu-indicator{{image:none;width:0;height:0;}}")
+        self.setStyleSheet(f"QToolButton{{background:transparent;border:0;border-radius:8px;padding:4px;}}QToolButton:hover{{background:{toolbar_hover_color()};}}QToolButton:pressed{{background:{PALETTE['pressed']};}}QToolButton:checked{{background:{toolbar_hover_color()};}}QToolButton::menu-indicator{{image:none;width:0;height:0;}}")
         icon_size = self.iconSize().width()
         pixel_size = round(icon_size * self.devicePixelRatioF())
         pm = QPixmap(pixel_size, pixel_size)
         pm.setDevicePixelRatio(pixel_size / icon_size)
         pm.fill(Qt.GlobalColor.transparent)
-        icon_color = QColor(PALETTE["active_text"] if self.isChecked() and self.kind != "fit" else PALETTE["text"])
+        icon_color = QColor(PALETTE["text"])
         if self.kind == "rotate": icon_color = QColor(PALETTE["warm"])
         if self.kind.startswith(("lang-", "theme-")) or self.kind in ("中", "A"):
             icon_color = QColor(PALETTE["muted"])
+        if self.isChecked(): icon_color = QColor(PALETTE["focus"])
         p = QPainter(pm); p.setRenderHint(QPainter.RenderHint.Antialiasing)
         # Map the existing vector coordinates into the 20 px icon canvas.
         # Leave space inside the icon canvas for the stroke and antialiasing.
@@ -267,6 +267,7 @@ class IconButton(QToolButton):
         else:
             p.drawText(0, 0, 36, 36, Qt.AlignmentFlag.AlignCenter, self.kind)
         p.end(); self.setIcon(QIcon(pm))
+
 
 
 class ReferenceSlider(QSlider):
@@ -1041,22 +1042,36 @@ class ImagePane(QFrame):
             self.full_window = None
             return
         if not self.frames: return
-        w=QMainWindow(self); w.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose); w.destroyed.connect(lambda: setattr(self, "full_window", None)); w.setWindowState(Qt.WindowState.WindowFullScreen); label=QLabel(); label.setAlignment(Qt.AlignmentFlag.AlignCenter); label.setStyleSheet(f"background:{self.background_color()};"); w.setCentralWidget(label); w.keyPressEvent=lambda e: self.open_full() if e.key()==Qt.Key.Key_Escape else None
+        w = QMainWindow(self)
+        w.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        w.destroyed.connect(lambda: setattr(self, "full_window", None) if self.full_window is w else None)
+        w.setWindowState(Qt.WindowState.WindowFullScreen)
+        label = QLabel()
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        label.setMinimumSize(0, 0)
+        label.setStyleSheet(f"background:{self.background_color()};")
+        w.setCentralWidget(label)
+        w.keyPressEvent = lambda e: self.open_full() if e.key() == Qt.Key.Key_Escape else None
         self.full_window=w
         self.apply_background()
-        if isinstance(self.frames[self.index][0], SvgDocument): label.resizeEvent = lambda event: self.update_full_image()
+        label.resizeEvent = lambda event: self.update_full_image()
         w.show(); self.update_full_image()
 
     def update_full_image(self):
         if self.full_window is None or not self.frames: return
         label = self.full_window.centralWidget()
+        original = QSize(*self.image_size())
+        size = original.scaled(label.contentsRect().size(), Qt.AspectRatioMode.KeepAspectRatio).boundedTo(original)
+        dpr = label.devicePixelRatioF()
+        pixels = (max(1, round(size.width() * dpr)), max(1, round(size.height() * dpr)))
         if isinstance(self.frames[self.index][0], SvgDocument):
-            size = QSize(*self.image_size()).scaled(label.size(), Qt.AspectRatioMode.KeepAspectRatio)
-            dpr = label.devicePixelRatioF()
-            pixmap = QPixmap.fromImage(self.svg_image((max(1, round(size.width() * dpr)), max(1, round(size.height() * dpr)))))
-            pixmap.setDevicePixelRatio(dpr)
+            pixmap = QPixmap.fromImage(self.svg_image(pixels))
         else:
-            pixmap = QPixmap.fromImage(qimage(self.image()))
+            image = self.image()
+            if image.size != pixels: image = image.resize(pixels, Image.Resampling.LANCZOS)
+            pixmap = QPixmap.fromImage(qimage(image))
+        pixmap.setDevicePixelRatio(dpr)
         label.setPixmap(pixmap)
 
 

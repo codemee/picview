@@ -70,13 +70,14 @@ uv run picview
 - 視窗最小可縮至 **260 × 220 px**。
 - 主工具列與資料夾標籤共用一列：左側為資料夾標籤，右側集中放置開啟、版面、比圖、語言與配色工具。
 - 選取標籤直接銜接下方窗格，移除原本兩列之間的留白，將空間留給圖片。
+- 比圖、符合窗格等狀態按鈕以 hover 底色與主題強調色圖示表示啟用，線條粗細不變。
 - 主工具列、縮圖與單圖工具列放不下的工具會收進 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="更多工具" title="更多工具"></picture>。
 - 放寬視窗後，收起的工具會自動恢復。
 - 縮圖會優先載入可見範圍，其餘在背景逐步製作。
 - 縮圖使用共用的記憶體快取（上限 64 MiB），不另存縮圖檔案。
 - 調整窗格大小只重新排列縮圖，不會重新解碼所有圖片。
 - 滑桿收起時，可從更多工具選單輸入縮放比例或縮圖大小。
-- 視窗標題會顯示目前版本，例如 **PicView v0.0.12**。
+- 視窗標題會顯示目前版本，例如 **PicView v0.1.0**。
 
 ### 開啟與拖放圖片
 
@@ -156,6 +157,8 @@ uv run picview
 - 點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fit-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fit-light.png" width="34" height="34" alt="符合窗格" title="符合窗格"></picture>，切換符合窗格與原始大小。
 - 拖曳縮放滑桿，或按 <kbd>+</kbd> / <kbd>-</kbd>，調整顯示比例。
 - 按 <kbd>0</kbd> 回到 **100%**。
+- 全螢幕只將超出螢幕的圖片等比例縮小；小圖維持原尺寸並置中，完整顯示、不裁切。
+- 離開全螢幕後保留原本窗格的縮放、旋轉與鏡射設定。
 - 點擊滑桿左側的數值，輸入精確的縮放百分比或縮圖大小。
 - 在數值輸入視窗按 <kbd>Enter</kbd> 套用。
 - 按 <kbd>Esc</kbd> 或點擊視窗外部取消。
