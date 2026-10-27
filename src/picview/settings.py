@@ -22,6 +22,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "sash_fraction": 0.45,
     "maximized_pane": "",
     "thumbnail_size": 140,
+    "sort_mode": "natural",
+    "sort_descending": False,
+    "show_modified": True,
     "image_zoom": 1.0,
     "image_background": "default",
     "language": "system",
@@ -42,6 +45,9 @@ def normalize_tab_state(value: Any) -> dict[str, Any] | None:
         item = state[key]
         state[key] = min(maximum, max(minimum, item)) if isinstance(item, (int, float)) and not isinstance(item, bool) and math.isfinite(item) else default
     state["thumbnail_size"] = int(state["thumbnail_size"])
+    mode = value.get("sort_mode", "natural")
+    state["sort_mode"] = mode if mode in ("natural", "modified") else "natural"
+    state["sort_descending"] = value.get("sort_descending") is True
     state["rotation"] = value.get("rotation", 0) if value.get("rotation", 0) in (0, 90, 180, 270) else 0
     for key in ("fh", "fv"):
         state[key] = value.get(key) is True

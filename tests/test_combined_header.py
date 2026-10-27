@@ -51,6 +51,9 @@ def test_tabs_share_thumbnail_header_below_main_toolbar(browser):
     assert window.tabs.layout().count() == 1
     assert window.tabs.strip.mapTo(window, QPoint(window.tabs.strip.width(), 0)).x() <= page.thumbs.max_button.mapTo(window, QPoint()).x()
     assert window.language_button.geometry().right() < window.theme_button.geometry().left()
+    assert window.modified_button.geometry().right() < window.language_button.geometry().left()
+    assert window.theme_button.geometry().right() == window.main_toolbar.width() - 9
+    assert window.language_button.x() > window.compare_button.geometry().right() + 100
     toolbar_bottom = window.main_toolbar.mapTo(window, QPoint(0, window.main_toolbar.height())).y()
     page_top = page.mapTo(window, QPoint(0, 0)).y()
     assert page_top == toolbar_bottom

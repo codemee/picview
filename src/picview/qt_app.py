@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from PIL import Image, ImageOps
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import __version__
+from .file_actions import copy_file, show_properties
 from .settings import IMAGE_BACKGROUND_COLORS, load_settings, normalize_tab_state, save_settings
 from .svg import SvgDocument
 from .thumbnails import THUMBNAILS
@@ -109,6 +111,11 @@ TEXT = {
 LANGUAGE_MODES = ("system", "zh", "en")
 LANGUAGE_ICONS = {"system": "lang-system", "zh": "中", "en": "A"}
 TEXT["en"].update({
+    "sort": "Sort thumbnails", "sort_method": "Sort by", "sort_direction": "Sort direction", "sort_natural": "Name (natural order)", "sort_modified": "Date modified",
+    "sort_ascending": "Ascending (A–Z / oldest first)", "sort_descending": "Descending (Z–A / newest first)",
+    "show_modified": "Show date modified", "copy": "Copy", "properties": "Properties", "file_close": "Close",
+    "file_name": "Name", "file_type": "Type", "file_location": "Location", "file_size": "Size",
+    "modified": "Modified", "created": "Created", "dimensions": "Dimensions", "bytes": "bytes",
     "background": "Image background", "bg_default": "Default (follow theme)",
     "bg_white": "White", "bg_black": "Black", "bg_gray": "Gray", "bg_light_gray": "Light gray",
     "bg_cream": "Cream", "bg_blue": "Light blue", "bg_green": "Light green", "bg_pink": "Light pink",
@@ -125,6 +132,11 @@ TEXT["en"].update({
     "lang_en": "Language: English (click to switch)",
 })
 TEXT["zh"].update({
+    "sort": "縮圖排序", "sort_method": "排序方式", "sort_direction": "排序方向", "sort_natural": "檔名（自然排序）", "sort_modified": "修改時間",
+    "sort_ascending": "順向（A–Z／舊到新）", "sort_descending": "逆向（Z–A／新到舊）",
+    "show_modified": "顯示修改日期時間", "copy": "複製", "properties": "內容", "file_close": "關閉",
+    "file_name": "檔名", "file_type": "類型", "file_location": "位置", "file_size": "大小",
+    "modified": "修改時間", "created": "建立時間", "dimensions": "圖片尺寸", "bytes": "位元組",
     "background": "圖片背景色", "bg_default": "預設（跟隨主題）",
     "bg_white": "白色", "bg_black": "黑色", "bg_gray": "灰色", "bg_light_gray": "淺灰色",
     "bg_cream": "米色", "bg_blue": "淺藍色", "bg_green": "淺綠色", "bg_pink": "淺粉色",
@@ -234,6 +246,23 @@ class IconButton(QToolButton):
         elif self.kind == "more":
             p.setBrush(icon_color)
             for x in (12, 18, 24): p.drawEllipse(QPoint(x, 18), 1, 1)
+        elif self.kind == "sort-name":
+            font = self.font(); font.setPixelSize(12); p.setFont(font)
+            p.drawText(QRectF(7, 7, 11, 14), Qt.AlignmentFlag.AlignCenter, "A")
+            p.drawText(QRectF(7, 18, 11, 14), Qt.AlignmentFlag.AlignCenter, "1")
+            p.drawLine(20, 13, 28, 13); p.drawLine(20, 24, 25, 24)
+        elif self.kind == "sort-date":
+            p.drawEllipse(QRectF(9, 9, 18, 18))
+            p.drawLine(18, 12, 18, 18); p.drawLine(18, 18, 23, 18)
+        elif self.kind in ("sort-ascending", "sort-descending"):
+            p.drawLine(18, 9, 18, 27)
+            end, wing = (9, 14) if self.kind == "sort-ascending" else (27, 22)
+            p.drawLine(13, wing, 18, end); p.drawLine(18, end, 23, wing)
+        elif self.kind == "modified-visible":
+            p.drawRoundedRect(QRectF(9, 11, 18, 16), 1.5, 1.5)
+            p.drawLine(9, 16, 27, 16)
+            p.drawLine(13, 9, 13, 13); p.drawLine(23, 9, 23, 13)
+            p.drawLine(13, 20, 17, 20); p.drawLine(13, 23, 22, 23)
         elif self.kind == "compare":
             p.drawRoundedRect(QRectF(8, 10, 20, 16), 1.5, 1.5)
             p.drawLine(18, 10, 18, 26)
@@ -406,18 +435,47 @@ class ScaleValueButton(QToolButton):
 
 
 class ThumbnailTile(QFrame):
-    """A uniform two-row thumbnail card: filename always precedes image."""
+    """A thumbnail card with its name above and optional modified time below."""
     clicked_path = Signal(Path)
-    def __init__(self, path: Path, pixmap: QPixmap | None, size: int, selected: bool) -> None:
+    contextRequested = Signal(Path, QPoint)
+    def __init__(self, path: Path, pixmap: QPixmap | None, size: int, selected: bool, show_modified=True) -> None:
         super().__init__(); self.path = path; self.selected = selected; self.setFixedSize(size + 12, size + 38)
         self._drag_start = None
         layout = QVBoxLayout(self); layout.setContentsMargins(5, 5, 5, 5); layout.setSpacing(2)
         self.name = QLabel(path.name); self.name.setAlignment(Qt.AlignmentFlag.AlignCenter); self.name.setFixedHeight(20); self.name.setWordWrap(False)
         self.preview = QLabel(); self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter); self.preview.setFixedHeight(size)
-        for label in (self.name, self.preview):
+        self.modified_label = QLabel()
+        self.modified_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.modified_label.setFixedHeight(18)
+        font = self.modified_label.font(); font.setPixelSize(10); self.modified_label.setFont(font)
+        for label in (self.name, self.preview, self.modified_label):
             label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         if pixmap: self.preview.setPixmap(pixmap)
-        layout.addWidget(self.name); layout.addWidget(self.preview); self.apply_style()
+        layout.addWidget(self.name); layout.addWidget(self.preview); layout.addWidget(self.modified_label)
+        self.set_size(size, show_modified)
+        self.update_modified()
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(lambda pos: self.contextRequested.emit(self.path, self.mapToGlobal(pos)))
+        self.apply_style()
+
+    def set_size(self, size, show_modified):
+        self.setFixedSize(size + 12, size + 38 + (20 if show_modified else 0))
+        self.preview.setFixedHeight(size)
+        self.modified_label.setVisible(show_modified)
+        self.elide_modified()
+
+    def update_modified(self, mtime_ns=None):
+        try:
+            if mtime_ns is None: mtime_ns = self.path.stat().st_mtime_ns
+            text = datetime.fromtimestamp(mtime_ns / 1_000_000_000).strftime("%Y-%m-%d %H:%M:%S")
+        except (OSError, ValueError, OverflowError):
+            text = ""
+        self.modified_label.setToolTip(text)
+        self.elide_modified()
+
+    def elide_modified(self):
+        self.modified_label.setText(self.modified_label.fontMetrics().elidedText(
+            self.modified_label.toolTip(), Qt.TextElideMode.ElideRight, max(0, self.width() - 12)))
     def apply_style(self) -> None:
         color = PALETTE["selection"] if self.selected else PALETTE["thumbnail_card"]
         text = PALETTE["selection_text"] if self.selected else PALETTE["text"]
@@ -460,9 +518,13 @@ class ThumbnailTile(QFrame):
 class ThumbnailPane(QFrame):
     selected = Signal(Path)
     rowRequested = Signal(int)
+    sortRequested = Signal(str, bool)
     def __init__(self, labels: dict[str, str], parent=None):
         self.columns = 1
         super().__init__(parent); self.labels=labels; self.files=[]; self.selected_path=None; self.size=THUMBNAIL_BASE_SIZE; self.buttons={}; self.failed_paths=set()
+        self.sort_mode = "natural"
+        self.sort_descending = False
+        self.show_modified = True
         self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,4,10,8); layout.setSpacing(4)
         header=QHBoxLayout(); header.setSpacing(4); self.max_button=IconButton("expand",labels["max"]); header.addWidget(self.max_button); header.addStretch(); self.size_label=ScaleValueButton(self.size,72,260,THUMBNAIL_BASE_SIZE,1,"px",labels["edit_thumb"]); header.addWidget(self.size_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,THUMBNAIL_BASE_SIZE); self.slider.setRange(72,260); self.slider.setValue(self.size); self.slider.setFixedSize(SLIDER_WIDTH,30); self.slider.logicalValueChanged.connect(self._resize); self.size_label.valueChosen.connect(self.slider.setValue); header.addWidget(self.slider); layout.addLayout(header)
         self.tab_slot = QWidget()
@@ -474,6 +536,17 @@ class ThumbnailPane(QFrame):
         tab_layout.setContentsMargins(0, 0, 0, 0)
         header.insertWidget(0, self.tab_slot, 1)
         header.takeAt(2)  # The tab slot supplies the flexible space.
+        self.sort_button = IconButton("sort-name", labels["sort_method"])
+        self.sort_button.setCheckable(True)
+        self.direction_button = IconButton("sort-ascending", labels["sort_direction"])
+        self.direction_button.setCheckable(True)
+        header.insertWidget(1, self.sort_button)
+        header.insertWidget(2, self.direction_button)
+        self.context_menu = QMenu(self)
+        self.sort_button.clicked.connect(lambda: self.sortRequested.emit(
+            "modified" if self.sort_mode == "natural" else "natural", self.sort_descending))
+        self.direction_button.clicked.connect(lambda: self.sortRequested.emit(self.sort_mode, not self.sort_descending))
+        self.update_sort_buttons()
         self.scroll=QScrollArea(); self.scroll.setWidgetResizable(True); self.scroll.setFrameShape(QFrame.Shape.NoFrame); self.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};"); self.grid_host=QWidget(); self.grid_host.setObjectName("thumbnailGrid"); self.grid_host.setStyleSheet(f"#thumbnailGrid{{background:{PALETTE['pane']};}}"); self.grid=QGridLayout(self.grid_host); self.grid.setAlignment(Qt.AlignmentFlag.AlignTop|Qt.AlignmentFlag.AlignLeft); self.scroll.setWidget(self.grid_host); layout.addWidget(self.scroll)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.setMinimumSize(54, 50)
@@ -490,12 +563,41 @@ class ThumbnailPane(QFrame):
         self.layout_timer.setSingleShot(True)
         self.layout_timer.timeout.connect(self.build)
         self.scroll.verticalScrollBar().valueChanged.connect(self.schedule_previews)
-        self.toolbar_overflow = ToolbarOverflow(self, header, [self.slider, self.size_label, self.max_button],
+        self.toolbar_overflow = ToolbarOverflow(self, header, [self.slider, self.size_label, self.max_button, self.direction_button, self.sort_button],
             lambda: self.labels["more_tools"], {self.slider: self.size_label},
             self.toolbar_width, flex_widgets=(self.tab_slot,))
         for widget in (self.scroll, self.scroll.viewport(), self.grid_host,
                        self.scroll.verticalScrollBar(), self.scroll.horizontalScrollBar()):
             widget.installEventFilter(self)
+
+    def update_sort_buttons(self):
+        modified = self.sort_mode == "modified"
+        self.sort_button.setChecked(modified)
+        self.sort_button.set_kind("sort-date" if modified else "sort-name",
+            f"{self.labels['sort_method']}: {self.labels['sort_modified' if modified else 'sort_natural']}")
+        self.direction_button.setChecked(self.sort_descending)
+        direction = "sort-descending" if self.sort_descending else "sort-ascending"
+        self.direction_button.set_kind(direction,
+            f"{self.labels['sort_direction']}: {self.labels['sort_descending' if self.sort_descending else 'sort_ascending']}")
+        for button in (self.sort_button, self.direction_button): button.setAccessibleName(button.toolTip())
+
+    def set_show_modified(self, show):
+        self.show_modified = bool(show)
+        self.build()
+
+    def show_file_menu(self, path, position):
+        self.select_clicked(path)
+        menu = self.context_menu
+        menu.clear()
+        copy = menu.addAction(shortcut_tooltip(self.labels["copy"], QKeySequence.StandardKey.Copy))
+        copy.triggered.connect(lambda checked=False: copy_file(path))
+        properties = menu.addAction(self.labels["properties"])
+        properties.triggered.connect(lambda checked=False: self.open_properties(path))
+        for action in (copy, properties): action.setEnabled(path.is_file())
+        menu.popup(position)
+
+    def open_properties(self, path):
+        self.properties_dialog = show_properties(path, self, self.labels)
 
     def toolbar_width(self):
         margins = self.layout().contentsMargins()
@@ -536,7 +638,7 @@ class ThumbnailPane(QFrame):
         self.failed_paths.intersection_update(wanted)
         self._pending_paths.intersection_update(wanted)
         cols = max(1, self.scroll.viewport().width() // (self.size + 20))
-        signature = (cols, self.size, tuple(self.files))
+        signature = (cols, self.size, self.show_modified, tuple(self.files))
         rearrange = signature != getattr(self, "_layout_signature", None)
         self._layout_signature = signature
         self.columns = cols
@@ -544,17 +646,17 @@ class ThumbnailPane(QFrame):
             tile = self.buttons.get(path)
             new = tile is None
             if new:
-                tile = ThumbnailTile(path, None, self.size, path == self.selected_path)
+                tile = ThumbnailTile(path, None, self.size, path == self.selected_path, self.show_modified)
                 tile.clicked_path.connect(self.select_clicked)
+                tile.contextRequested.connect(self.show_file_menu)
                 self.buttons[path] = tile
             selected = path == self.selected_path
             if tile.selected != selected:
                 tile.selected = selected
                 tile.apply_style()
-            resized = tile.width() != self.size + 12
+            resized = tile.size() != QSize(self.size + 12, self.tile_height())
             if resized:
-                tile.setFixedSize(self.size + 12, self.size + 38)
-                tile.preview.setFixedHeight(self.size)
+                tile.set_size(self.size, self.show_modified)
             if new or rearrange or resized:
                 self.grid.addWidget(tile, index // cols, index % cols)
             if self._loaded.get(path) != THUMBNAILS.key(path, self.size, self.devicePixelRatioF()):
@@ -571,13 +673,16 @@ class ThumbnailPane(QFrame):
 
     def preview_order(self):
         # Prioritize the viewport and one nearby row, then decode the rest.
-        row_height = self.size + 38 + max(0, self.grid.verticalSpacing())
+        row_height = self.tile_height() + max(0, self.grid.verticalSpacing())
         first_row = max(0, self.scroll.verticalScrollBar().value() // row_height - 1)
         last_row = (self.scroll.verticalScrollBar().value() + self.scroll.viewport().height()) // row_height + 2
         visible = self.files[first_row * self.columns:last_row * self.columns]
         priority = list(dict.fromkeys(visible + ([self.selected_path] if self.selected_path else [])))
         seen = set(priority)
         return [path for path in priority + [p for p in self.files if p not in seen] if path in self._pending_paths]
+
+    def tile_height(self):
+        return self.size + 38 + (20 if self.show_modified else 0)
 
     def apply_preview(self, key, image):
         path = key[0]
@@ -1177,6 +1282,7 @@ class FolderTab(QWidget):
         layout.addWidget(self.split)
         self.thumbs.selected.connect(self.select_image)
         self.thumbs.rowRequested.connect(self.select_row)
+        self.thumbs.sortRequested.connect(self.set_sort)
         self.thumbs.max_button.clicked.connect(lambda: self.maximize("thumb"))
         self.image.max_button.clicked.connect(self.maximize_image)
         self.scroll_restore_timer = QTimer(self)
@@ -1201,7 +1307,10 @@ class FolderTab(QWidget):
         self.folder = folder.resolve()
         self._initial_view = state
         self._restore_selected = selected
-        self.files = image_files(self.folder)
+        self.thumbs.sort_mode = state.get("sort_mode", "natural") if state else "natural"
+        self.thumbs.sort_descending = state.get("sort_descending", False) if state else False
+        self.thumbs.update_sort_buttons()
+        self.files = self.ordered_files(image_files(self.folder))
         self._layout_pending = True
         if state:
             self.image.set_background(state.get("image_background", "default"))
@@ -1226,6 +1335,26 @@ class FolderTab(QWidget):
             key = "folder_missing" if self.folder and not self.folder.is_dir() else "empty"
             self.image.label.setText(self.t[key])
             self.image.label.setFixedSize(self.image.label.sizeHint())
+
+    def ordered_files(self, files, versions=None):
+        if self.thumbs.sort_mode == "modified":
+            versions = self.image_versions(files) if versions is None else versions
+            return sorted(files, key=lambda path: ((versions.get(path) or (0, 0))[1], natural_key(path)),
+                          reverse=self.thumbs.sort_descending)
+        return sorted(files, key=natural_key, reverse=self.thumbs.sort_descending)
+
+    def set_sort(self, mode, descending):
+        if mode not in ("natural", "modified"): return
+        self.cancel_scroll_restore()
+        self.thumbs.sort_mode = mode
+        self.thumbs.sort_descending = bool(descending)
+        self.thumbs.update_sort_buttons()
+        selected = self.thumbs.selected_path
+        self.files = self.ordered_files(self.files)
+        self.thumbs.set_files(self.files, selected, emit_selection=False)
+        if selected in self.thumbs.buttons:
+            QTimer.singleShot(0, self.thumbs, lambda: self.thumbs.scroll.ensureWidgetVisible(self.thumbs.buttons[selected])
+                              if selected in self.thumbs.buttons else None)
 
     def select_image(self, path):
         if self._initial_view is None: self.cancel_scroll_restore()
@@ -1349,6 +1478,7 @@ class FolderTab(QWidget):
         state = {"folder": str(self.folder) if self.folder else "", "selected_file": str(self.thumbs.selected_path or self._restore_selected or ""),
                  "orientation": "horizontal" if self.split.orientation() == Qt.Orientation.Horizontal else "vertical",
                  "sash_fraction": fraction, "thumbnail_size": self.thumbs.size,
+                 "sort_mode": self.thumbs.sort_mode, "sort_descending": self.thumbs.sort_descending,
                  "image_zoom": self.image.zoom, "fit_to_pane": self.image.fit_to_pane,
                  "image_background": self.image.background_mode,
                  "rotation": self.image.rotation, "fh": self.image.fh, "fv": self.image.fv,
@@ -1365,6 +1495,7 @@ class FolderTab(QWidget):
         self.t = labels
         self.thumbs.labels = labels
         self.image.labels = labels
+        self.thumbs.update_sort_buttons()
         for pane in (self.thumbs, self.image):
             pane.max_button.setToolTip(labels["restore" if pane.max_button.kind == "shrink" else "max"])
         self.thumbs.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};")
@@ -1458,10 +1589,14 @@ class FolderTab(QWidget):
             # A temporary access failure does not mean the images were deleted.
             return
         versions = self.image_versions(files)
+        files = self.ordered_files(files, versions)
         changed = {path for path in files if path in self._image_versions and versions[path] != self._image_versions[path]}
         changed.update(self._changed_image_paths.intersection(files))
         self._changed_image_paths.clear()
         self._image_versions = versions
+        for path in changed:
+            if path in self.thumbs.buttons and versions.get(path) is not None:
+                self.thumbs.buttons[path].update_modified(versions[path][1])
         # Atomic replacement can remove a native file watch; reattach it here.
         self.watch_image_files(files)
         pending = self.pending_image_versions()
@@ -1493,7 +1628,10 @@ class FolderTab(QWidget):
         removed = previous is not None and previous not in files
         selected = previous
         if removed:
-            selected = next((path for path in files if natural_key(path) > natural_key(previous)), files[0] if files else None)
+            index = self.files.index(previous) if previous in self.files else -1
+            successors = self.files[index + 1:] + self.files[:max(0, index)]
+            remaining = set(files)
+            selected = next((path for path in successors if path in remaining), files[0] if files else None)
         elif selected is None and files:
             selected = self._restore_selected if self._restore_selected in files else files[0]
         thumbs = self.thumbs
@@ -1501,6 +1639,7 @@ class FolderTab(QWidget):
         self.files = files
         reload_image = selected != previous or (selected is not None and not self.image.frames)
         thumbs.set_files(files, selected, emit_selection=reload_image)
+        if changed: thumbs.refresh_previews(changed)
         self._image_reload_retries = 0
         if selected == previous and selected in changed and not reload_image:
             if not self.reload_current_image(): self._image_reload_retries = 8
@@ -1554,10 +1693,7 @@ class FolderTab(QWidget):
 
     def copy_selected_file(self):
         path = self.thumbs.selected_path
-        if path is None or not path.is_file(): return
-        data = QMimeData()
-        data.setUrls([QUrl.fromLocalFile(str(path))])
-        QApplication.clipboard().setMimeData(data)
+        if path is not None: copy_file(path)
 
 
 
@@ -1810,6 +1946,7 @@ class PicView(QMainWindow):
     def __init__(self):
         super().__init__()
         self.settings = load_settings()
+        self.show_modified = self.settings.get("show_modified", True) is not False
         self.language_mode = self.settings.get("language", "system")
         if self.language_mode not in LANGUAGE_MODES: self.language_mode = "system"
         self.lang = resolve_language(self.language_mode)
@@ -1865,6 +2002,10 @@ class PicView(QMainWindow):
         self.compare_button.setCheckable(True)
         self.compare_button.toggled.connect(self.set_compare)
         self.language_button = IconButton(LANGUAGE_ICONS[self.language_mode], self.t[f"lang_{self.language_mode}"])
+        self.modified_button = IconButton("modified-visible", self.t["show_modified"])
+        self.modified_button.setCheckable(True)
+        self.modified_button.setChecked(self.show_modified)
+        self.modified_button.toggled.connect(self.set_show_modified)
         self.theme_button = IconButton(f"theme-{self.theme_mode}", self.t[f"theme_{self.theme_mode}"])
         self.main_toolbar = tool
         outer.addWidget(tool)
@@ -1895,14 +2036,15 @@ class PicView(QMainWindow):
             if button in (self.vertical_button, self.compare_button): separate_tools(layout)
             button.clicked.connect(action)
             layout.addWidget(button)
+        layout.addStretch(1)
         separate_tools(layout)
+        layout.addWidget(self.modified_button)
         for button, action in ((self.language_button, self.toggle_lang), (self.theme_button, self.toggle_theme)):
             button.clicked.connect(action)
             layout.addWidget(button)
         self.toolbar_overflow = ToolbarOverflow(tool, layout,
-            [self.theme_button, self.language_button, self.horizontal_button, self.vertical_button, self.compare_button, self.open_button],
+            [self.theme_button, self.language_button, self.modified_button, self.horizontal_button, self.vertical_button, self.compare_button, self.open_button],
             lambda: self.t["more_tools"])
-        layout.addStretch(1)
         outer.addWidget(self.tabs, 1)
         self.apply_styles()
 
@@ -1953,6 +2095,7 @@ class PicView(QMainWindow):
         """)
     def add_page(self):
         page = FolderTab(self.t)
+        page.thumbs.show_modified = self.show_modified
         page.notification.connect(lambda message, tab=page: self.show_notification(tab, message))
         page.attentionChanged.connect(self.update_tab_titles)
         self.tabs.addTab(page, self.t["empty_tab"])
@@ -2217,6 +2360,9 @@ class PicView(QMainWindow):
             self.comparison_area.set_layout_orientation(orientation)
 
     def rebuild_ui(self):
+        self.modified_button.setToolTip(self.t["show_modified"])
+        self.modified_button.setAccessibleName(self.t["show_modified"])
+        self.modified_button.refresh_icon()
         self.open_button.setToolTip(shortcut_tooltip(self.t["open"], QKeySequence.StandardKey.Open))
         self.vertical_button.setToolTip(shortcut_tooltip(self.t["vertical"], "Alt+Shift+V"))
         self.horizontal_button.setToolTip(shortcut_tooltip(self.t["horizontal"], "Alt+Shift+H"))
@@ -2277,10 +2423,19 @@ class PicView(QMainWindow):
         current = self.current_tab()
         active = sum(page.folder is not None for page in pages[:self.tabs.currentIndex()]) if current and current.folder else 0
         values = current.snapshot() if current is not None else {}
-        values.update(tabs=states, active_tab=active, language=self.language_mode, theme=self.theme_mode, maximized_pane="")
+        values.update(tabs=states, active_tab=active, language=self.language_mode, theme=self.theme_mode,
+                      show_modified=self.show_modified, maximized_pane="")
         save_settings(values)
         for page in pages: page.shutdown()
         event.accept()
+
+    def set_show_modified(self, show):
+        self.show_modified = bool(show)
+        self.settings["show_modified"] = self.show_modified
+        if self.modified_button.isChecked() != self.show_modified:
+            self.modified_button.setChecked(self.show_modified)
+            return
+        for page in self.pages(): page.thumbs.set_show_modified(self.show_modified)
 
     def toggle_theme(self):
         modes=("system","light","dark")

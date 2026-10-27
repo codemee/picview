@@ -111,7 +111,7 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
         assert slider.height() == 30
     thumbnail_toolbar = window.thumbs.layout().itemAt(0).layout()
     thumbnail_widgets = [thumbnail_toolbar.itemAt(i).widget() for i in range(thumbnail_toolbar.count()) if thumbnail_toolbar.itemAt(i).widget() and not thumbnail_toolbar.itemAt(i).widget().isHidden()]
-    assert thumbnail_widgets[:2] == [window.thumbs.tab_slot, window.thumbs.max_button]
+    assert thumbnail_widgets[:4] == [window.thumbs.tab_slot, window.thumbs.sort_button, window.thumbs.direction_button, window.thumbs.max_button]
     assert thumbnail_widgets[-2] is window.thumbs.size_label
     assert window.thumbs.size_label.text() == "140px"
     window.thumbs.size_label.click()

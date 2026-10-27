@@ -68,7 +68,7 @@ uv run picview
 ### Window and toolbars
 
 - Resize the window down to **260 × 220 px**.
-- The main toolbar occupies its own row, with open, layout, comparison, language, and theme tools grouped on the left.
+- The main toolbar occupies its own row: open, layout, and comparison tools on the left; date display, language, and theme tools on the right.
 - Folder tabs sit inside the thumbnail pane, sharing a row with the thumbnail tools on the right. The tab strip follows the active thumbnail pane.
 - Fit, maximize pane, and full screen sit on the right, before the zoom value and slider. The shared comparison toolbar uses the same order.
 - Hover over buttons or zoom controls to see their assigned keyboard shortcuts. The overflow menu also shows the corresponding keys.
@@ -80,7 +80,7 @@ uv run picview
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - When sliders are hidden, use the overflow menu to enter zoom or thumbnail-size values.
-- The window title shows the current version, for example **PicView v0.1.2**.
+- The window title shows the current version, for example **PicView v0.1.3**.
 
 ### Open and drag images
 
@@ -100,6 +100,17 @@ uv run picview
 | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/expand-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/expand-light.png" width="34" height="34" alt="Maximize pane" title="Maximize pane"></picture> | Maximize the thumbnail or image pane |
 | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shrink-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shrink-light.png" width="34" height="34" alt="Restore pane" title="Restore pane"></picture> | Restore the pane layout |
 | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fullscreen-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fullscreen-light.png" width="34" height="34" alt="Full screen" title="Full screen"></picture> | Open the current image in full screen |
+
+### Thumbnail sorting, dates, and file actions
+
+- The thumbnail sort-method button toggles between <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-light.png" width="34" height="34" alt="Sort by name" title="Sort by name"></picture> **Name (natural order)** and <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-light.png" width="34" height="34" alt="Sort by date modified" title="Sort by date modified"></picture> **Date modified**.
+- The adjacent direction button toggles between <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-ascending-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-ascending-light.png" width="34" height="34" alt="Ascending" title="Ascending"></picture> **ascending** and <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-descending-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-descending-light.png" width="34" height="34" alt="Descending" title="Descending"></picture> **descending**. Dates ascend from oldest to newest and descend from newest to oldest. Sorting preserves the selected image and its view settings.
+- <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-light.png" width="34" height="34" alt="Show date modified" title="Show date modified"></picture> before the language button in the main toolbar toggles **Show date modified** for all tabs. This global preference survives restarting and applies to new and duplicated tabs.
+- Cards show the local modification date and time at the bottom by default; hover over a truncated date to see the full timestamp.
+- Each tab remembers its sort method and direction when duplicated or restored after restarting. New or modified files update their order and timestamps automatically.
+- Right-click a thumbnail card and choose **Copy** to copy the original file to the clipboard for pasting into another application or folder.
+- **Properties** opens the native Explorer property sheet on Windows. On other platforms, or if the system dialog cannot open, it shows the file name, type, location, size, modification time, image dimensions, and creation time when available.
+- When a toolbar is narrow, use its **⋯ More tools** menu to operate the sorting and date-display buttons.
 
 ### Supported formats
 
