@@ -20,8 +20,31 @@ def current_tab_visible(window):
     rect = bar.tabRect(bar.currentIndex())
     arrows = [button for button in bar.findChildren(QToolButton)
               if button.isVisible() and button.objectName().startswith("Scroll")]
-    right = min((button.x() for button in arrows), default=bar.width())
-    return rect.left() >= 0 and rect.right() < right
+    left = max((button.geometry().right() + 1 for button in arrows
+                if button.objectName() == "ScrollLeftButton"), default=0)
+    right = min((button.x() for button in arrows
+                 if button.objectName() == "ScrollRightButton"), default=bar.width())
+    return rect.left() >= left and rect.right() < right
+
+
+def test_scroll_arrows_stay_at_opposite_edges(browser):
+    window, folders = browser
+    for _ in range(12): window.open_folder(folders[0])
+    bar = window.tabs.bar
+    for width in (1100, 650, 260):
+        window.resize(width, 500)
+        QTest.qWait(50)
+        left = bar.findChild(QToolButton, "ScrollLeftButton")
+        right = bar.findChild(QToolButton, "ScrollRightButton")
+        assert left.isVisible() and right.isVisible()
+        assert left.x() == 0
+        assert right.geometry().right() == bar.width() - 1
+        bar.setCurrentIndex(0)
+        wait_until(lambda: current_tab_visible(window))
+        left.click()
+        right.click()
+        bar.setCurrentIndex(bar.count() - 1)
+        wait_until(lambda: current_tab_visible(window))
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])

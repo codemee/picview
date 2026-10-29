@@ -10,7 +10,7 @@ from PySide6.QtCore import QEvent, QFileSystemWatcher, QLocale, QMimeData, QObje
 from PySide6.QtGui import QAction, QColor, QDrag, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPolygon, QPalette, QRegion, QShortcut, QTransform
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QMainWindow,
-    QMenu, QPushButton, QScrollArea, QSlider, QSplitter, QStackedWidget, QTabBar, QStyle, QStyleOptionSlider, QStyleOptionTab, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
+    QMenu, QPushButton, QProxyStyle, QScrollArea, QSlider, QSplitter, QStackedWidget, QTabBar, QStyle, QStyleOptionSlider, QStyleOptionTab, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
 )
 
 from . import __version__
@@ -274,6 +274,7 @@ class IconButton(QToolButton):
             p.drawLine(13, 9, 13, 13); p.drawLine(23, 9, 23, 13)
             p.drawLine(13, 20, 17, 20); p.drawLine(13, 23, 22, 23)
         elif self.kind == "tab-list":
+            p.setPen(QPen(QColor(PALETTE["muted"]), 1 / drawing_scale))
             p.drawLine(14, 16, 18, 20); p.drawLine(18, 20, 22, 16)
         elif self.kind == "compare":
             p.drawRoundedRect(QRectF(8, 10, 20, 16), 1.5, 1.5)
@@ -1826,7 +1827,65 @@ class TabCloseButton(QToolButton):
         painter.end()
 
 
+class FolderTabStyle(QProxyStyle):
+    """Keep Qt's scrolling behavior with navigation at opposite ends."""
+    def pixelMetric(self, metric, option=None, widget=None):
+        if metric == QStyle.PixelMetric.PM_TabBarScrollButtonWidth:
+            return 16
+        return super().pixelMetric(metric, option, widget)
+
+    def subElementRect(self, element, option, widget=None):
+        if element in (QStyle.SubElement.SE_TabBarTearIndicatorLeft,
+                       QStyle.SubElement.SE_TabBarTearIndicatorRight):
+            return QRect()
+        if element in (QStyle.SubElement.SE_TabBarScrollLeftButton,
+                       QStyle.SubElement.SE_TabBarScrollRightButton):
+            width = self.pixelMetric(QStyle.PixelMetric.PM_TabBarScrollButtonWidth, option, widget)
+            x = option.rect.left() if element == QStyle.SubElement.SE_TabBarScrollLeftButton else option.rect.right() - width + 1
+            return QRect(x, option.rect.top(), width, option.rect.height())
+        return super().subElementRect(element, option, widget)
+
+    def drawComplexControl(self, control, option, painter, widget=None):
+        if (control == QStyle.ComplexControl.CC_ToolButton
+                and isinstance(widget, QToolButton) and widget.objectName().startswith("Scroll")):
+            painter.fillRect(option.rect, QColor(PALETTE["hover"] if option.state & QStyle.StateFlag.State_MouseOver else PALETTE["surface"]))
+            element = (QStyle.PrimitiveElement.PE_IndicatorArrowLeft
+                       if widget.objectName() == "ScrollLeftButton"
+                       else QStyle.PrimitiveElement.PE_IndicatorArrowRight)
+            self.drawPrimitive(element, option, painter, widget)
+            return
+        super().drawComplexControl(control, option, painter, widget)
+
+    def drawPrimitive(self, element, option, painter, widget=None):
+        if (isinstance(widget, QToolButton) and widget.objectName().startswith("Scroll")
+                and element in (QStyle.PrimitiveElement.PE_IndicatorArrowLeft,
+                                QStyle.PrimitiveElement.PE_IndicatorArrowRight)):
+            color = QColor(PALETTE["muted"])
+            if not option.state & QStyle.StateFlag.State_Enabled:
+                color.setAlpha(80)
+            direction = -1 if element == QStyle.PrimitiveElement.PE_IndicatorArrowLeft else 1
+            center = option.rect.center()
+            path = QPainterPath()
+            path.moveTo(center.x() - direction * 2, center.y() - 4)
+            path.lineTo(center.x() + direction * 2, center.y())
+            path.lineTo(center.x() - direction * 2, center.y() + 4)
+            painter.save()
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setPen(QPen(color, 1))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawPath(path)
+            painter.restore()
+            return
+        super().drawPrimitive(element, option, painter, widget)
+
+
 class FolderTabBar(QTabBar):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.navigation_style = FolderTabStyle()
+        self.navigation_style.setParent(self)
+        self.setStyle(self.navigation_style)
+
     def tabSizeHint(self, index):
         size = super().tabSizeHint(index)
         return QSize(min(200, max(150, size.width())), 34)
@@ -2597,8 +2656,22 @@ class PicView(QMainWindow):
         return self.current_tab().copy_selected_file(*args)
 
 
+def set_application_identity(app: QApplication) -> None:
+    app.setApplicationName("PicView")
+    # macOS uses the application icon for the Dock; a window icon alone
+    # leaves Python's icon in place when running outside an .app bundle.
+    icon_path = Path(__file__).parent / "assets" / "picview-icon.png"
+    app.setWindowIcon(QIcon(str(icon_path)))
+
+
 def main():
     parser = argparse.ArgumentParser(description="PicView image folder viewer")
     parser.add_argument("--version", action="version", version=f"PicView {__version__}")
     parser.parse_args()
-    app=QApplication(sys.argv); app.setApplicationName("PicView"); use_system_palette(app); w=PicView(); app.paletteChanged.connect(w.refresh_system_theme); icon=Path(__file__).parent/"assets"/"picview-icon.png"; w.setWindowIcon(QIcon(str(icon))); w.show(); sys.exit(app.exec())
+    app = QApplication(sys.argv)
+    set_application_identity(app)
+    use_system_palette(app)
+    window = PicView()
+    app.paletteChanged.connect(window.refresh_system_theme)
+    window.show()
+    sys.exit(app.exec())

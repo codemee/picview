@@ -9,7 +9,6 @@ def smoke_test(report_path):
     from pathlib import Path
 
     from PIL import Image
-    from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
 
     from picview import __version__, qt_app
@@ -23,15 +22,15 @@ def smoke_test(report_path):
     qt_app.load_settings = lambda: DEFAULT_SETTINGS.copy()
     qt_app.save_settings = lambda values: None
     app = QApplication([])
+    qt_app.set_application_identity(app)
+    assert app.applicationName() == "PicView"
+    assert not app.windowIcon().pixmap(32, 32).isNull(), "Bundled application icon could not be loaded"
     with tempfile.TemporaryDirectory() as directory:
         folder = Path(directory)
         sample = folder / "sample.png"
         Image.new("RGB", (64, 48), "red").save(sample)
         window = qt_app.PicView()
-        icon_path = Path(qt_app.__file__).parent / "assets" / "picview-icon.png"
-        icon = QIcon(str(icon_path))
-        assert not icon.pixmap(32, 32).isNull(), "Bundled icon could not be loaded"
-        window.setWindowIcon(icon)
+        assert window.windowIcon().cacheKey() == app.windowIcon().cacheKey()
         window.show()
         window.open_folder(folder)
         app.processEvents()

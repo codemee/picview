@@ -63,6 +63,8 @@ From the project directory, run:
 uv run picview
 ```
 
+When launched through Python/uv on macOS, the Dock uses the PicView icon, but the application menu may still be named Python. Use the desktop `PicView.app` for the full application name and icon.
+
 ## Usage
 
 ### Window and toolbars
@@ -70,6 +72,7 @@ uv run picview
 - Resize the window down to **260 × 220 px**.
 - The main toolbar occupies its own row: open, layout, and comparison tools on the left; date display, language, and theme tools on the right.
 - Folder tabs sit inside the thumbnail pane, sharing a row with the thumbnail tools on the right. The tab strip follows the active thumbnail pane.
+- When tabs overflow, scroll arrows appear at opposite ends of the tab bar. Both scroll arrows and the tab-list dropdown use thin chevrons.
 - Fit, maximize pane, and full screen sit on the right, before the zoom value and slider. The shared comparison toolbar uses the same order.
 - Hover over buttons or zoom controls to see their assigned keyboard shortcuts. The overflow menu also shows the corresponding keys.
 - Thumbnail cards use distinct backgrounds and thin borders in both light and dark themes, keeping their boundaries visible while scrolling.
