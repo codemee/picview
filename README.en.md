@@ -83,7 +83,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - When sliders are hidden, use the overflow menu to enter zoom or thumbnail-size values.
-- The window title shows the current version, for example **PicView v0.1.3**.
+- The window title shows the current version, for example **PicView v0.1.4**.
 
 ### Open and drag images
 
@@ -148,7 +148,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Drag tabs to reorder them.
 - Secondary tools collapse first when space is limited; excess tabs scroll horizontally and long names are shortened.
 - The selected tab's underline stops before the scroll arrows and does not show beneath them, in both light and dark themes.
-- Scroll arrows follow the Qt interface style and may appear as solid triangles or outlined chevrons depending on the runtime environment.
+- Scroll arrows stay at opposite ends of the tab strip and use consistent thin chevrons, matching the dropdown arrow on the right.
 - The current tab stays visible when opening tabs, switching tabs, or resizing the window.
 - Use a tab's close button to close it; closing the last tab leaves an empty tab.
 - Each tab keeps its own selection, zoom, rotation, mirroring, scrolling, thumbnail size, and pane layout.
