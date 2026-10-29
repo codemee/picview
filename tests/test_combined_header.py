@@ -1,9 +1,10 @@
 from PySide6.QtCore import QPoint
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QToolButton
+from PySide6.QtGui import QColor, QPalette
+from PySide6.QtWidgets import QApplication, QToolButton
 import pytest
 
-from picview.qt_app import FolderTabBar
+from picview.qt_app import FolderTabBar, PALETTE, themed_palette, use_system_palette
 
 from test_tabs import browser, wait_until
 
@@ -21,6 +22,43 @@ def current_tab_visible(window):
               if button.isVisible() and button.objectName().startswith("Scroll")]
     right = min((button.x() for button in arrows), default=bar.width())
     return rect.left() >= 0 and rect.right() < right
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_selected_underline_does_not_leak_below_scroll_arrows(browser, theme):
+    app = QApplication.instance()
+    original_palette = QPalette(app.palette())
+    bar = FolderTabBar()
+    try:
+        app.setPalette(themed_palette(original_palette, theme))
+        use_system_palette(app)
+        bar.setStyleSheet(f"QTabBar{{background:{PALETTE['card']};}}")
+        bar.setExpanding(False)
+        bar.setUsesScrollButtons(True)
+        for index in range(8): bar.addTab(f"Folder {index}")
+        bar.resize(450, 34)
+        bar.setCurrentIndex(7)
+        bar.show()
+        QTest.qWait(50)
+        selected = bar.tabRect(bar.currentIndex())
+        left = bar.findChild(QToolButton, "ScrollLeftButton")
+        right = bar.findChild(QToolButton, "ScrollRightButton")
+        assert left.isVisible() and right.isVisible()
+        # Exercise native styles with arrows at both ends and vertical insets:
+        # painting only behind each button rectangle leaves the bottom exposed.
+        left.setGeometry(selected.left() + 2, 3, 16, 28)
+        right.setGeometry(selected.right() - 15, 3, 16, 28)
+        pixels = bar.grab().toImage()
+        accent = QColor(PALETTE["focus"])
+        for button in (left, right):
+            for x in range(button.x(), button.x() + button.width()):
+                assert pixels.pixelColor(x, bar.height() - 1) != accent
+        assert pixels.pixelColor(selected.center().x(), bar.height() - 1) == accent
+    finally:
+        bar.close()
+        bar.deleteLater()
+        app.setPalette(original_palette)
+        use_system_palette(app)
 
 
 @pytest.mark.parametrize("count", [2, 3, 4])

@@ -6,8 +6,8 @@ from datetime import datetime
 from pathlib import Path
 
 from PIL import Image, ImageOps
-from PySide6.QtCore import QEvent, QFileSystemWatcher, QLocale, QMimeData, QObject, QPoint, QRectF, QSize, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QDrag, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPolygon, QPalette, QShortcut, QTransform
+from PySide6.QtCore import QEvent, QFileSystemWatcher, QLocale, QMimeData, QObject, QPoint, QRect, QRectF, QSize, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QColor, QDrag, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPolygon, QPalette, QRegion, QShortcut, QTransform
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QMainWindow,
     QMenu, QPushButton, QScrollArea, QSlider, QSplitter, QStackedWidget, QTabBar, QStyle, QStyleOptionSlider, QStyleOptionTab, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
@@ -1829,6 +1829,13 @@ class FolderTabBar(QTabBar):
 
     def paintEvent(self, event):
         painter = QPainter(self)
+        visible = QRegion(self.rect())
+        for button in self.findChildren(QToolButton):
+            if button.isVisible() and button.objectName().startswith("Scroll"):
+                # Native arrow buttons can be shorter than the tab strip.
+                # Reserve their full-height columns, including the underline.
+                visible -= QRegion(QRect(button.x(), 0, button.width(), self.height()))
+        painter.setClipRegion(visible)
         order = [index for index in range(self.count()) if index != self.currentIndex()]
         if self.currentIndex() >= 0: order.append(self.currentIndex())
         for index in order:

@@ -142,6 +142,8 @@ uv run picview
 - In comparison mode, duplicating a checked tab also adds the copy to comparison.
 - Drag tabs to reorder them.
 - Secondary tools collapse first when space is limited; excess tabs scroll horizontally and long names are shortened.
+- The selected tab's underline stops before the scroll arrows and does not show beneath them, in both light and dark themes.
+- Scroll arrows follow the Qt interface style and may appear as solid triangles or outlined chevrons depending on the runtime environment.
 - The current tab stays visible when opening tabs, switching tabs, or resizing the window.
 - Use a tab's close button to close it; closing the last tab leaves an empty tab.
 - Each tab keeps its own selection, zoom, rotation, mirroring, scrolling, thumbnail size, and pane layout.
