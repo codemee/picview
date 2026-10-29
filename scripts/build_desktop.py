@@ -82,6 +82,7 @@ def main():
         staging = build / "dmg"
         staging.mkdir(exist_ok=True)
         run("ditto", output / "PicView.app", staging / "PicView.app")
+        shutil.copy2(ROOT / "LICENSE", staging / "LICENSE.txt")
         applications = staging / "Applications"
         if not applications.is_symlink():
             applications.symlink_to("/Applications", target_is_directory=True)
@@ -94,6 +95,7 @@ def main():
     with artifact.open("rb") as stream:
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
     artifact.with_suffix(artifact.suffix + ".sha256").write_text(f"{digest}  {artifact.name}\n")
+    shutil.copy2(ROOT / "LICENSE", release / f"PicView-{version}-{target}-LICENSE.txt")
     print(f"Built {artifact}", flush=True)
 
 

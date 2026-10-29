@@ -29,6 +29,7 @@ For an existing PyPI project, add the same publisher under the project's Publish
 
 ## Documentation
 
+- PicView uses `GPL-3.0-or-later`. Keep the root `LICENSE`, package metadata, and README license notices in sync. Python distributions include the full license text.
 - `README.md` is the default Traditional Chinese guide and the PyPI project description. Keep `README.en.md` in sync; `README.zh-TW.md` preserves the former Chinese documentation link.
 - Update usage instructions and release notes when behavior changes.
 - Keep image and language links in the published README absolute so they also resolve on PyPI.
@@ -38,6 +39,7 @@ For an existing PyPI project, add the same publisher under the project's Publish
 
 - `desktop.yml` builds a single Windows x64 EXE and an Apple Silicon macOS DMG containing `PicView.app` and an Applications shortcut.
 - Publishing a new GitHub Release triggers both the PyPI and desktop workflows. Desktop files and individual SHA-256 checksums are attached to that release after tests and frozen-app smoke checks pass.
+- Desktop builds bundle the license and attach a platform-specific `LICENSE.txt` alongside the downloads. The DMG also includes a readable `LICENSE.txt`.
 - Manually run **Build desktop apps** in GitHub Actions to validate the current branch. Manual runs store downloads as workflow artifacts and do not modify an existing release.
 - Download and extract the workflow artifact ZIP to obtain the EXE or DMG; the macOS release download itself is a DMG, not an App ZIP.
 - Windows builds run on `windows-latest`; Apple Silicon builds run on `macos-15`. Intel macOS builds are not produced.
@@ -53,7 +55,7 @@ uv run --frozen --group build python scripts/build_desktop.py
 
 - Deliverables are written to `dist/desktop/release/`.
 - PyInstaller bundles Python, Qt, image decoders, and the application icon. Users do not need Python or uv.
-- The build checks the actual frozen executable by opening a temporary image, rendering it with Qt, and checking the bundled icon and version.
+- The build checks the actual frozen executable by opening a temporary image, rendering it with Qt, and checking the bundled icon, version, and license text in the About dialog.
 - macOS builds also verify the bundle's ad-hoc signature and the DMG structure.
 - Windows files are unsigned. macOS apps have an ad-hoc signature, not an Apple Developer ID signature or notarization. Public distribution without security prompts requires separately configured signing certificates and, on macOS, notarization credentials.
 - The existing `v0.0.1` tag predates desktop packaging. Use a new version and release tag for the first automatic desktop release; do not move the existing tag.

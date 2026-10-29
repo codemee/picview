@@ -7,17 +7,19 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 from PySide6.QtCore import QEvent, QFileSystemWatcher, QLocale, QMimeData, QObject, QPoint, QRect, QRectF, QSize, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QDrag, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPolygon, QPalette, QRegion, QShortcut, QTransform
+from PySide6.QtGui import QAction, QColor, QDrag, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPolygon, QPalette, QRegion, QShortcut, QTransform
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QMainWindow,
     QMenu, QPushButton, QScrollArea, QSlider, QSplitter, QStackedWidget, QTabBar, QStyle, QStyleOptionSlider, QStyleOptionTab, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
 )
 
 from . import __version__
+from .about import AboutDialog
 from .file_actions import copy_file, show_properties
 from .settings import IMAGE_BACKGROUND_COLORS, load_settings, normalize_tab_state, save_settings
 from .svg import SvgDocument
 from .thumbnails import THUMBNAILS
+from .system_menu import install_about_item, is_about_message
 from .utils import IMAGE_SUFFIXES, image_files, natural_key
 
 
@@ -111,6 +113,10 @@ TEXT = {
 LANGUAGE_MODES = ("system", "zh", "en")
 LANGUAGE_ICONS = {"system": "lang-system", "zh": "中", "en": "A"}
 TEXT["en"].update({
+    "about": "About PicView", "about_description": "Fast image viewing and multi-folder comparison.",
+    "about_license": "GNU General Public License, version 3 or later",
+    "about_style": "Interface style", "about_home": "Project home", "about_releases": "Releases and downloads",
+    "about_license_full": "Full license text", "about_license_missing": "The license text is unavailable locally. Use the GNU GPL link above to read the terms.",
     "sort": "Sort thumbnails", "sort_method": "Sort by", "sort_direction": "Sort direction", "sort_natural": "Name (natural order)", "sort_modified": "Date modified",
     "sort_ascending": "Ascending (A–Z / oldest first)", "sort_descending": "Descending (Z–A / newest first)",
     "show_modified": "Show date modified", "copy": "Copy", "properties": "Properties", "file_close": "Close",
@@ -124,7 +130,7 @@ TEXT["en"].update({
     "more_tools": "More tools",
     "compare": "Compare images", "compare_folder": "Compare this folder", "compare_empty": "Check folder tabs to compare images", "image_tools": "Image tools",
     "close_tab": "Close tab",
-    "new_tab": "Open folder in a new tab", "empty_tab": "New tab", "folder_missing": "Folder unavailable; waiting for it to return", "duplicate_tab": "Duplicate tab",
+    "new_tab": "Open folder in a new tab", "tab_list": "Select tab", "empty_tab": "New tab", "folder_missing": "Folder unavailable; waiting for it to return", "duplicate_tab": "Duplicate tab",
     "image_deleted": "The image being viewed was deleted: {name}. Now viewing {next}.",
     "image_deleted_empty": "The image being viewed was deleted: {name}. No images remain in this folder.",
     "lang_system": "Language: follow system (click to switch)",
@@ -132,6 +138,10 @@ TEXT["en"].update({
     "lang_en": "Language: English (click to switch)",
 })
 TEXT["zh"].update({
+    "about": "關於 PicView", "about_description": "快速載圖與多資料夾比圖工具。",
+    "about_license": "GNU General Public License 第 3 版或更新版本",
+    "about_style": "介面樣式", "about_home": "專案首頁", "about_releases": "版本與下載",
+    "about_license_full": "授權全文", "about_license_missing": "無法讀取本機授權文件，請使用上方 GNU GPL 連結閱讀條款。",
     "sort": "縮圖排序", "sort_method": "排序方式", "sort_direction": "排序方向", "sort_natural": "檔名（自然排序）", "sort_modified": "修改時間",
     "sort_ascending": "順向（A–Z／舊到新）", "sort_descending": "逆向（Z–A／新到舊）",
     "show_modified": "顯示修改日期時間", "copy": "複製", "properties": "內容", "file_close": "關閉",
@@ -145,7 +155,7 @@ TEXT["zh"].update({
     "more_tools": "更多工具",
     "compare": "比圖", "compare_folder": "勾選此資料夾進行比圖", "compare_empty": "勾選資料夾標籤以比較圖片", "image_tools": "圖片工具",
     "close_tab": "關閉標籤",
-    "new_tab": "在新標籤開啟資料夾", "empty_tab": "新標籤", "folder_missing": "資料夾不存在，等待重新連線", "duplicate_tab": "複製標籤",
+    "new_tab": "在新標籤開啟資料夾", "tab_list": "選取標籤", "empty_tab": "新標籤", "folder_missing": "資料夾不存在，等待重新連線", "duplicate_tab": "複製標籤",
     "image_deleted": "正在檢視的圖片已被刪除：{name}。已切換至 {next}。",
     "image_deleted_empty": "正在檢視的圖片已被刪除：{name}。資料夾中已沒有圖片。",
     "lang_system": "語言：跟隨系統（點擊切換）",
@@ -263,6 +273,8 @@ class IconButton(QToolButton):
             p.drawLine(9, 16, 27, 16)
             p.drawLine(13, 9, 13, 13); p.drawLine(23, 9, 23, 13)
             p.drawLine(13, 20, 17, 20); p.drawLine(13, 23, 22, 23)
+        elif self.kind == "tab-list":
+            p.drawLine(14, 16, 18, 20); p.drawLine(18, 20, 22, 16)
         elif self.kind == "compare":
             p.drawRoundedRect(QRectF(8, 10, 20, 16), 1.5, 1.5)
             p.drawLine(18, 10, 18, 26)
@@ -1867,7 +1879,7 @@ class FolderTabBar(QTabBar):
 
 
 class FolderTabs(QWidget):
-    """A compact tab strip with the add button directly after the last tab."""
+    """A compact tab strip with a trailing control and separate page stack."""
     currentChanged = Signal(int)
     tabCloseRequested = Signal(int)
 
@@ -1919,7 +1931,7 @@ class FolderTabs(QWidget):
     def tabToolTip(self, index): return self.bar.tabToolTip(index)
 
     def setCornerWidget(self, widget):
-        self.header.insertWidget(1, widget)
+        self.header.addWidget(widget)
 
     def addTab(self, page, title):
         first = not self.count()
@@ -1960,6 +1972,9 @@ class PicView(QMainWindow):
         self.t = TEXT[self.lang]
         self._closing = False
         self._previous_tab = None
+        self.about_dialog = None
+        self.about_action = None
+        self._system_menu_hwnd = None
         self.closed_tabs = []
         self.compare_enabled = False
         self.checked_pages = set()
@@ -1978,8 +1993,43 @@ class PicView(QMainWindow):
         self.notification_bar.hide()
         self.notification_bar.messageChanged.connect(lambda message: self.notification_bar.setVisible(bool(message)))
         self.build()
+        if sys.platform == "darwin": self.setup_application_menu()
         self.setup_shortcuts()
         self.restore()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.refresh_system_menu()
+
+    def setup_application_menu(self):
+        if self.about_action is not None: return
+        menu_bar = self.menuBar()
+        menu_bar.setNativeMenuBar(True)
+        self.application_menu = menu_bar.addMenu("PicView")
+        self.about_action = QAction(self.t["about"], self)
+        self.about_action.setMenuRole(QAction.MenuRole.AboutRole)
+        self.about_action.triggered.connect(self.show_about)
+        self.application_menu.addAction(self.about_action)
+
+    def refresh_system_menu(self):
+        if sys.platform == "win32" and self.isVisible():
+            self._system_menu_hwnd = int(self.winId())
+            install_about_item(self._system_menu_hwnd, self.t["about"] + "…")
+
+    def nativeEvent(self, event_type, message):
+        if is_about_message(event_type, message, getattr(self, "_system_menu_hwnd", None)):
+            QTimer.singleShot(0, self, self.show_about)
+            return True, 0
+        return super().nativeEvent(event_type, message)
+
+    def show_about(self):
+        if self._closing: return
+        if self.about_dialog is None:
+            self.about_dialog = AboutDialog(self.t, self)
+            self.about_dialog.finished.connect(lambda: setattr(self, "about_dialog", None))
+        self.about_dialog.show()
+        self.about_dialog.raise_()
+        self.about_dialog.activateWindow()
 
     def current_tab(self):
         return self.tabs.currentWidget()
@@ -2029,13 +2079,14 @@ class PicView(QMainWindow):
         self.tabs.tabBar().customContextMenuRequested.connect(self.show_tab_menu)
         self.comparison_area = ComparisonArea(root)
         self.comparison_area.hide()
-        self.add_tab_button = QToolButton()
-        self.add_tab_button.setObjectName("addTabButton")
-        self.add_tab_button.setText("+")
-        self.add_tab_button.setFixedSize(30, 30)
-        self.add_tab_button.setToolTip(shortcut_tooltip(self.t["new_tab"], QKeySequence.StandardKey.AddTab))
-        self.add_tab_button.clicked.connect(self.choose)
-        self.tabs.setCornerWidget(self.add_tab_button)
+        self.tab_list_button = IconButton("tab-list", self.t["tab_list"])
+        self.tab_list_button.setAccessibleName(self.t["tab_list"])
+        self.tab_list_menu = QMenu(self.tab_list_button)
+        self.tab_list_menu.setToolTipsVisible(True)
+        self.tab_list_menu.aboutToShow.connect(self.populate_tab_list)
+        self.tab_list_button.setMenu(self.tab_list_menu)
+        self.tab_list_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.tabs.setCornerWidget(self.tab_list_button)
         self.tabs.layout().removeWidget(self.tabs.strip)
         for button, action in ((self.open_button, self.choose), (self.vertical_button, lambda: self.set_orientation(Qt.Orientation.Vertical)),
                                (self.horizontal_button, lambda: self.set_orientation(Qt.Orientation.Horizontal)),
@@ -2096,8 +2147,7 @@ class PicView(QMainWindow):
             QTabBar::tab:!selected:hover{{background:{hover};}}
             QTabBar QToolButton{{background:{strip};color:{PALETTE['text']};border:0;border-radius:4px;}}
             QTabBar QToolButton:hover{{background:{hover};}}
-            #addTabButton{{background:transparent;color:{PALETTE['text']};border:0;border-radius:5px;font-size:20px;}}
-            #addTabButton:hover,#tabCloseButton:hover{{background:{hover};}}
+            #tabCloseButton:hover{{background:{hover};}}
             #tabCloseButton{{background:transparent;border:0;border-radius:4px;}}
         """)
     def add_page(self):
@@ -2133,6 +2183,20 @@ class PicView(QMainWindow):
     def choose(self):
         folder = QFileDialog.getExistingDirectory(self, self.t["open"], str(self.folder) if self.folder else "")
         if folder: self.open_folder(Path(folder))
+
+    def populate_tab_list(self):
+        self.tab_list_menu.clear()
+        current = self.current_tab()
+        for index, page in enumerate(self.pages()):
+            action = self.tab_list_menu.addAction(self.tabs.tabText(index).replace("&", "&&"))
+            action.setCheckable(page is current)
+            action.setChecked(page is current)
+            action.setToolTip(self.tabs.tabToolTip(index))
+            action.triggered.connect(lambda checked=False, page=page: self.select_listed_tab(page))
+
+    def select_listed_tab(self, page):
+        if self.tabs.indexOf(page) >= 0:
+            self.tabs.setCurrentWidget(page)
 
     def show_tab_menu(self, position):
         bar = self.tabs.tabBar()
@@ -2367,6 +2431,7 @@ class PicView(QMainWindow):
             self.comparison_area.set_layout_orientation(orientation)
 
     def rebuild_ui(self):
+        if self.about_action is not None: self.about_action.setText(self.t["about"])
         self.modified_button.setToolTip(self.t["show_modified"])
         self.modified_button.setAccessibleName(self.t["show_modified"])
         self.modified_button.refresh_icon()
@@ -2379,7 +2444,8 @@ class PicView(QMainWindow):
         self.language_button.set_kind(LANGUAGE_ICONS[self.language_mode], self.t[f"lang_{self.language_mode}"])
         self.language_button.setAccessibleName(self.language_button.toolTip())
         self.theme_button.set_kind(f"theme-{self.theme_mode}", self.t[f"theme_{self.theme_mode}"])
-        self.add_tab_button.setToolTip(shortcut_tooltip(self.t["new_tab"], QKeySequence.StandardKey.AddTab))
+        self.tab_list_button.set_kind("tab-list", self.t["tab_list"])
+        self.tab_list_button.setAccessibleName(self.t["tab_list"])
         self.apply_styles()
         for page in self.pages(): page.restyle(self.t)
         if self.compare_enabled:
@@ -2392,6 +2458,7 @@ class PicView(QMainWindow):
             button.update()
         for button in (self.open_button, self.vertical_button, self.horizontal_button): button.refresh_icon()
         self.update_tab_titles()
+        self.refresh_system_menu()
 
     def restore(self):
         states = self.settings.get("tabs", [])

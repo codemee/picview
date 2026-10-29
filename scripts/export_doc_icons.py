@@ -21,7 +21,7 @@ ICONS = {
     "mirror-v": "mirror-v", "fit": "fit", "expand": "expand",
     "shrink": "shrink", "fullscreen": "fullscreen", "more": "more", "background": "background",
     "sort-name": "sort-name", "sort-date": "sort-date", "sort-ascending": "sort-ascending",
-    "sort-descending": "sort-descending", "modified-visible": "modified-visible",
+    "sort-descending": "sort-descending", "modified-visible": "modified-visible", "tab-list": "tab-list",
     "lang-system": "lang-system", "lang-zh": "中", "lang-en": "A",
     "theme-system": "theme-system", "theme-light": "theme-light",
     "theme-dark": "theme-dark",

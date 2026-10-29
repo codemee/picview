@@ -51,9 +51,9 @@ def test_shortcut_tooltips_follow_language_and_new_tabs(browser):
         window.toggle_lang()
         window.toggle_lang()
         for button, key in ((window.open_button, QKeySequence.StandardKey.Open),
-                            (window.add_tab_button, QKeySequence.StandardKey.AddTab),
                             (window.tabs.bar.tabButton(window.tabs.currentIndex(), QTabBar.ButtonPosition.RightSide), QKeySequence.StandardKey.Close)):
             assert QKeySequence(key).toString(QKeySequence.SequenceFormat.NativeText) in button.toolTip()
+        assert window.tab_list_button.toolTip() == window.t["tab_list"]
         for tab in window.pages():
             assert tab.image.full.toolTip() == f"{window.t['full']} (F11)"
             assert tab.image.zoom_label.toolTip() == f"{window.t['edit_zoom']} (+ / - / 0)"
@@ -131,8 +131,54 @@ def test_new_tabs_allow_duplicate_folders(browser):
 def test_folder_dialog_cancel_does_not_create_tab(browser, monkeypatch):
     window, folders = browser
     monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: "")
-    window.add_tab_button.click()
+    window.open_button.click()
     assert window.tabs.count() == 1 and window.folder is None
+
+
+def test_tab_list_tracks_order_active_tab_duplicates_and_closed_pages(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    duplicate = window.duplicate_page(first)
+    window.populate_tab_list()
+    actions = window.tab_list_menu.actions()
+    assert [action.text() for action in actions] == [window.tabs.tabText(i) for i in range(window.tabs.count())]
+    assert sum(action.isChecked() for action in actions) == 1
+    assert actions[window.tabs.indexOf(duplicate)].isChecked()
+    assert [action.toolTip() for action in actions] == [str(page.folder) for page in window.pages()]
+    target = actions[window.tabs.indexOf(second)]
+    closed = actions[window.tabs.indexOf(first)]
+    window.tabs.bar.moveTab(window.tabs.indexOf(second), 0)
+    target.trigger()
+    assert window.current_tab() is second
+    window.close_tab(window.tabs.indexOf(first))
+    closed.trigger()  # A stale menu entry must not switch to a different page.
+    assert window.current_tab() is second
+    window.populate_tab_list()
+    assert [action.text() for action in window.tab_list_menu.actions()] == [window.tabs.tabText(i) for i in range(window.tabs.count())]
+    for page in list(window.pages()): window.close_tab(window.tabs.indexOf(page))
+    window.toggle_lang()
+    window.populate_tab_list()
+    assert len(window.tab_list_menu.actions()) == 1
+    assert window.tab_list_menu.actions()[0].text() == window.t["empty_tab"]
+    assert window.tab_list_menu.actions()[0].isChecked()
+
+
+def test_tab_list_button_stays_at_right_edge_for_short_and_scrolling_strips(browser):
+    window, folders = browser
+    window.open_folder(folders[0])
+    button = window.tab_list_button
+    assert button.menu() is window.tab_list_menu
+    assert button.text() != "+"
+    for count in (1, 12):
+        while window.tabs.count() < count: window.open_folder(folders[0])
+        for width in (1100, 650, 260):
+            window.resize(width, 500)
+            QTest.qWait(50)
+            assert button.isVisible()
+            assert button.geometry().right() == window.tabs.strip.width() - 1
+            assert button.geometry().left() > window.tabs.bar.geometry().right()
+            assert button.parentWidget() is window.tabs.strip
 
 
 def test_each_tab_keeps_its_own_view_and_global_styles(browser):

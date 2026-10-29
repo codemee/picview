@@ -15,6 +15,10 @@ def smoke_test(report_path):
     from picview import __version__, qt_app
     from picview.settings import DEFAULT_SETTINGS
 
+    license_path = (Path(sys._MEIPASS) / "licenses" / "LICENSE" if getattr(sys, "frozen", False)
+                    else Path(__file__).resolve().parents[1] / "LICENSE")
+    assert "GNU GENERAL PUBLIC LICENSE" in license_path.read_text(encoding="utf-8"), "Bundled license is missing"
+
     # Keep validation independent of the user's saved folders and preferences.
     qt_app.load_settings = lambda: DEFAULT_SETTINGS.copy()
     qt_app.save_settings = lambda values: None
@@ -47,6 +51,11 @@ def smoke_test(report_path):
         window.sync_comparison()
         app.processEvents()
         assert len(window.comparison_area.pages) == 2, "SVG comparison failed"
+        window.show_about()
+        app.processEvents()
+        assert "GPL-3.0-or-later" in window.about_dialog.license_label.text(), "About license identifier is missing"
+        assert "GNU GENERAL PUBLIC LICENSE" in window.about_dialog.license_view.toPlainText(), "About license text is missing"
+        window.about_dialog.close()
         window.close()
         app.processEvents()
     Path(report_path).write_text(json.dumps({"version": __version__, "ok": True}))

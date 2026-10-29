@@ -134,7 +134,9 @@ uv run picview
 
 ### 多資料夾標籤
 
-- 點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-light.png" width="34" height="34" alt="開啟資料夾" title="開啟資料夾"></picture> 或標籤列的 **＋**，在新標籤開啟資料夾。
+- 點擊主工具列的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-light.png" width="34" height="34" alt="開啟資料夾" title="開啟資料夾"></picture>，在新標籤開啟資料夾。
+- 標籤列最右側的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/tab-list-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/tab-list-light.png" width="34" height="34" alt="選取標籤" title="選取標籤"></picture> 展開所有標籤的下拉清單，依標籤順序排列，可直接選取要切換的標籤；勾選標記表示目前標籤。
+- 清單顯示完整標籤名稱，將滑鼠停在項目上可查看資料夾完整路徑。
 - 一次拖入多個資料夾，會逐一開啟標籤。
 - 同一資料夾可開啟多個標籤，各自選圖，方便比較不同圖片。
 - 在標籤上按右鍵 → **複製標籤**，在原標籤旁建立副本。
@@ -231,3 +233,11 @@ uv run picview
 - 預設為 **跟隨系統**。
 - 深色介面採初號機風格：深紫色窗格、螢光綠選取提示與滑桿，以及少量橘色工具點綴。
 - 圖片本身的顏色不會改變。
+
+## 授權
+
+PicView 採用 **GNU General Public License 第 3 版或更新版本**（`GPL-3.0-or-later`）授權。完整條款見 [LICENSE](https://github.com/codemee/picview/blob/main/LICENSE)。
+
+- Windows：點擊標題列左上角的應用程式圖示，或按 <kbd>Alt</kbd>+<kbd>Space</kbd> 開啟系統功能表，再選 **關於 PicView**。
+- macOS：從螢幕頂端的 **PicView → 關於 PicView** 應用程式選單開啟。
+- 「關於」顯示目前版本、授權全文與專案／下載連結，也列出 Qt 版本及目前介面樣式，方便確認不同執行環境的外觀差異。

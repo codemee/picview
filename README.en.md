@@ -134,7 +134,9 @@ uv run picview
 
 ### Multiple folder tabs
 
-- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-light.png" width="34" height="34" alt="Open folder" title="Open folder"></picture> or **＋** to open a folder in a new tab.
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-light.png" width="34" height="34" alt="Open folder" title="Open folder"></picture> in the main toolbar to open a folder in a new tab.
+- <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/tab-list-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/tab-list-light.png" width="34" height="34" alt="Select tab" title="Select tab"></picture> at the far right of the tab strip opens a dropdown of all tabs in their current order. Select an entry to switch directly to that tab; a checkmark identifies the current tab.
+- The list shows full tab names. Hover over an entry to see the folder's full path.
 - Drop multiple folders to open a tab for each one.
 - Open the same folder in multiple tabs to select and compare different images independently.
 - Right-click a tab → **Duplicate tab** to create a copy beside it.
@@ -231,3 +233,11 @@ uv run picview
 - The default is **Follow system**.
 - The dark theme uses a Unit-01-inspired palette: deep purple surfaces, neon green indicators and sliders, and orange tool accents.
 - Image colors remain unchanged.
+
+## License
+
+PicView is licensed under the **GNU General Public License, version 3 or later** (`GPL-3.0-or-later`). See [LICENSE](https://github.com/codemee/picview/blob/main/LICENSE) for the full terms.
+
+- On Windows, click the application icon at the left of the title bar, or press <kbd>Alt</kbd>+<kbd>Space</kbd>, then choose **About PicView** from the system menu.
+- On macOS, choose **PicView → About PicView** from the application menu at the top of the screen.
+- About shows the current version, full license text, and project/download links. It also lists the Qt version and current interface style to help identify appearance differences between runtime environments.
