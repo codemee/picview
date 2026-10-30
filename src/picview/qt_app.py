@@ -6,8 +6,8 @@ from datetime import datetime
 from pathlib import Path
 
 from PIL import Image, ImageOps
-from PySide6.QtCore import QEvent, QFileSystemWatcher, QLocale, QMimeData, QObject, QPoint, QRect, QRectF, QSize, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QColor, QDrag, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPolygon, QPalette, QRegion, QShortcut, QTransform
+from PySide6.QtCore import QEvent, QFileSystemWatcher, QLocale, QMimeData, QObject, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QAction, QColor, QDrag, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPalette, QRegion, QShortcut, QTransform
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QMainWindow,
     QMenu, QPushButton, QProxyStyle, QScrollArea, QSlider, QSplitter, QStackedWidget, QTabBar, QStyle, QStyleOptionSlider, QStyleOptionTab, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
@@ -194,10 +194,9 @@ class IconButton(QToolButton):
 
     def refresh_icon(self) -> None:
         self.setStyleSheet(f"QToolButton{{background:transparent;border:0;border-radius:8px;padding:4px;}}QToolButton:hover{{background:{toolbar_hover_color()};}}QToolButton:pressed{{background:{PALETTE['pressed']};}}QToolButton:checked{{background:{toolbar_hover_color()};}}QToolButton::menu-indicator{{image:none;width:0;height:0;}}")
-        icon_size = self.iconSize().width()
-        pixel_size = round(icon_size * self.devicePixelRatioF())
-        pm = QPixmap(pixel_size, pixel_size)
-        pm.setDevicePixelRatio(pixel_size / icon_size)
+        # Keep a 2x raster of the 24 px source artwork. Qt reduces it to the
+        # button's 20 px icon size when the icon is displayed.
+        pm = QPixmap(48, 48)
         pm.fill(Qt.GlobalColor.transparent)
         icon_color = QColor(PALETTE["text"])
         if self.kind == "rotate": icon_color = QColor(PALETTE["warm"])
@@ -205,122 +204,123 @@ class IconButton(QToolButton):
             icon_color = QColor(PALETTE["muted"])
         if self.isChecked(): icon_color = QColor(PALETTE["focus"])
         p = QPainter(pm); p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        # Map the existing vector coordinates into the 20 px icon canvas.
-        # Leave space inside the icon canvas for the stroke and antialiasing.
-        drawing_scale = .84
-        p.translate(icon_size / 2, icon_size / 2)
-        p.scale(drawing_scale, drawing_scale)
-        p.translate(-18.5 if self.kind == "folder" else -18, -18)
-        p.setPen(QPen(icon_color, 1 / drawing_scale))
-        if self.kind.startswith(("lang-", "theme-")):
-            scale = 1.125 if self.kind == "theme-light" else 18 / 14
-            p.translate(18, 18)
-            p.scale(scale, scale)
-            p.translate(-18, -18)
-            preference_pen = QPen(icon_color, 1 / (scale * drawing_scale))
-        r = 9, 9, 18, 18
+        p.scale(2, 2)
+        # Use a 1 px outline in the 24 px source artwork.
+        stroke = 1.0
+        p.setPen(QPen(icon_color, stroke))
+        def line(x1, y1, x2, y2):
+            p.drawLine(QPointF(x1, y1), QPointF(x2, y2))
+
+        def polygon(*points):
+            path = QPainterPath(QPointF(*points[0]))
+            for point in points[1:]: path.lineTo(QPointF(*point))
+            path.closeSubpath()
+            p.drawPath(path)
+
         if self.kind == "folder":
-            back = QPainterPath()
-            back.moveTo(9, 25)
-            back.lineTo(9, 12)
-            back.quadTo(9, 11, 10, 11)
-            back.lineTo(15, 11)
-            back.lineTo(17, 14)
-            back.lineTo(25, 14)
-            back.quadTo(26, 14, 26, 15)
-            back.lineTo(26, 17)
+            back = QPainterPath(QPointF(4, 19))
+            back.lineTo(4, 6); back.quadTo(4, 5, 5, 5)
+            back.lineTo(10, 5); back.lineTo(12, 8)
+            back.lineTo(19, 8); back.quadTo(20, 8, 20, 9)
+            back.lineTo(20, 11)
             p.drawPath(back)
-            p.drawPolygon(QPolygon([QPoint(9,25), QPoint(12,17), QPoint(28,17), QPoint(25,25)]))
+            polygon((4, 19), (7, 11), (21, 11), (18, 19))
         elif self.kind.startswith("split"):
-            p.drawRect(9, 11, 18, 14); p.drawLine(18, 12, 18, 24) if self.kind == "split-v" else p.drawLine(10, 18, 26, 18)
+            p.drawRect(QRectF(4, 5, 16, 14))
+            if self.kind == "split-v": line(12, 5.5, 12, 18.5)
+            else: line(4.5, 12, 19.5, 12)
         elif self.kind == "rotate":
-            p.drawArc(*r, 40 * 16, 285 * 16); p.drawLine(26, 9, 27, 15); p.drawLine(27, 15, 21, 12)
+            p.drawArc(QRectF(4, 4, 16, 16), 40 * 16, 285 * 16)
+            line(19.5, 4, 20.5, 10); line(20.5, 10, 14.5, 7)
         elif self.kind in {"mirror-h", "mirror-v"}:
             p.setBrush(Qt.BrushStyle.NoBrush)
+            # Longer, lighter marks survive the 48 -> 20 px reduction as dashes,
+            # unlike Qt's default DashLine pattern, which becomes square dots.
+            p.setPen(QPen(icon_color, stroke, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap))
             if self.kind == "mirror-h":
-                p.setPen(QPen(icon_color, 1, Qt.PenStyle.DashLine)); p.drawLine(18, 9, 18, 27)
-                p.setPen(QPen(icon_color, 1)); p.drawPolygon(QPolygon([QPoint(9,25),QPoint(15,12),QPoint(15,25)])); p.drawPolygon(QPolygon([QPoint(27,25),QPoint(21,12),QPoint(21,25)]))
+                for start in (4, 8.5, 13, 17.5): line(12, start, 12, start + 2.5)
+                p.setPen(QPen(icon_color, stroke))
+                polygon((4, 19), (9, 6), (9, 19))
+                polygon((20, 19), (15, 6), (15, 19))
             else:
-                p.setPen(QPen(icon_color, 1, Qt.PenStyle.DashLine)); p.drawLine(9, 18, 27, 18)
-                p.setPen(QPen(icon_color, 1)); p.drawPolygon(QPolygon([QPoint(12,9),QPoint(25,15),QPoint(12,15)])); p.drawPolygon(QPolygon([QPoint(12,27),QPoint(25,21),QPoint(12,21)]))
+                for start in (4, 8.5, 13, 17.5): line(start, 12, start + 2.5, 12)
+                p.setPen(QPen(icon_color, stroke))
+                polygon((6, 4), (19, 9), (6, 9))
+                polygon((6, 20), (19, 15), (6, 15))
         elif self.kind in {"expand", "shrink"}:
-            p.drawRect(9, 9, 18, 18)
-            if self.kind == "expand": p.drawLine(15,15,10,10); p.drawLine(10,10,14,10); p.drawLine(10,10,10,14); p.drawLine(21,21,26,26); p.drawLine(26,26,22,26); p.drawLine(26,26,26,22)
-            else: p.drawLine(10,10,15,15); p.drawLine(15,15,11,15); p.drawLine(15,15,15,11); p.drawLine(26,26,21,21); p.drawLine(21,21,25,21); p.drawLine(21,21,21,25)
+            p.drawRect(QRectF(4, 4, 16, 16))
+            if self.kind == "expand":
+                line(10, 10, 5, 5); line(5, 5, 9, 5); line(5, 5, 5, 9)
+                line(14, 14, 19, 19); line(19, 19, 15, 19); line(19, 19, 19, 15)
+            else:
+                line(5, 5, 10, 10); line(10, 10, 6, 10); line(10, 10, 10, 6)
+                line(19, 19, 14, 14); line(14, 14, 18, 14); line(14, 14, 14, 18)
         elif self.kind == "fit":
-            p.drawRect(9, 9, 18, 18); p.drawRect(13, 14, 10, 8)
+            p.drawRect(QRectF(4, 4, 16, 16)); p.drawRect(QRectF(8, 9, 8, 6))
         elif self.kind == "background":
-            p.fillRect(QRectF(9, 9, 9, 9), icon_color)
-            p.fillRect(QRectF(18, 18, 9, 9), icon_color)
-            p.drawRect(9, 9, 18, 18)
+            p.fillRect(QRectF(4, 4, 8, 8), icon_color)
+            p.fillRect(QRectF(12, 12, 8, 8), icon_color)
+            p.drawRect(QRectF(4, 4, 16, 16))
         elif self.kind == "more":
             p.setBrush(icon_color)
-            for x in (12, 18, 24): p.drawEllipse(QPoint(x, 18), 1, 1)
+            for x in (6, 12, 18): p.drawEllipse(QRectF(x - 1.2, 10.8, 2.4, 2.4))
         elif self.kind == "sort-name":
             font = self.font(); font.setPixelSize(12); p.setFont(font)
-            p.drawText(QRectF(7, 7, 11, 14), Qt.AlignmentFlag.AlignCenter, "A")
-            p.drawText(QRectF(7, 18, 11, 14), Qt.AlignmentFlag.AlignCenter, "1")
-            p.drawLine(20, 13, 28, 13); p.drawLine(20, 24, 25, 24)
+            p.drawText(QRectF(2, 2, 9, 10), Qt.AlignmentFlag.AlignCenter, "A")
+            p.drawText(QRectF(2, 12, 9, 10), Qt.AlignmentFlag.AlignCenter, "1")
+            line(14, 7, 21, 7); line(14, 17, 19, 17)
         elif self.kind == "sort-date":
-            p.drawEllipse(QRectF(9, 9, 18, 18))
-            p.drawLine(18, 12, 18, 18); p.drawLine(18, 18, 23, 18)
+            p.drawEllipse(QRectF(4, 4, 16, 16))
+            line(12, 7, 12, 12); line(12, 12, 17, 12)
         elif self.kind in ("sort-ascending", "sort-descending"):
-            p.drawLine(18, 9, 18, 27)
-            end, wing = (9, 14) if self.kind == "sort-ascending" else (27, 22)
-            p.drawLine(13, wing, 18, end); p.drawLine(18, end, 23, wing)
+            line(12, 4, 12, 20)
+            end, wing = (4, 9) if self.kind == "sort-ascending" else (20, 15)
+            line(7, wing, 12, end); line(12, end, 17, wing)
         elif self.kind == "modified-visible":
-            p.drawRoundedRect(QRectF(9, 11, 18, 16), 1.5, 1.5)
-            p.drawLine(9, 16, 27, 16)
-            p.drawLine(13, 9, 13, 13); p.drawLine(23, 9, 23, 13)
-            p.drawLine(13, 20, 17, 20); p.drawLine(13, 23, 22, 23)
+            p.drawRoundedRect(QRectF(4, 6, 16, 14), 2, 2)
+            line(4, 11, 20, 11); line(8, 4, 8, 8); line(16, 4, 16, 8)
+            line(8, 14, 11, 14); line(8, 17, 16, 17)
         elif self.kind == "tab-list":
-            p.setPen(QPen(QColor(PALETTE["muted"]), 1 / drawing_scale))
-            p.drawLine(14, 16, 18, 20); p.drawLine(18, 20, 22, 16)
+            p.setPen(QPen(QColor(PALETTE["muted"]), stroke))
+            line(8, 10, 12, 14); line(12, 14, 16, 10)
         elif self.kind == "compare":
-            p.drawRoundedRect(QRectF(8, 10, 20, 16), 1.5, 1.5)
-            p.drawLine(18, 10, 18, 26)
-            for x in (9, 19):
-                landscape = QPainterPath()
-                landscape.moveTo(x + 1, 23)
-                landscape.lineTo(x + 4, 19)
-                landscape.lineTo(x + 7, 23)
-                p.drawPath(landscape)
-                p.drawEllipse(QRectF(x + 2, 14, 1.5, 1.5))
+            p.drawRoundedRect(QRectF(3, 5, 18, 14), 2, 2)
+            line(12, 5, 12, 19)
+            for x in (3, 12):
+                line(x + 1.5, 16, x + 4.5, 12)
+                line(x + 4.5, 12, x + 7.5, 16)
+                p.drawEllipse(QRectF(x + 2.5, 8, 1.5, 1.5))
         elif self.kind == "fullscreen":
-            for x,y,dx,dy in ((9,9,1,1),(27,9,-1,1),(9,27,1,-1),(27,27,-1,-1)): p.drawLine(x,y,x+6*dx,y); p.drawLine(x,y,x,y+6*dy)
+            for x,y,dx,dy in ((4,4,1,1),(20,4,-1,1),(4,20,1,-1),(20,20,-1,-1)):
+                line(x, y, x + 6 * dx, y); line(x, y, x, y + 6 * dy)
         elif self.kind == "lang-system":
-            p.setPen(preference_pen)
-            p.drawEllipse(QRectF(11, 11, 14, 14))
-            p.drawEllipse(QRectF(15, 11, 6, 14))
-            p.drawLine(QPoint(11, 18), QPoint(25, 18))
+            p.drawEllipse(QRectF(4, 4, 16, 16))
+            p.drawEllipse(QRectF(9, 4, 6, 16))
+            line(4, 12, 20, 12)
         elif self.kind in ("中", "A"):
             font = self.font()
-            font.setPixelSize(22 if self.kind == "A" else 20)
+            font.setPixelSize(21 if self.kind == "A" else 19)
             font.setBold(False)
             p.setFont(font)
-            p.drawText(QRectF(4, 4, 28, 28), Qt.AlignmentFlag.AlignCenter, self.kind)
+            p.drawText(QRectF(2, 2, 20, 20), Qt.AlignmentFlag.AlignCenter, self.kind)
         elif self.kind == "theme-system":
             half = QPainterPath()
-            half.moveTo(18, 11)
-            half.arcTo(QRectF(11, 11, 14, 14), 90, -180)
+            half.moveTo(12, 4)
+            half.arcTo(QRectF(4, 4, 16, 16), 90, -180)
             half.closeSubpath()
             p.fillPath(half, icon_color)
-            p.setPen(preference_pen)
-            p.drawEllipse(QRectF(11, 11, 14, 14))
+            p.drawEllipse(QRectF(4, 4, 16, 16))
         elif self.kind == "theme-light":
-            p.setPen(preference_pen)
-            p.drawEllipse(QRectF(14.5, 14.5, 7, 7))
-            for x1,y1,x2,y2 in ((18,10,18,12),(18,24,18,26),(10,18,12,18),(24,18,26,18),(12,12,13.5,13.5),(22.5,22.5,24,24),(12,24,13.5,22.5),(22.5,13.5,24,12)):
-                ray = QPainterPath()
-                ray.moveTo(x1, y1); ray.lineTo(x2, y2)
-                p.drawPath(ray)
+            p.drawEllipse(QRectF(8.5, 8.5, 7, 7))
+            for x1,y1,x2,y2 in ((12,3,12,6),(12,18,12,21),(3,12,6,12),(18,12,21,12),
+                                (5,5,7,7),(17,17,19,19),(5,19,7,17),(17,7,19,5)):
+                line(x1, y1, x2, y2)
         elif self.kind == "theme-dark":
-            outer = QPainterPath(); outer.addEllipse(QRectF(11, 11, 14, 14))
-            cutout = QPainterPath(); cutout.addEllipse(QRectF(15, 8, 14, 14))
-            p.setPen(preference_pen)
+            outer = QPainterPath(); outer.addEllipse(QRectF(4, 4, 16, 16))
+            cutout = QPainterPath(); cutout.addEllipse(QRectF(9, 1, 16, 16))
             p.drawPath(outer.subtracted(cutout))
         else:
-            p.drawText(0, 0, 36, 36, Qt.AlignmentFlag.AlignCenter, self.kind)
+            p.drawText(QRectF(0, 0, 24, 24), Qt.AlignmentFlag.AlignCenter, self.kind)
         p.end(); self.setIcon(QIcon(pm))
 
 
@@ -555,6 +555,8 @@ class ThumbnailPane(QFrame):
         self.direction_button.setCheckable(True)
         header.insertWidget(1, self.sort_button)
         header.insertWidget(2, self.direction_button)
+        self.tab_tools_separator = ToolbarSeparator()
+        header.insertWidget(1, self.tab_tools_separator)
         self.context_menu = QMenu(self)
         self.sort_button.clicked.connect(lambda: self.sortRequested.emit(
             "modified" if self.sort_mode == "natural" else "natural", self.sort_descending))
@@ -786,9 +788,7 @@ class ToolbarSeparator(QFrame):
 
 
 def separate_tools(layout):
-    layout.addSpacing(6)
     layout.addWidget(ToolbarSeparator())
-    layout.addSpacing(6)
 
 
 class ToolbarOverflow(QObject):
@@ -1729,7 +1729,7 @@ class TabFolderControl(QCheckBox):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(QPen(QColor(PALETTE["text"]), 1.25))
+        painter.setPen(QPen(QColor(PALETTE["text"]), 1))
         painter.save()
         painter.translate(8, 0)
         if self.comparing:
@@ -1738,7 +1738,7 @@ class TabFolderControl(QCheckBox):
                 painter.setPen(QPen(QColor(PALETTE["focus"]), 1))
             painter.drawRoundedRect(QRectF(3.5, 3.5, 13, 13), 2, 2)
             if self.isChecked():
-                painter.setPen(QPen(QColor(PALETTE["active_text"]), 1.5))
+                painter.setPen(QPen(QColor(PALETTE["active_text"]), 1))
                 painter.drawLine(QPoint(6, 10), QPoint(9, 13))
                 painter.drawLine(QPoint(9, 13), QPoint(14, 7))
         else:

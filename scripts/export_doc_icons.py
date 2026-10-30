@@ -60,7 +60,12 @@ def main():
             painter.setPen(QPen(QColor(PALETTE["edge"]), 1))
             painter.setBrush(QColor(PALETTE["surface"]))
             painter.drawRoundedRect(QRectF(.5, .5, 33, 33), 6, 6)
-            icon = button.icon().pixmap(60, 60)
+            # QIcon does not enlarge its 48 px source for this request.
+            # Fill the 20 logical px icon slot on the 3x documentation plate.
+            icon = button.icon().pixmap(48, 48).scaled(
+                60, 60, Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
             icon.setDevicePixelRatio(3)
             painter.drawPixmap(QPoint(7, 7), icon)
             painter.end()

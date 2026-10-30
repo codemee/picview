@@ -100,6 +100,9 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     app.processEvents()
 
     toolbar = window.image.toolbar
+    assert window.open_button.icon().availableSizes()[0].width() == 48
+    assert window.open_button.icon().pixmap(window.open_button.iconSize()).width() == 20
+    assert window.image.mh.icon().availableSizes()[0].width() == 48
     widgets = [toolbar.itemAt(i).widget() for i in range(toolbar.count()) if toolbar.itemAt(i).widget() and not toolbar.itemAt(i).widget().isHidden()]
     assert widgets[:3] == [window.image.rotate_b, window.image.mh, window.image.mv]
     assert widgets[3].width() == 1
@@ -111,7 +114,7 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
         assert slider.height() == 30
     thumbnail_toolbar = window.thumbs.layout().itemAt(0).layout()
     thumbnail_widgets = [thumbnail_toolbar.itemAt(i).widget() for i in range(thumbnail_toolbar.count()) if thumbnail_toolbar.itemAt(i).widget() and not thumbnail_toolbar.itemAt(i).widget().isHidden()]
-    assert thumbnail_widgets[:4] == [window.thumbs.tab_slot, window.thumbs.sort_button, window.thumbs.direction_button, window.thumbs.max_button]
+    assert thumbnail_widgets[:5] == [window.thumbs.tab_slot, window.thumbs.tab_tools_separator, window.thumbs.sort_button, window.thumbs.direction_button, window.thumbs.max_button]
     assert thumbnail_widgets[-2] is window.thumbs.size_label
     assert window.thumbs.size_label.text() == "140px"
     window.thumbs.size_label.click()
