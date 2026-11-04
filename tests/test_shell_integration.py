@@ -168,4 +168,5 @@ def test_toolbar_button_can_toggle_shell_integration(browser, monkeypatch):
     window.integration_button.click()
     assert not state["enabled"] and not window.integration_button.isChecked()
     window.toggle_lang()
-    assert window.t["shell_integration"] in window.integration_button.toolTip()
+    label = "finder_integration" if sys.platform == "darwin" else "shell_integration"
+    assert window.t[label] in window.integration_button.toolTip()

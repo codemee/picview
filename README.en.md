@@ -83,7 +83,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - When sliders are hidden, use the overflow menu to enter zoom or thumbnail-size values.
-- The window title shows the current version, for example **PicView v0.1.6**.
+- The window title shows the current version, for example **PicView v0.1.7**.
 
 ### Open and drag images
 
@@ -94,9 +94,19 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 
 ### File Explorer and Finder context menus
 
-- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-light.png" width="34" height="34" alt="File Explorer and Finder integration" title="File Explorer and Finder integration"></picture> to the left of the language tool to toggle the integration directly. It is off by default; the active button uses the accent color.
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-light.png" width="34" height="34" alt="File Explorer and Finder integration" title="File Explorer and Finder integration"></picture> to the left of the language tool to toggle the Windows File Explorer command or macOS Finder Services command. It is off by default; the active button uses the accent color.
 - **Windows:** Right-click a folder, a folder background, or a supported image and choose **Open in PicView**. On Windows 11, the command may be under **Show more options**. It registers only for the current user and does not change the default image viewer.
-- **macOS:** The packaged `PicView.app` can install a Finder **Services** command. Right-click a folder or image, then choose **Open in PicView** under **Services**. Turning the integration off removes the command. Move `PicView.app` to Applications before enabling it. Finder integration is unavailable when running from Python/uv.
+
+macOS provides two separate ways to open items. Both require the packaged `PicView.app` in Applications:
+
+| Method | Finder context-menu location | Supported items | How to enable |
+| --- | --- | --- | --- |
+| Open With | **Open With → PicView** | Supported images: JPEG, PNG, WebP, BMP, GIF, TIFF, SVG | Install and launch the App once for macOS to register it; the toolbar integration toggle is not required |
+| Finder Services | **Services → Open in PicView** | Folders and supported images | Turn on the toolbar’s Finder integration toggle to install the service for the current user |
+
+- Turning off Finder integration removes only the Services command. PicView remains in the image’s Open With list.
+- Registering these commands does not make PicView the default image viewer. You can also drop images onto its Dock icon.
+- Running through Python/uv cannot register the App’s Open With entry or install its bundled Finder service.
 - Opening an image selects it in its containing folder; opening a folder views that folder. You can also run `picview "<folder-or-image-path>"` from a terminal.
 - When PicView is already running, a context-menu or command-line path opens in that window as a new tab. Otherwise, PicView starts a new window.
 

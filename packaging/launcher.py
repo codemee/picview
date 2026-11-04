@@ -10,7 +10,7 @@ def smoke_test(report_path):
 
     from PIL import Image
     from PySide6.QtCore import QMimeData
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtGui import QFileOpenEvent
 
     from picview import __version__, qt_app, shell_integration
     from picview.settings import DEFAULT_SETTINGS
@@ -22,12 +22,12 @@ def smoke_test(report_path):
     # Keep validation independent of the user's saved folders and preferences.
     qt_app.load_settings = lambda: DEFAULT_SETTINGS.copy()
     qt_app.save_settings = lambda values: None
-    app = QApplication([])
+    app = qt_app.PicViewApplication([])
     qt_app.set_application_identity(app)
     assert app.applicationName() == "PicView"
     assert not app.windowIcon().pixmap(32, 32).isNull(), "Bundled application icon could not be loaded"
     with tempfile.TemporaryDirectory() as directory:
-        folder = Path(directory)
+        folder = Path(directory).resolve()
         sample = folder / "sample.png"
         Image.new("RGB", (64, 48), "red").save(sample)
         window = qt_app.PicView()
@@ -35,15 +35,19 @@ def smoke_test(report_path):
         if sys.platform == "darwin" and getattr(sys, "frozen", False):
             assert shell_integration.mac_available(), "Bundled Finder Service is missing"
         window.show()
-        window.open_folder(folder)
+        app.sendEvent(app, QFileOpenEvent(str(sample)))
+        app.set_open_paths_handler(lambda paths: qt_app.open_received_paths(window, paths))
         app.processEvents()
+        assert window.folder == folder, "Document-open request failed"
+        assert window.thumbs.selected_path == sample, "Requested image was not selected"
         assert window.image.frames, "Image decoder failed"
         assert not window.image.label.pixmap().isNull(), "Qt failed to render image"
         assert f"v{__version__}" in window.windowTitle()
         vector = folder / "vector.svg"
         vector.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 80"><rect x="10" y="10" width="30" height="20" fill="red"/></svg>', encoding="utf-8")
-        window.open_folder(folder, vector)
+        app.sendEvent(app, QFileOpenEvent(str(vector)))
         app.processEvents()
+        assert window.thumbs.selected_path == vector, "Running application did not open the requested image"
         assert window.image.frames, "Bundled SVG renderer failed to load"
         window.image.choose_zoom(2000)
         window.image.rotate()

@@ -111,6 +111,8 @@ def main():
     if macos:
         # ditto preserves the bundle's symlinks, permissions and ad-hoc signature.
         staging = build / "dmg"
+        # A merged copy retains old version metadata and breaks the signature.
+        if staging.exists(): shutil.rmtree(staging)
         staging.mkdir(exist_ok=True)
         run("ditto", output / "PicView.app", staging / "PicView.app")
         shutil.copy2(ROOT / "LICENSE", staging / "LICENSE.txt")

@@ -35,6 +35,16 @@ if is_macos:
             "CFBundleShortVersionString": version,
             "CFBundleVersion": version,
             "NSHighResolutionCapable": True,
+            "CFBundleDocumentTypes": [{
+                "CFBundleTypeName": "Image",
+                "CFBundleTypeRole": "Viewer",
+                "LSHandlerRank": "Alternate",
+                "LSItemContentTypes": [
+                    "public.jpeg", "public.png", "public.tiff",
+                    "com.compuserve.gif", "com.microsoft.bmp",
+                    "org.webmproject.webp", "public.svg-image",
+                ],
+            }],
         },
     )
 else:

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import __version__
+from .application import PicViewApplication
 from .instance import InstanceReceiver, forward_paths
 from .about import AboutDialog
 from .file_actions import copy_file, show_properties
@@ -3062,7 +3063,7 @@ def set_application_identity(app: QApplication) -> None:
 
 def open_startup_paths(window: PicView, paths: list[str]) -> None:
     for raw in paths:
-        path = Path(raw).expanduser()
+        path = Path(raw).expanduser().resolve()
         if path.is_dir():
             window.open_folder(path)
         elif path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES:
@@ -3082,7 +3083,7 @@ def main():
     parser.add_argument("--version", action="version", version=f"PicView {__version__}")
     parser.add_argument("paths", nargs="*", help="folders or image files to open")
     args = parser.parse_args()
-    app = QApplication([sys.argv[0]])
+    app = PicViewApplication([sys.argv[0]])
     if forward_paths(args.paths):
         return
     set_application_identity(app)
@@ -3092,4 +3093,5 @@ def main():
     window.show()
     InstanceReceiver(window, lambda paths: open_received_paths(window, paths))
     open_startup_paths(window, args.paths)
+    app.set_open_paths_handler(lambda paths: open_received_paths(window, paths))
     sys.exit(app.exec())

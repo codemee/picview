@@ -83,7 +83,7 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 - 縮圖使用共用的記憶體快取（上限 64 MiB），不另存縮圖檔案。
 - 調整窗格大小只重新排列縮圖，不會重新解碼所有圖片。
 - 滑桿收起時，可從更多工具選單輸入縮放比例或縮圖大小。
-- 視窗標題會顯示目前版本，例如 **PicView v0.1.6**。
+- 視窗標題會顯示目前版本，例如 **PicView v0.1.7**。
 
 ### 開啟與拖放圖片
 
@@ -94,9 +94,19 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 
 ### 檔案總管與 Finder 右鍵選單
 
-- 點擊主工具列語系工具左側的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-light.png" width="34" height="34" alt="檔案總管與 Finder 整合" title="檔案總管與 Finder 整合"></picture>，直接開啟或關閉檔案總管／Finder 整合；預設關閉。啟用時按鈕會顯示強調色。
+- 點擊主工具列語系工具左側的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-light.png" width="34" height="34" alt="檔案總管與 Finder 整合" title="檔案總管與 Finder 整合"></picture>，直接開啟或關閉 Windows 檔案總管右鍵選單或 macOS Finder「服務」；預設關閉。啟用時按鈕會顯示強調色。
 - **Windows**：在資料夾、資料夾空白處或支援的圖片檔上按右鍵，選擇「使用 PicView 開啟」。Windows 11 可能需要先選「顯示其他選項」。此設定只修改目前使用者的右鍵選單，不會變更預設開圖程式。
-- **macOS**：封裝版 `PicView.app` 可安裝 Finder「服務」項目。在資料夾或圖片上按右鍵，從「服務」選擇「使用 PicView 開啟」；關閉整合會移除該項目。請將 `PicView.app` 放在 Applications 後啟用。從 Python／uv 啟動時無法安裝 Finder 服務。
+
+macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封裝版 `PicView.app`：
+
+| 方式 | Finder 右鍵選單位置 | 適用對象 | 如何啟用 |
+| --- | --- | --- | --- |
+| 打開檔案的應用程式 | 「打開檔案的應用程式 → PicView」 | 支援的圖檔：JPEG、PNG、WebP、BMP、GIF、TIFF、SVG | 安裝並開啟 App 一次，由 macOS 註冊；不需開啟工具列整合按鈕 |
+| Finder 服務 | 「服務 → 使用 PicView 開啟」 | 資料夾與支援的圖檔 | 在 App 內開啟工具列的 Finder 整合按鈕，安裝目前使用者的服務 |
+
+- 關閉 Finder 整合按鈕只會移除「服務」項目；PicView 仍會出現在圖檔的「打開檔案的應用程式」清單。
+- 註冊以上項目不會將 PicView 設為預設開圖程式。圖檔也可拖到 PicView 的 Dock 圖示開啟。
+- 從 Python／uv 啟動無法註冊 App 的「打開檔案的應用程式」項目，也無法安裝內附的 Finder 服務。
 - 從圖片啟動時，PicView 會開啟該圖片所在資料夾並選取該圖片；從資料夾啟動時會直接檢視資料夾。也可用 `picview "<資料夾或圖片路徑>"` 從命令列開啟。
 - 若已有 PicView 視窗，從右鍵選單或命令列開啟路徑會交給該視窗，在新標籤檢視；沒有執行中的視窗時才啟動新視窗。
 
