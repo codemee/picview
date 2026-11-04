@@ -12,7 +12,7 @@ def smoke_test(report_path):
     from PySide6.QtCore import QMimeData
     from PySide6.QtWidgets import QApplication
 
-    from picview import __version__, qt_app
+    from picview import __version__, qt_app, shell_integration
     from picview.settings import DEFAULT_SETTINGS
 
     license_path = (Path(sys._MEIPASS) / "licenses" / "LICENSE" if getattr(sys, "frozen", False)
@@ -32,6 +32,8 @@ def smoke_test(report_path):
         Image.new("RGB", (64, 48), "red").save(sample)
         window = qt_app.PicView()
         assert window.windowIcon().cacheKey() == app.windowIcon().cacheKey()
+        if sys.platform == "darwin" and getattr(sys, "frozen", False):
+            assert shell_integration.mac_available(), "Bundled Finder Service is missing"
         window.show()
         window.open_folder(folder)
         app.processEvents()

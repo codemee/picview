@@ -10,13 +10,15 @@ from PySide6.QtCore import QEvent, QFileSystemWatcher, QLocale, QMimeData, QObje
 from PySide6.QtGui import QAction, QColor, QDrag, QIcon, QImage, QKeySequence, QMouseEvent, QPainter, QPainterPath, QPen, QPixmap, QPalette, QRegion, QShortcut, QTransform
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QMainWindow,
-    QMenu, QPushButton, QProxyStyle, QScrollArea, QSlider, QSplitter, QStackedWidget, QTabBar, QStyle, QStyleOptionSlider, QStyleOptionTab, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
+    QMenu, QMessageBox, QPushButton, QProxyStyle, QScrollArea, QSlider, QSplitter, QStackedWidget, QTabBar, QStyle, QStyleOptionSlider, QStyleOptionTab, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
 )
 
 from . import __version__
+from .instance import InstanceReceiver, forward_paths
 from .about import AboutDialog
 from .file_actions import copy_file, show_properties
 from .settings import IMAGE_BACKGROUND_COLORS, load_settings, normalize_tab_state, save_settings
+from . import shell_integration
 from .svg import SvgDocument
 from .thumbnails import THUMBNAILS
 from .system_menu import install_about_item, is_about_message
@@ -141,6 +143,10 @@ TEXT["en"].update({
     "compare": "Compare images", "compare_folder": "Drag a tab or thumbnail onto an image to compare", "compare_empty": "Drag a tab or thumbnail here to compare images", "image_tools": "Image tools",
     "compare_close": "Remove from comparison", "compare_too_small": "The image panes are too small for another comparison.",
     "sync_tools": "Apply image tools to every comparison pane",
+    "settings": "Settings", "shell_integration": "File Explorer context menu", "finder_integration": "Finder Services menu",
+    "shell_on": "On (click to turn off)", "shell_off": "Off (click to turn on)",
+    "shell_open": "Open in PicView", "shell_unavailable": "Finder integration requires the packaged PicView.app",
+    "shell_error": "Could not change File Explorer/Finder integration:\n{error}",
     "close_tab": "Close tab",
     "new_tab": "Open folder in a new tab", "tab_list": "Select tab", "empty_tab": "New tab", "folder_missing": "Folder unavailable; waiting for it to return", "duplicate_tab": "Duplicate tab",
     "image_deleted": "The image being viewed was deleted: {name}. Now viewing {next}.",
@@ -168,6 +174,10 @@ TEXT["zh"].update({
     "compare": "比圖", "compare_folder": "拖曳標籤或縮圖到單圖窗格進行比圖", "compare_empty": "拖曳標籤或縮圖到這裡進行比圖", "image_tools": "圖片工具",
     "compare_close": "移出比圖", "compare_too_small": "單圖窗格太小，無法再加入比圖。",
     "sync_tools": "同步操作所有比圖窗格",
+    "settings": "設定", "shell_integration": "檔案總管右鍵選單", "finder_integration": "Finder 服務選單",
+    "shell_on": "已開啟（點擊關閉）", "shell_off": "已關閉（點擊開啟）",
+    "shell_open": "使用 PicView 開啟", "shell_unavailable": "Finder 整合需使用封裝版 PicView.app",
+    "shell_error": "無法變更檔案總管／Finder 整合：\n{error}",
     "close_tab": "關閉標籤",
     "new_tab": "在新標籤開啟資料夾", "tab_list": "選取標籤", "empty_tab": "新標籤", "folder_missing": "資料夾不存在，等待重新連線", "duplicate_tab": "複製標籤",
     "image_deleted": "正在檢視的圖片已被刪除：{name}。已切換至 {next}。",
@@ -214,7 +224,7 @@ class IconButton(QToolButton):
         pm.fill(Qt.GlobalColor.transparent)
         icon_color = QColor(PALETTE["text"])
         if self.kind == "rotate": icon_color = QColor(PALETTE["warm"])
-        if self.kind.startswith(("lang-", "theme-")) or self.kind in ("中", "A"):
+        if self.kind.startswith(("lang-", "theme-")) or self.kind in ("中", "A", "shell-integration"):
             icon_color = QColor(PALETTE["muted"])
         if self.isChecked(): icon_color = QColor(PALETTE["focus"])
         p = QPainter(pm); p.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -278,6 +288,21 @@ class IconButton(QToolButton):
         elif self.kind == "more":
             p.setBrush(icon_color)
             for x in (6, 12, 18): p.drawEllipse(QRectF(x - 1.2, 10.8, 2.4, 2.4))
+        elif self.kind == "shell-integration":
+            folder = QPainterPath(QPointF(4, 17))
+            folder.lineTo(4, 7); folder.quadTo(4, 6, 5, 6)
+            folder.lineTo(9, 6); folder.lineTo(11, 8)
+            folder.lineTo(16, 8); folder.quadTo(17, 8, 17, 9)
+            folder.lineTo(17, 17); folder.closeSubpath()
+            p.drawPath(folder)
+            page = QPainterPath(QPointF(10, 10))
+            page.lineTo(17, 10); page.lineTo(20, 13)
+            page.lineTo(20, 20); page.quadTo(20, 21, 19, 21)
+            page.lineTo(11, 21); page.quadTo(10, 21, 10, 20)
+            page.closeSubpath()
+            p.drawPath(page)
+            line(17, 10, 17, 13); line(17, 13, 20, 13)
+            line(12.5, 15.5, 18, 15.5); line(12.5, 18, 18, 18)
         elif self.kind == "sort-name":
             font = self.font(); font.setPixelSize(12); p.setFont(font)
             p.drawText(QRectF(2, 2, 9, 10), Qt.AlignmentFlag.AlignCenter, "A")
@@ -2282,6 +2307,27 @@ class PicView(QMainWindow):
         self.about_dialog.raise_()
         self.about_dialog.activateWindow()
 
+    def refresh_shell_integration_button(self):
+        button = self.integration_button
+        active = shell_integration.enabled()
+        available = shell_integration.available()
+        button.blockSignals(True)
+        button.setChecked(active)
+        button.blockSignals(False)
+        button.setEnabled(available)
+        label = self.t["finder_integration" if sys.platform == "darwin" else "shell_integration"]
+        tip = f"{label}：{self.t['shell_on' if active else 'shell_off']}" if available else self.t["shell_unavailable"]
+        button.setToolTip(tip)
+        button.setAccessibleName(tip)
+        button.refresh_icon()
+
+    def set_shell_integration(self, enabled):
+        try:
+            shell_integration.set_enabled(bool(enabled), self.t["shell_open"])
+        except OSError as error:
+            QMessageBox.warning(self, self.t["settings"], self.t["shell_error"].format(error=error))
+        self.refresh_shell_integration_button()
+
     def current_tab(self):
         return self.tabs.currentWidget()
 
@@ -2312,6 +2358,10 @@ class PicView(QMainWindow):
         self.modified_button.setChecked(self.show_modified)
         self.modified_button.toggled.connect(self.set_show_modified)
         self.theme_button = IconButton(f"theme-{self.theme_mode}", self.t[f"theme_{self.theme_mode}"])
+        self.integration_button = IconButton("shell-integration", "")
+        self.integration_button.setCheckable(True)
+        self.integration_button.clicked.connect(self.set_shell_integration)
+        self.refresh_shell_integration_button()
         self.main_toolbar = tool
         outer.addWidget(tool)
         self.tabs = FolderTabs()
@@ -2344,11 +2394,12 @@ class PicView(QMainWindow):
         layout.addStretch(1)
         separate_tools(layout)
         layout.addWidget(self.modified_button)
+        layout.addWidget(self.integration_button)
         for button, action in ((self.language_button, self.toggle_lang), (self.theme_button, self.toggle_theme)):
             button.clicked.connect(action)
             layout.addWidget(button)
         self.toolbar_overflow = ToolbarOverflow(tool, layout,
-            [self.theme_button, self.language_button, self.modified_button, self.horizontal_button, self.vertical_button, self.open_button],
+            [self.theme_button, self.language_button, self.integration_button, self.modified_button, self.horizontal_button, self.vertical_button, self.open_button],
             lambda: self.t["more_tools"])
         outer.addWidget(self.tabs, 1)
         self.apply_styles()
@@ -2837,6 +2888,7 @@ class PicView(QMainWindow):
 
     def rebuild_ui(self):
         if self.about_action is not None: self.about_action.setText(self.t["about"])
+        self.refresh_shell_integration_button()
         self.modified_button.setToolTip(self.t["show_modified"])
         self.modified_button.setAccessibleName(self.t["show_modified"])
         self.modified_button.refresh_icon()
@@ -2859,7 +2911,7 @@ class PicView(QMainWindow):
             button.setToolTip(shortcut_tooltip(self.t["close_tab"], QKeySequence.StandardKey.Close))
             button.setAccessibleName(self.t["close_tab"])
             button.update()
-        for button in (self.open_button, self.vertical_button, self.horizontal_button): button.refresh_icon()
+        for button in (self.open_button, self.vertical_button, self.horizontal_button, self.integration_button): button.refresh_icon()
         self.update_tab_titles()
         self.refresh_system_menu()
 
@@ -3008,14 +3060,36 @@ def set_application_identity(app: QApplication) -> None:
     app.setWindowIcon(QIcon(str(icon_path)))
 
 
+def open_startup_paths(window: PicView, paths: list[str]) -> None:
+    for raw in paths:
+        path = Path(raw).expanduser()
+        if path.is_dir():
+            window.open_folder(path)
+        elif path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES:
+            window.open_folder(path.parent, path)
+
+
+def open_received_paths(window: PicView, paths: list[str]) -> None:
+    open_startup_paths(window, paths)
+    if window.isMinimized():
+        window.showNormal()
+    window.raise_()
+    window.activateWindow()
+
+
 def main():
     parser = argparse.ArgumentParser(description="PicView image folder viewer")
     parser.add_argument("--version", action="version", version=f"PicView {__version__}")
-    parser.parse_args()
-    app = QApplication(sys.argv)
+    parser.add_argument("paths", nargs="*", help="folders or image files to open")
+    args = parser.parse_args()
+    app = QApplication([sys.argv[0]])
+    if forward_paths(args.paths):
+        return
     set_application_identity(app)
     use_system_palette(app)
     window = PicView()
     app.paletteChanged.connect(window.refresh_system_theme)
     window.show()
+    InstanceReceiver(window, lambda paths: open_received_paths(window, paths))
+    open_startup_paths(window, args.paths)
     sys.exit(app.exec())

@@ -70,7 +70,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 ### Window and toolbars
 
 - Resize the window down to **260 × 220 px**.
-- The main toolbar occupies its own row: open and layout tools on the left; date display, language, and theme tools on the right.
+- The main toolbar occupies its own row: open and layout tools on the left; date display, File Explorer/Finder integration, language, and theme on the right.
 - Folder tabs sit inside the thumbnail pane, sharing a row with the thumbnail tools on the right. The tab strip follows the active thumbnail pane.
 - When tabs overflow, scroll arrows appear at opposite ends of the tab bar. Both scroll arrows and the tab-list dropdown use thin chevrons.
 - Fit, maximize pane, and full screen sit on the right, before the zoom value and slider. The shared comparison toolbar uses the same order.
@@ -91,6 +91,14 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Drop a folder or image file onto the window to open it.
 - Drag a thumbnail or its filename to send the original file to another application that accepts file drops.
 - Rotation and mirroring only affect the view; they do not modify image files.
+
+### File Explorer and Finder context menus
+
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-light.png" width="34" height="34" alt="File Explorer and Finder integration" title="File Explorer and Finder integration"></picture> to the left of the language tool to toggle the integration directly. It is off by default; the active button uses the accent color.
+- **Windows:** Right-click a folder, a folder background, or a supported image and choose **Open in PicView**. On Windows 11, the command may be under **Show more options**. It registers only for the current user and does not change the default image viewer.
+- **macOS:** The packaged `PicView.app` can install a Finder **Services** command. Right-click a folder or image, then choose **Open in PicView** under **Services**. Turning the integration off removes the command. Move `PicView.app` to Applications before enabling it. Finder integration is unavailable when running from Python/uv.
+- Opening an image selects it in its containing folder; opening a folder views that folder. You can also run `picview "<folder-or-image-path>"` from a terminal.
+- When PicView is already running, a context-menu or command-line path opens in that window as a new tab. Otherwise, PicView starts a new window.
 
 ### Image and pane tools
 

@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import platform
+import plistlib
 import shutil
 import subprocess
 import sys
@@ -19,6 +20,35 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def run(*args, **kwargs):
     subprocess.run([str(arg) for arg in args], check=True, **kwargs)
+
+
+def bundle_finder_service(app: Path) -> None:
+    service = app / "Contents" / "PlugIns" / "PicViewOpen.service"
+    contents = service / "Contents"
+    binary = contents / "MacOS" / "PicViewOpenService"
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    info = {
+        "CFBundleIdentifier": "io.github.codemee.picview.open-service",
+        "CFBundleName": "PicView Open Service",
+        "CFBundleExecutable": binary.name,
+        "CFBundlePackageType": "SRVC",
+        "CFBundleVersion": "1",
+        "NSServices": [{
+            "NSMessage": "openInPicView",
+            "NSPortName": "PicViewOpenService",
+            "NSMenuItem": {"default": "Open in PicView"},
+            "NSSendFileTypes": ["public.folder", "public.image"],
+            "NSRequiredContext": {},
+        }],
+    }
+    (contents / "Info.plist").write_bytes(plistlib.dumps(info))
+    localized = contents / "Resources" / "zh_TW.lproj"
+    localized.mkdir(parents=True, exist_ok=True)
+    (localized / "ServicesMenu.strings").write_text(
+        '"Open in PicView" = "使用 PicView 開啟";\n', encoding="utf-8")
+    run("clang", "-fobjc-arc", "-framework", "AppKit", ROOT / "packaging" / "macos_service.m", "-o", binary)
+    run("codesign", "--force", "--sign", "-", service)
+    run("codesign", "--force", "--deep", "--sign", "-", app)
 
 
 def main():
@@ -65,6 +95,7 @@ def main():
         ROOT / "packaging" / "picview.spec", cwd=ROOT, env=build_env)
 
     executable = output / ("PicView.app/Contents/MacOS/PicView" if macos else "PicView.exe")
+    if macos: bundle_finder_service(output / "PicView.app")
     report = build / "desktop-smoke.json"
     report.unlink(missing_ok=True)
     try:

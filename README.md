@@ -70,7 +70,7 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 ### 視窗與工具列
 
 - 視窗最小可縮至 **260 × 220 px**。
-- 主工具列獨立一列：左側為開啟與版面工具，右側為修改時間顯示、語言與配色工具。
+- 主工具列獨立一列：左側為開啟與版面工具，右側為修改時間顯示、語言、配色與設定工具。
 - 資料夾標籤位於縮圖窗格內，與右側的縮圖工具共用一列；切換標籤時會跟隨目前的縮圖窗格。
 - 標籤超出可見範圍時，左右捲動箭頭分別顯示於標籤列兩側；左右箭頭與標籤清單的向下箭頭採細線條樣式。
 - 單圖窗格的符合窗格、最大化窗格與全螢幕工具位於右側縮放比例與滑桿之前；比圖模式的共用工具列也採用相同排列。
@@ -91,6 +91,14 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 - 將資料夾或圖片檔案拖曳至視窗，也能開啟檢視。
 - 按住縮圖或檔名拖曳，可將原始圖檔拖放至接受檔案的其他應用程式。
 - 旋轉與鏡射只影響檢視畫面，不會修改圖檔。
+
+### 檔案總管與 Finder 右鍵選單
+
+- 點擊主工具列語系工具左側的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-light.png" width="34" height="34" alt="檔案總管與 Finder 整合" title="檔案總管與 Finder 整合"></picture>，直接開啟或關閉檔案總管／Finder 整合；預設關閉。啟用時按鈕會顯示強調色。
+- **Windows**：在資料夾、資料夾空白處或支援的圖片檔上按右鍵，選擇「使用 PicView 開啟」。Windows 11 可能需要先選「顯示其他選項」。此設定只修改目前使用者的右鍵選單，不會變更預設開圖程式。
+- **macOS**：封裝版 `PicView.app` 可安裝 Finder「服務」項目。在資料夾或圖片上按右鍵，從「服務」選擇「使用 PicView 開啟」；關閉整合會移除該項目。請將 `PicView.app` 放在 Applications 後啟用。從 Python／uv 啟動時無法安裝 Finder 服務。
+- 從圖片啟動時，PicView 會開啟該圖片所在資料夾並選取該圖片；從資料夾啟動時會直接檢視資料夾。也可用 `picview "<資料夾或圖片路徑>"` 從命令列開啟。
+- 若已有 PicView 視窗，從右鍵選單或命令列開啟路徑會交給該視窗，在新標籤檢視；沒有執行中的視窗時才啟動新視窗。
 
 ### 圖片與窗格工具
 
