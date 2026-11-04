@@ -12,6 +12,11 @@ def action_for(controller, control):
     return next(action for action in controller.menu.actions() if action.text().startswith(control.toolTip()))
 
 
+def trigger_control(controller, control):
+    if control in controller.overflowed: action_for(controller, control).trigger()
+    else: control.click()
+
+
 @pytest.mark.parametrize("orientation", [Qt.Orientation.Vertical, Qt.Orientation.Horizontal])
 def test_narrow_and_short_window_overflows_and_restores(browser, orientation):
     window, folders = browser
@@ -89,15 +94,14 @@ def test_compared_pane_actions_still_target_own_image(browser):
     window.focus_compare_page(first)
     QTest.qWait(50)
     controller = first.image.toolbar_overflow
-    assert first.image.rotate_b in controller.overflowed
-    action_for(controller, first.image.rotate_b).trigger()
+    trigger_control(controller, first.image.rotate_b)
     assert first.image.rotation == 90 and second.image.rotation == 0
-    action_for(controller, first.image.full).trigger()
+    trigger_control(controller, first.image.full)
     assert first.image.full_window is not None
     first.image.open_full()
     window.focus_compare_page(second)
     QTest.qWait(50)
-    action_for(second.image.toolbar_overflow, second.image.mh).trigger()
+    trigger_control(second.image.toolbar_overflow, second.image.mh)
     assert second.image.fh and not first.image.fh
     window.set_compare(False)
     window.resize(1100, 780)

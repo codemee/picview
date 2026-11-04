@@ -163,7 +163,11 @@ def test_sort_and_date_state_buttons_work_from_narrow_overflow(browser):
     assert page.thumbs.sort_mode == "modified" and page.thumbs.sort_descending
     main = window.toolbar_overflow
     main.populate_menu()
-    action = next(item for item in main.menu.actions() if item.text() == window.modified_button.toolTip())
-    assert action.isChecked()
-    action.trigger()
+    if window.modified_button in main.overflowed:
+        action = next(item for item in main.menu.actions() if item.text() == window.modified_button.toolTip())
+        assert action.isChecked()
+        action.trigger()
+    else:
+        assert window.modified_button.isVisible()
+        window.modified_button.click()
     assert not window.show_modified and not page.thumbs.show_modified

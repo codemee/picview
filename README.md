@@ -13,7 +13,7 @@
 
 ### 多圖比較
 
-- 勾選標籤即可並排比較圖片，支援不同資料夾，也能開啟同一資料夾的多個標籤比較不同圖片。
+- 將標籤或縮圖拖到單圖窗格即可開始比圖，支援不同資料夾，也能在同一資料夾比較不同圖片。
 - 每個比圖窗格可各自選圖、縮放、旋轉、鏡射與捲動，方便檢查細節與差異。
 
 ## 安裝與啟動
@@ -70,20 +70,20 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 ### 視窗與工具列
 
 - 視窗最小可縮至 **260 × 220 px**。
-- 主工具列獨立一列：左側為開啟、版面與比圖工具，右側為修改時間顯示、語言與配色工具。
+- 主工具列獨立一列：左側為開啟與版面工具，右側為修改時間顯示、語言與配色工具。
 - 資料夾標籤位於縮圖窗格內，與右側的縮圖工具共用一列；切換標籤時會跟隨目前的縮圖窗格。
 - 標籤超出可見範圍時，左右捲動箭頭分別顯示於標籤列兩側；左右箭頭與標籤清單的向下箭頭採細線條樣式。
 - 單圖窗格的符合窗格、最大化窗格與全螢幕工具位於右側縮放比例與滑桿之前；比圖模式的共用工具列也採用相同排列。
 - 將滑鼠停在按鈕或縮放控制上，可從提示查看已設定的快捷鍵；收合選單也會顯示對應按鍵。
 - 淺色與深色配色的縮圖卡片皆採用獨立底色與細邊框，捲動時也能清楚辨識卡片邊界。
-- 比圖、符合窗格等狀態按鈕以 hover 底色與主題強調色圖示表示啟用，線條粗細不變。
+- 符合窗格、同步等狀態按鈕以 hover 底色與主題強調色圖示表示啟用，線條粗細不變。
 - 主工具列、縮圖與單圖工具列放不下的工具會收進 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="更多工具" title="更多工具"></picture>。
 - 放寬視窗後，收起的工具會自動恢復。
 - 縮圖會優先載入可見範圍，其餘在背景逐步製作。
 - 縮圖使用共用的記憶體快取（上限 64 MiB），不另存縮圖檔案。
 - 調整窗格大小只重新排列縮圖，不會重新解碼所有圖片。
 - 滑桿收起時，可從更多工具選單輸入縮放比例或縮圖大小。
-- 視窗標題會顯示目前版本，例如 **PicView v0.1.5**。
+- 視窗標題會顯示目前版本，例如 **PicView v0.1.6**。
 
 ### 開啟與拖放圖片
 
@@ -144,8 +144,9 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 - 同一資料夾可開啟多個標籤，各自選圖，方便比較不同圖片。
 - 在標籤上按右鍵 → **複製標籤**，在原標籤旁建立副本。
 - 副本會保留原標籤的選圖與檢視狀態。
-- 比圖模式中，複製已勾選的標籤，副本也會加入比圖。
-- 拖曳標籤可調整順序。
+- 比圖模式中，複製已加入的標籤，副本也會加入比圖。
+- 沿標籤列拖曳可調整順序；將標籤往下拖到單圖窗格可加入比圖。
+- 單擊標籤會在放開滑鼠時切換；拖曳標籤時維持原本檢視的資料夾。
 - 空間不足時先收合次要工具；標籤過多時可水平捲動，長名稱會省略顯示。
 - 選取底線會在左右捲動箭頭前裁切，不會從箭頭下方露出；淺色與深色配色皆適用。
 - 左右捲動箭頭固定在標籤列兩端，統一採用細線角括號樣式，與右側的下拉箭頭一致。
@@ -159,17 +160,19 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 
 ### 比較圖片
 
-- 點擊工具列的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/compare-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/compare-light.png" width="34" height="34" alt="比圖" title="比圖"></picture>，啟用比較模式。
-- 標籤的資料夾圖示會變成核取方塊，預設勾選目前標籤。
-- 勾選要比較的標籤，單圖區域會依標籤順序等分。
+- 將標籤或縮圖拖到單圖窗格，會保留原窗格並加入拖入的圖片，立即開始比圖。
+- 繼續拖到任一比圖窗格，可依拖入順序加入更多窗格；各窗格平均分配空間，過小時會停止加入。
+- 再拖入已在比圖中的標籤或縮圖，會建立獨立標籤，方便比較同一資料夾的不同圖片。
 - <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-h-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-h-light.png" width="34" height="34" alt="上下版面" title="上下版面"></picture> 上下版面：比較圖片左右並排。
 - <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-v-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-v-light.png" width="34" height="34" alt="左右版面" title="左右版面"></picture> 左右版面：比較圖片上下排列。
 - 切換到各標籤，從縮圖選擇該資料夾要比較的圖片。
 - 比較窗格共用上方工具列。
-- 點擊圖片窗格，指定工具列的操作目標；該窗格會顯示重點色外框。
-- 各窗格可獨立縮放、旋轉、鏡射及捲動。
+- 點擊圖片窗格，會選取該窗格、切換到對應標籤與縮圖，並將共用工具列指向該窗格；選中窗格會顯示重點色外框。
+- 使用方向鍵、<kbd>Home</kbd>／<kbd>End</kbd>、<kbd>Page Up</kbd>／<kbd>Page Down</kbd>、<kbd>Space</kbd> 或 <kbd>Backspace</kbd> 切換圖片時，只操作選中窗格所屬的資料夾。
+- 預設各窗格可獨立縮放、旋轉、鏡射、設定背景色及捲動。
+- 點擊單圖工具列的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-light.png" width="34" height="34" alt="同步操作" title="同步操作"></picture>，可同步旋轉、鏡射、縮放、符合窗格、背景色，以及水平與垂直捲動到所有比圖窗格。不同尺寸的圖片會依捲動比例對齊；再次點擊恢復獨立操作。
 - 比較中的背景圖片也會即時更新。
-- 再次點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/compare-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/compare-light.png" width="34" height="34" alt="比圖" title="比圖"></picture>，回到一般檢視並保留各標籤的選圖與操作狀態。
+- 點擊各比圖窗格右上角的關閉按鈕可將該資料夾移出比圖；剩下一個窗格時自動回到一般檢視，並保留各標籤的選圖與操作狀態。
 
 ### 縮放與縮圖大小
 

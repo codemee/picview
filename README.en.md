@@ -13,7 +13,7 @@ An image folder viewer built with Qt, focused on **fast loading** and **image co
 
 ### Image comparison
 
-- Check tabs to compare images side by side, across different folders or multiple tabs of the same folder.
+- Drag a tab or thumbnail onto the image pane to compare images across folders or within the same folder.
 - Select images, zoom, rotate, mirror, and scroll each comparison pane independently to inspect details and differences.
 
 ## Install and run
@@ -70,20 +70,20 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 ### Window and toolbars
 
 - Resize the window down to **260 × 220 px**.
-- The main toolbar occupies its own row: open, layout, and comparison tools on the left; date display, language, and theme tools on the right.
+- The main toolbar occupies its own row: open and layout tools on the left; date display, language, and theme tools on the right.
 - Folder tabs sit inside the thumbnail pane, sharing a row with the thumbnail tools on the right. The tab strip follows the active thumbnail pane.
 - When tabs overflow, scroll arrows appear at opposite ends of the tab bar. Both scroll arrows and the tab-list dropdown use thin chevrons.
 - Fit, maximize pane, and full screen sit on the right, before the zoom value and slider. The shared comparison toolbar uses the same order.
 - Hover over buttons or zoom controls to see their assigned keyboard shortcuts. The overflow menu also shows the corresponding keys.
 - Thumbnail cards use distinct backgrounds and thin borders in both light and dark themes, keeping their boundaries visible while scrolling.
-- Toggle tools such as comparison and fit-to-pane use the hover background and theme accent-colored icons to indicate their active state, keeping the original stroke widths.
+- Toggle tools such as sync and fit-to-pane use the hover background and theme accent-colored icons to indicate their active state, keeping the original stroke widths.
 - Tools that no longer fit move into <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="More tools" title="More tools"></picture> on the main, thumbnail, and image toolbars.
 - Widen the window to restore the hidden tools automatically.
 - Visible thumbnails load first; the rest are decoded progressively in the background.
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - When sliders are hidden, use the overflow menu to enter zoom or thumbnail-size values.
-- The window title shows the current version, for example **PicView v0.1.5**.
+- The window title shows the current version, for example **PicView v0.1.6**.
 
 ### Open and drag images
 
@@ -144,8 +144,9 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Open the same folder in multiple tabs to select and compare different images independently.
 - Right-click a tab → **Duplicate tab** to create a copy beside it.
 - The copy preserves the original tab's image selection and view settings.
-- In comparison mode, duplicating a checked tab also adds the copy to comparison.
-- Drag tabs to reorder them.
+- In comparison mode, duplicating a participating tab also adds the copy to comparison.
+- Drag along the tab strip to reorder tabs; drag a tab downward onto the image pane to compare it.
+- A tab switches on mouse release after a click. Dragging a tab keeps the currently displayed folder in view.
 - Secondary tools collapse first when space is limited; excess tabs scroll horizontally and long names are shortened.
 - The selected tab's underline stops before the scroll arrows and does not show beneath them, in both light and dark themes.
 - Scroll arrows stay at opposite ends of the tab strip and use consistent thin chevrons, matching the dropdown arrow on the right.
@@ -159,17 +160,19 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 
 ### Compare images
 
-- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/compare-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/compare-light.png" width="34" height="34" alt="Compare images" title="Compare images"></picture> to enable comparison mode.
-- Tab folder icons become checkboxes; the current tab is checked initially.
-- Check the tabs to compare; the image area divides equally in tab order.
+- Drag a tab or thumbnail onto an image pane to keep that image and add the dragged image to a comparison.
+- Drag onto any comparison pane to add more images in drop order. Space is shared equally; adding stops when the panes would become too small.
+- Drag a tab or thumbnail already in the comparison again to create an independent tab for another image from that folder.
 - <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-h-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-h-light.png" width="34" height="34" alt="Stacked layout" title="Stacked layout"></picture> With thumbnails above the images, comparison panes appear side by side.
 - <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-v-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-v-light.png" width="34" height="34" alt="Side-by-side layout" title="Side-by-side layout"></picture> With thumbnails beside the images, comparison panes are stacked.
 - Switch to each tab and select its image from the thumbnails.
 - Comparison panes share one toolbar above the images.
-- Click an image pane to make it the toolbar's target; an accent-colored border marks it.
-- Zoom, rotate, mirror, and scroll each pane independently.
+- Click an image pane to select it, show its corresponding tab and thumbnails, and target it with the shared toolbar; an accent-colored border marks the selection.
+- Arrow keys, <kbd>Home</kbd>/<kbd>End</kbd>, <kbd>Page Up</kbd>/<kbd>Page Down</kbd>, <kbd>Space</kbd>, and <kbd>Backspace</kbd> navigate images in the selected pane's folder.
+- By default, zoom, rotate, mirror, set the background, and scroll each pane independently.
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-light.png" width="34" height="34" alt="Sync tools" title="Sync tools"></picture> in the image toolbar to apply rotation, mirroring, zoom, fit, background, and horizontal and vertical scrolling to every comparison pane. Images of different sizes align by scroll position as a proportion of their scrollable range. Click again to return to independent controls.
 - Visible background images continue updating when files change.
-- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/compare-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/compare-light.png" width="34" height="34" alt="Compare images" title="Compare images"></picture> again to return to normal viewing and keep each tab's selection and adjustments.
+- Click the close button in the upper-right corner of a comparison pane to remove that folder. When one pane remains, normal viewing resumes with each tab's selection and adjustments intact.
 
 ### Zoom and thumbnail size
 

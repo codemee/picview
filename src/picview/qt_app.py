@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 from PySide6.QtCore import QEvent, QFileSystemWatcher, QLocale, QMimeData, QObject, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QColor, QDrag, QIcon, QImage, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPalette, QRegion, QShortcut, QTransform
+from PySide6.QtGui import QAction, QColor, QDrag, QIcon, QImage, QKeySequence, QMouseEvent, QPainter, QPainterPath, QPen, QPixmap, QPalette, QRegion, QShortcut, QTransform
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QMainWindow,
     QMenu, QPushButton, QProxyStyle, QScrollArea, QSlider, QSplitter, QStackedWidget, QTabBar, QStyle, QStyleOptionSlider, QStyleOptionTab, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
@@ -31,6 +31,16 @@ PALETTE = {"surface": "#f4f7f8", "card": "#ffffff", "edge": "#c7d3d8", "accent":
            "focus": "#1677ff", "selection": THUMBNAIL_SELECTED, "selection_text": "#153047", "active_text": "#ffffff", "hover": "#e2e6ed", "pressed": "#d5dbe4", "warm": "#172a31"}
 SLIDER_WIDTH = 160
 THUMBNAIL_BASE_SIZE = 140
+COMPARISON_TAB_MIME = "application/x-picview-tab"
+COMPARISON_IMAGE_MIME = "application/x-picview-image"
+
+
+def start_tab_comparison_drag(widget, page):
+    drag = QDrag(widget)
+    data = QMimeData()
+    data.setData(COMPARISON_TAB_MIME, str(id(page)).encode("ascii"))
+    drag.setMimeData(data)
+    drag.exec(Qt.DropAction.CopyAction, Qt.DropAction.CopyAction)
 
 
 def shortcut_tooltip(text, *bindings):
@@ -128,7 +138,9 @@ TEXT["en"].update({
     "bg_dark_gray": "Dark gray", "bg_slate": "Slate", "bg_dark_blue": "Dark blue", "bg_dark_green": "Dark green",
     "bg_dark_purple": "Dark purple", "bg_dark_red": "Dark red", "bg_dark_brown": "Dark brown", "bg_dark_teal": "Dark teal",
     "more_tools": "More tools",
-    "compare": "Compare images", "compare_folder": "Compare this folder", "compare_empty": "Check folder tabs to compare images", "image_tools": "Image tools",
+    "compare": "Compare images", "compare_folder": "Drag a tab or thumbnail onto an image to compare", "compare_empty": "Drag a tab or thumbnail here to compare images", "image_tools": "Image tools",
+    "compare_close": "Remove from comparison", "compare_too_small": "The image panes are too small for another comparison.",
+    "sync_tools": "Apply image tools to every comparison pane",
     "close_tab": "Close tab",
     "new_tab": "Open folder in a new tab", "tab_list": "Select tab", "empty_tab": "New tab", "folder_missing": "Folder unavailable; waiting for it to return", "duplicate_tab": "Duplicate tab",
     "image_deleted": "The image being viewed was deleted: {name}. Now viewing {next}.",
@@ -153,7 +165,9 @@ TEXT["zh"].update({
     "bg_dark_gray": "深灰色", "bg_slate": "灰藍色", "bg_dark_blue": "深藍色", "bg_dark_green": "深綠色",
     "bg_dark_purple": "深紫色", "bg_dark_red": "深紅色", "bg_dark_brown": "深棕色", "bg_dark_teal": "深青色",
     "more_tools": "更多工具",
-    "compare": "比圖", "compare_folder": "勾選此資料夾進行比圖", "compare_empty": "勾選資料夾標籤以比較圖片", "image_tools": "圖片工具",
+    "compare": "比圖", "compare_folder": "拖曳標籤或縮圖到單圖窗格進行比圖", "compare_empty": "拖曳標籤或縮圖到這裡進行比圖", "image_tools": "圖片工具",
+    "compare_close": "移出比圖", "compare_too_small": "單圖窗格太小，無法再加入比圖。",
+    "sync_tools": "同步操作所有比圖窗格",
     "close_tab": "關閉標籤",
     "new_tab": "在新標籤開啟資料夾", "tab_list": "選取標籤", "empty_tab": "新標籤", "folder_missing": "資料夾不存在，等待重新連線", "duplicate_tab": "複製標籤",
     "image_deleted": "正在檢視的圖片已被刪除：{name}。已切換至 {next}。",
@@ -290,6 +304,10 @@ class IconButton(QToolButton):
                 line(x + 1.5, 16, x + 4.5, 12)
                 line(x + 4.5, 12, x + 7.5, 16)
                 p.drawEllipse(QRectF(x + 2.5, 8, 1.5, 1.5))
+        elif self.kind == "sync":
+            p.drawRoundedRect(QRectF(3, 5, 7, 14), 1, 1)
+            p.drawRoundedRect(QRectF(14, 5, 7, 14), 1, 1)
+            line(10, 12, 14, 12)
         elif self.kind == "fullscreen":
             for x,y,dx,dy in ((4,4,1,1),(20,4,-1,1),(4,20,1,-1),(20,20,-1,-1)):
                 line(x, y, x + 6 * dx, y); line(x, y, x, y + 6 * dy)
@@ -500,7 +518,6 @@ class ThumbnailTile(QFrame):
         self._drag_start = None
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_start = event.position().toPoint()
-            self.clicked_path.emit(self.path)
             event.accept()
             return
         super().mousePressEvent(event)
@@ -513,6 +530,12 @@ class ThumbnailTile(QFrame):
                     drag = QDrag(self.window())
                     data = QMimeData()
                     data.setUrls([QUrl.fromLocalFile(str(self.path.resolve()))])
+                    page = self.parentWidget()
+                    while page is not None and not isinstance(page, FolderTab):
+                        page = page.parentWidget()
+                    if page is not None:
+                        data.setData(COMPARISON_TAB_MIME, str(id(page)).encode("ascii"))
+                        data.setData(COMPARISON_IMAGE_MIME, str(self.path.resolve()).encode("utf-8"))
                     drag.setMimeData(data)
                     pixmap = self.preview.pixmap()
                     if pixmap is not None and not pixmap.isNull():
@@ -524,6 +547,8 @@ class ThumbnailTile(QFrame):
             return
         super().mouseMoveEvent(event)
     def mouseReleaseEvent(self, event):
+        if self._drag_start is not None and event.button() == Qt.MouseButton.LeftButton:
+            self.clicked_path.emit(self.path)
         self._drag_start = None
         super().mouseReleaseEvent(event)
 
@@ -909,6 +934,8 @@ class ToolbarOverflow(QObject):
 
 class ImagePane(QFrame):
     interacted = Signal()
+    operationApplied = Signal(str, object)
+    comparisonCloseRequested = Signal()
 
     def __init__(self, labels, parent=None):
         super().__init__(parent); self.labels=labels; self.path=None; self.frames=[]; self.index=0; self.rotation=0; self.fh=False; self.fv=False; self.zoom=1.0; self.fit_to_pane=False; self.auto_scale=False; self._applying_auto_scale=False; self.display_scale=1.0; self.full_window=None; self.timer=QTimer(self); self.timer.timeout.connect(self.next_frame)
@@ -917,6 +944,7 @@ class ImagePane(QFrame):
         self.comparison_selected = False
         self.background_mode = "default"
         bar=QHBoxLayout(); self.rotate_b=IconButton("rotate",labels["rotate"]); self.mh=IconButton("mirror-h",labels["mh"]); self.mv=IconButton("mirror-v",labels["mv"]); self.fit_b=IconButton("fit",labels["fit"]); self.fit_b.setCheckable(True); self.fit_b.toggled.connect(self.set_fit); self.max_button=IconButton("expand",labels["max"]); self.full=IconButton("fullscreen",labels["full"])
+        self.fit_b.clicked.connect(lambda checked: self.operationApplied.emit("fit", self.fit_to_pane))
         for b,fn in ((self.rotate_b,self.rotate),(self.mh,self.mirror_h),(self.mv,self.mirror_v)): b.clicked.connect(fn); bar.addWidget(b)
         bar.setSpacing(4)
         separate_tools(bar)
@@ -924,6 +952,10 @@ class ImagePane(QFrame):
         self.background_button = IconButton("background", labels["background"])
         self.background_button.clicked.connect(self.show_background_menu)
         bar.addWidget(self.background_button)
+        self.sync_button = IconButton("sync", labels["sync_tools"])
+        self.sync_button.setCheckable(True)
+        self.sync_button.setEnabled(False)
+        bar.addWidget(self.sync_button)
         self.background_menu = QMenu(self)
         self.background_panel = QWidget()
         choices = QGridLayout(self.background_panel)
@@ -956,10 +988,26 @@ class ImagePane(QFrame):
         self.setMinimumSize(54, 50)
         layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         self.toolbar_overflow = ToolbarOverflow(self.toolbar_widget, bar,
-            [self.slider, self.zoom_label, self.background_button, self.full, self.max_button, self.mv, self.mh, self.rotate_b, self.fit_b],
+            [self.slider, self.zoom_label, self.sync_button, self.background_button, self.full, self.max_button, self.mv, self.mh, self.rotate_b, self.fit_b],
             lambda: self.labels["more_tools"], {self.slider: self.zoom_label})
         layout.addWidget(self.toolbar_widget)
+        self.comparison_header = QWidget(self)
+        comparison_row = QHBoxLayout(self.comparison_header)
+        comparison_row.setContentsMargins(4, 0, 4, 0)
+        comparison_row.setSpacing(4)
+        self.comparison_label = QLabel(self.comparison_header)
+        self.comparison_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        comparison_row.addWidget(self.comparison_label, 1)
+        self.comparison_close = TabCloseButton(self.comparison_header)
+        self.comparison_close.setToolTip(labels["compare_close"])
+        self.comparison_close.clicked.connect(self.comparisonCloseRequested.emit)
+        comparison_row.addWidget(self.comparison_close)
+        self.comparison_header.setFixedHeight(24)
+        self.comparison_header.hide()
+        layout.addWidget(self.comparison_header)
         self.scroll=QScrollArea(); self.scroll.setWidgetResizable(False); self.scroll.setAlignment(Qt.AlignmentFlag.AlignCenter); self.scroll.setFrameShape(QFrame.Shape.NoFrame); self.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};"); self.label=QLabel(labels["empty"]); self.label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.label.setStyleSheet(f"color:{PALETTE['muted']};background:transparent;"); self.scroll.setWidget(self.label); layout.addWidget(self.scroll)
+        for target in (self, self.comparison_header, self.scroll, self.scroll.viewport(), self.label):
+            target.setAcceptDrops(True)
         self.scroll.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         self.toolbar = bar
         self.update_shortcut_tooltips()
@@ -974,6 +1022,8 @@ class ImagePane(QFrame):
         self.zoom_label.setToolTip(shortcut_tooltip(self.labels["edit_zoom"], "+", "-", "0"))
         self.slider.setToolTip(shortcut_tooltip(self.labels["zoom"], "+", "-", "0"))
         self.zoom_label.reset_button.setToolTip(shortcut_tooltip("100%", "0"))
+        self.sync_button.setToolTip(self.labels["sync_tools"])
+        self.comparison_close.setToolTip(self.labels["compare_close"])
 
     def background_color(self):
         return IMAGE_BACKGROUND_COLORS[self.background_mode] or PALETTE["pane"]
@@ -1005,6 +1055,7 @@ class ImagePane(QFrame):
     def choose_background(self, mode):
         self.set_background(mode)
         self.background_menu.hide()
+        self.operationApplied.emit("background", mode)
 
     def show_background_menu(self):
         self.apply_background()
@@ -1021,17 +1072,38 @@ class ImagePane(QFrame):
             painter.end()
 
     def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.DragEnter, QEvent.Type.DragMove, QEvent.Type.Drop):
+            if self.handle_comparison_drag(event): return True
         if event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.Wheel): self.interacted.emit()
         return super().eventFilter(watched, event)
+
+    def handle_comparison_drag(self, event):
+        window = self.window()
+        if not hasattr(window, "comparison_drag_source") or window.comparison_drag_source(event.mimeData()) is None:
+            return False
+        if event.type() == QEvent.Type.Drop: window.add_comparison_drop(self, event.mimeData())
+        event.acceptProposedAction()
+        return True
+
+    def dragEnterEvent(self, event):
+        if not self.handle_comparison_drag(event): super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if not self.handle_comparison_drag(event): super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        if not self.handle_comparison_drag(event): super().dropEvent(event)
 
     def update_filename(self):
         name = self.path.name if self.path else ""
         self.filename_label.setText(f"{self.comparison_title} / {name}" if self.comparison_title else name)
+        self.comparison_label.setText(f"{self.comparison_title} / {name}" if self.comparison_title else "")
 
     def set_comparison_mode(self, title=None):
         self.comparison_title = title
         comparing = title is not None
         self.toolbar_widget.setVisible(not comparing)
+        self.comparison_header.setVisible(comparing)
         if comparing:
             self.layout().setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
             self.setMinimumSize(0, 0)
@@ -1154,9 +1226,15 @@ class ImagePane(QFrame):
             try: self.fit_b.setChecked(oversized)
             finally: self._applying_auto_scale=False
     def wheelEvent(self,e): self.scroll.verticalScrollBar().setValue(self.scroll.verticalScrollBar().value()-e.angleDelta().y()); e.accept()
-    def rotate(self): self.rotation=(self.rotation+90)%360; self.render()
-    def mirror_h(self): self.fh=not self.fh; self.render()
-    def mirror_v(self): self.fv=not self.fv; self.render()
+    def rotate(self):
+        self.rotation=(self.rotation+90)%360; self.render()
+        self.operationApplied.emit("rotate", None)
+    def mirror_h(self):
+        self.fh=not self.fh; self.render()
+        self.operationApplied.emit("mirror_h", None)
+    def mirror_v(self):
+        self.fv=not self.fv; self.render()
+        self.operationApplied.emit("mirror_v", None)
     def set_zoom_percent(self, ticks):
         self.auto_scale=False
         if self.fit_to_pane:
@@ -1168,6 +1246,7 @@ class ImagePane(QFrame):
         self.zoom = ticks / 1000
         self.zoom_label.set_value(ticks)
         self.render()
+        self.operationApplied.emit("zoom", ticks)
     def toggle_fit(self):
         self.fit_b.click()
 
@@ -1200,6 +1279,7 @@ class ImagePane(QFrame):
     def reset_zoom(self):
         if self.fit_to_pane: self.fit_b.setChecked(False)
         self.slider.setValue(1000)
+        self.operationApplied.emit("zoom", 1000)
     def open_full(self):
         if self.full_window is not None:
             self.full_window.close()
@@ -1294,7 +1374,7 @@ class FolderTab(QWidget):
         self.split.addWidget(self.image_slot)
         layout.addWidget(self.split)
         self.thumbs.selected.connect(self.select_image)
-        self.thumbs.rowRequested.connect(self.select_row)
+        self.thumbs.rowRequested.connect(self.navigate_row)
         self.thumbs.sortRequested.connect(self.set_sort)
         self.thumbs.max_button.clicked.connect(lambda: self.maximize("thumb"))
         self.image.max_button.clicked.connect(self.maximize_image)
@@ -1701,6 +1781,11 @@ class FolderTab(QWidget):
         if target_row < 0 or target_row * columns >= len(self.files): return
         self.thumbs.select(self.files[min(len(self.files) - 1, index + direction * columns)])
 
+    def navigate_row(self, direction):
+        window = self.window()
+        target = window.navigation_page() if hasattr(window, "navigation_page") else self
+        if target is not None: target.select_row(direction)
+
     def select_boundary(self, last):
         if self.files: self.thumbs.select(self.files[-1 if last else 0])
 
@@ -1715,6 +1800,8 @@ class TabFolderControl(QCheckBox):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.comparing = False
+        self.page = None
+        self._drag_start = None
         self.setFixedSize(28, 20)
 
     def hitButton(self, pos):
@@ -1722,9 +1809,29 @@ class TabFolderControl(QCheckBox):
 
     def mousePressEvent(self, event):
         if not self.comparing:
-            event.ignore()
+            if event.button() == Qt.MouseButton.LeftButton and self.page is not None:
+                self._drag_start = event.position().toPoint()
+                event.accept()
+            else: event.ignore()
             return
         super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_start is not None and event.buttons() & Qt.MouseButton.LeftButton:
+            if (event.position().toPoint() - self._drag_start).manhattanLength() >= QApplication.startDragDistance():
+                self._drag_start = None
+                start_tab_comparison_drag(self, self.page)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._drag_start is not None and self.page is not None:
+            bar = self.parentWidget()
+            index = next((index for index in range(bar.count()) if bar.tabData(index) is self.page), -1)
+            if index >= 0: bar.setCurrentIndex(index)
+        self._drag_start = None
+        super().mouseReleaseEvent(event)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -1882,9 +1989,81 @@ class FolderTabStyle(QProxyStyle):
 class FolderTabBar(QTabBar):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._comparison_drag_start = None
+        self._comparison_drag_page = None
+        self._comparison_drag_target = None
+        self._comparison_dragged = False
+        self._external_drag_finished = False
         self.navigation_style = FolderTabStyle()
         self.navigation_style.setParent(self)
         self.setStyle(self.navigation_style)
+
+    def mousePressEvent(self, event):
+        self._external_drag_finished = False
+        self._comparison_drag_target = self.tabData(self.currentIndex()) if self.currentIndex() >= 0 else None
+        self._comparison_drag_start = event.position().toPoint() if event.button() == Qt.MouseButton.LeftButton else None
+        index = self.tabAt(self._comparison_drag_start) if self._comparison_drag_start is not None else -1
+        self._comparison_drag_page = self.tabData(index) if index >= 0 else None
+        self._comparison_dragged = False
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        start = self._comparison_drag_start
+        if (start is not None and event.buttons() & Qt.MouseButton.LeftButton
+                and (event.position().toPoint() - start).manhattanLength() >= QApplication.startDragDistance()):
+            self._comparison_dragged = True
+        if (start is not None and self._comparison_drag_page is not None
+                and event.buttons() & Qt.MouseButton.LeftButton
+                and not self.rect().contains(event.position().toPoint())
+                and (event.position().toPoint() - start).manhattanLength() >= QApplication.startDragDistance()):
+            page = self._comparison_drag_page
+            target = self._comparison_drag_target
+            # Qt's built-in movable-tab drag may already have drawn a floating
+            # copy of the tab. End it before QDrag takes over the mouse release.
+            release = QMouseEvent(QEvent.Type.MouseButtonRelease, event.position(),
+                                  event.globalPosition(), Qt.MouseButton.LeftButton,
+                                  Qt.MouseButton.NoButton, event.modifiers())
+            blocked = self.blockSignals(True)
+            try:
+                super().mouseReleaseEvent(release)
+                if target is not None:
+                    index = next((index for index in range(self.count()) if self.tabData(index) is target), -1)
+                    if index >= 0: self.setCurrentIndex(index)
+            finally:
+                self.blockSignals(blocked)
+            self._comparison_drag_start = None
+            self._comparison_drag_page = None
+            self._comparison_drag_target = None
+            self._comparison_dragged = False
+            self._external_drag_finished = True
+            start_tab_comparison_drag(self, page)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._external_drag_finished:
+            self._external_drag_finished = False
+            event.accept()
+            return
+        source = self._comparison_drag_page
+        target = self._comparison_drag_target
+        dragged = self._comparison_dragged
+        blocked = self.blockSignals(True)
+        try:
+            super().mouseReleaseEvent(event)
+            if target is not None:
+                index = next((index for index in range(self.count()) if self.tabData(index) is target), -1)
+                if index >= 0: self.setCurrentIndex(index)
+        finally:
+            self.blockSignals(blocked)
+        self._comparison_drag_start = None
+        self._comparison_drag_page = None
+        self._comparison_drag_target = None
+        self._comparison_dragged = False
+        if source is not None and not dragged and event.button() == Qt.MouseButton.LeftButton:
+            index = next((index for index in range(self.count()) if self.tabData(index) is source), -1)
+            if index >= 0: self.setCurrentIndex(index)
 
     def tabSizeHint(self, index):
         size = super().tabSizeHint(index)
@@ -1965,7 +2144,8 @@ class FolderTabs(QWidget):
         layout.addWidget(self.strip)
         layout.addWidget(self.stack, 1)
         self.bar.currentChanged.connect(self.select_index)
-        self.bar.tabMoved.connect(lambda *_: self.stack.setCurrentWidget(self.currentWidget()))
+        self.bar.tabMoved.connect(lambda *_: self.stack.setCurrentWidget(
+            self.bar._comparison_drag_target or self.currentWidget()))
 
     def tabBar(self): return self.bar
     def count(self): return self.bar.count()
@@ -2007,6 +2187,15 @@ class FolderTabs(QWidget):
         return index
 
     def select_index(self, index):
+        if self.bar._comparison_drag_page is not None or self.bar._comparison_dragged:
+            target = self.bar._comparison_drag_target
+            if target is not None:
+                target_index = self.indexOf(target)
+                if target_index >= 0 and index != target_index:
+                    blocked = self.bar.blockSignals(True)
+                    self.bar.setCurrentIndex(target_index)
+                    self.bar.blockSignals(blocked)
+                    return
         page = self.widget(index)
         if page is not None: self.stack.setCurrentWidget(page)
         self.currentChanged.emit(index)
@@ -2037,7 +2226,10 @@ class PicView(QMainWindow):
         self.closed_tabs = []
         self.compare_enabled = False
         self.checked_pages = set()
+        self.comparison_order = []
         self.focused_compare_page = None
+        self.sync_enabled = False
+        self._syncing_tools = False
         app = QApplication.instance()
         self.system_palette = QPalette(app.palette())
         self.theme_mode = self.settings.get("theme", "system")
@@ -2114,9 +2306,6 @@ class PicView(QMainWindow):
         self.open_button = IconButton("folder", shortcut_tooltip(self.t["open"], QKeySequence.StandardKey.Open))
         self.vertical_button = IconButton("split-h", shortcut_tooltip(self.t["vertical"], "Alt+Shift+V"))
         self.horizontal_button = IconButton("split-v", shortcut_tooltip(self.t["horizontal"], "Alt+Shift+H"))
-        self.compare_button = IconButton("compare", self.t["compare"])
-        self.compare_button.setCheckable(True)
-        self.compare_button.toggled.connect(self.set_compare)
         self.language_button = IconButton(LANGUAGE_ICONS[self.language_mode], self.t[f"lang_{self.language_mode}"])
         self.modified_button = IconButton("modified-visible", self.t["show_modified"])
         self.modified_button.setCheckable(True)
@@ -2148,9 +2337,8 @@ class PicView(QMainWindow):
         self.tabs.setCornerWidget(self.tab_list_button)
         self.tabs.layout().removeWidget(self.tabs.strip)
         for button, action in ((self.open_button, self.choose), (self.vertical_button, lambda: self.set_orientation(Qt.Orientation.Vertical)),
-                               (self.horizontal_button, lambda: self.set_orientation(Qt.Orientation.Horizontal)),
-                               (self.compare_button, lambda: None)):
-            if button in (self.vertical_button, self.compare_button): separate_tools(layout)
+                               (self.horizontal_button, lambda: self.set_orientation(Qt.Orientation.Horizontal))):
+            if button is self.vertical_button: separate_tools(layout)
             button.clicked.connect(action)
             layout.addWidget(button)
         layout.addStretch(1)
@@ -2160,7 +2348,7 @@ class PicView(QMainWindow):
             button.clicked.connect(action)
             layout.addWidget(button)
         self.toolbar_overflow = ToolbarOverflow(tool, layout,
-            [self.theme_button, self.language_button, self.modified_button, self.horizontal_button, self.vertical_button, self.compare_button, self.open_button],
+            [self.theme_button, self.language_button, self.modified_button, self.horizontal_button, self.vertical_button, self.open_button],
             lambda: self.t["more_tools"])
         outer.addWidget(self.tabs, 1)
         self.apply_styles()
@@ -2211,14 +2399,23 @@ class PicView(QMainWindow):
         """)
     def add_page(self):
         page = FolderTab(self.t)
+        page.image.owner_page = page
         page.thumbs.show_modified = self.show_modified
         page.notification.connect(lambda message, tab=page: self.show_notification(tab, message))
         page.attentionChanged.connect(self.update_tab_titles)
         self.tabs.addTab(page, self.t["empty_tab"])
         control = TabFolderControl(self.tabs.tabBar())
+        control.page = page
         control.toggled.connect(lambda checked, tab=page: self.check_compare_page(tab, checked))
         self.tabs.tabBar().setTabButton(self.tabs.indexOf(page), QTabBar.ButtonPosition.LeftSide, control)
         page.image.interacted.connect(lambda tab=page: self.focus_compare_page(tab))
+        page.image.comparisonCloseRequested.connect(lambda tab=page: self.remove_comparison_page(tab))
+        page.image.operationApplied.connect(lambda action, value, tab=page: self.apply_comparison_tool(tab, action, value))
+        for action, bar in (("scroll_x", page.image.scroll.horizontalScrollBar()),
+                            ("scroll_y", page.image.scroll.verticalScrollBar())):
+            bar.valueChanged.connect(lambda value, tab=page, operation=action:
+                                     self.apply_comparison_tool(tab, operation, value))
+        page.image.sync_button.clicked.connect(self.set_sync)
         button = self.tabs.tabBar().tabButton(self.tabs.indexOf(page), QTabBar.ButtonPosition.RightSide)
         button.setToolTip(shortcut_tooltip(self.t["close_tab"], QKeySequence.StandardKey.Close))
         button.setAccessibleName(self.t["close_tab"])
@@ -2268,16 +2465,18 @@ class PicView(QMainWindow):
         menu.aboutToHide.connect(menu.deleteLater)
         menu.popup(bar.mapToGlobal(position))
 
-    def duplicate_page(self, source):
+    def duplicate_page(self, source, *, activate=True, add_to_compare=True, selected=None):
         if source not in self.pages() or source.folder is None: return None
         state = source.snapshot()
-        selected = Path(state["selected_file"]) if state["selected_file"] else None
+        if selected is None: selected = Path(state["selected_file"]) if state["selected_file"] else None
         page = self.open_folder(source.folder, selected, state=state, restoring=True)
         self.tabs.tabBar().moveTab(self.tabs.indexOf(page), self.tabs.indexOf(source) + 1)
-        self.tabs.setCurrentWidget(page)
-        if self.compare_enabled and source in self.checked_pages:
+        if add_to_compare and self.compare_enabled and source in self.checked_pages:
             self.checked_pages.add(page)
+            self.comparison_order.append(page)
+            if activate: self.focused_compare_page = page
             self.sync_comparison()
+        if activate: self.tabs.setCurrentWidget(page)
         self.update_tab_titles()
         return page
 
@@ -2296,7 +2495,9 @@ class PicView(QMainWindow):
                 self.notification_bar.showMessage(message, 8000)
         self.update_tab_titles()
         self.update_title()
-        if self.compare_enabled: self.sync_comparison()
+        if self.compare_enabled:
+            if page in self.checked_pages: self.focused_compare_page = page
+            self.sync_comparison()
 
     def close_tab(self, index=None):
         if index is None: index = self.tabs.currentIndex()
@@ -2306,7 +2507,10 @@ class PicView(QMainWindow):
             self.closed_tabs.append((index, page.snapshot()))
             self.closed_tabs = self.closed_tabs[-20:]
         self.checked_pages.discard(page)
-        if self.compare_enabled: self.sync_comparison()
+        if page in self.comparison_order: self.comparison_order.remove(page)
+        if self.compare_enabled:
+            if len(self.comparison_order) < 2: self.set_compare(False)
+            else: self.sync_comparison()
         if self.comparison_area.parentWidget() is page.image_slot:
             self.comparison_area.setParent(self.centralWidget())
             self.comparison_area.hide()
@@ -2349,13 +2553,13 @@ class PicView(QMainWindow):
             self.tabs.setTabText(index, name)
             control = self.tabs.bar.tabButton(index, QTabBar.ButtonPosition.LeftSide)
             if control is not None:
-                control.comparing = self.compare_enabled
+                control.comparing = False
                 control.blockSignals(True)
-                control.setChecked(page in self.checked_pages)
+                control.setChecked(False)
                 control.blockSignals(False)
                 control.setVisible(page.folder is not None)
-                control.setFocusPolicy(Qt.FocusPolicy.StrongFocus if self.compare_enabled else Qt.FocusPolicy.NoFocus)
-                control.setToolTip(self.t["compare_folder"] if self.compare_enabled else self.t["open"])
+                control.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+                control.setToolTip(self.t["compare_folder"])
                 control.setAccessibleName(control.toolTip())
                 control.update()
             self.tabs.setTabToolTip(index, str(page.folder) if page.folder else self.t["empty"])
@@ -2369,31 +2573,166 @@ class PicView(QMainWindow):
         if page in self.checked_pages:
             self.focused_compare_page = page
             self.comparison_area.select_toolbar(page.image)
+            if self.current_tab() is not page:
+                # Move the shared area while the destination tab is still hidden.
+                # Otherwise its empty image slot briefly lets thumbnails fill the page.
+                QTimer.singleShot(0, self, lambda: self.show_compare_page(page))
+
+    def show_compare_page(self, page):
+        if not (self.compare_enabled and self.focused_compare_page is page and page in self.pages()):
+            return
+        # Reparenting the shared area and mounting the tab strip can trigger
+        # several splitter layouts. Keep the previous frame on screen until
+        # the destination has completed its layout.
+        self.tabs.setUpdatesEnabled(False)
+        try:
+            self.rehost_comparison(page)
+            self.tabs.setCurrentWidget(page)
+            if page._layout_pending: page.apply_layout()
+            page.layout().activate()
+        finally:
+            QTimer.singleShot(0, self.tabs, lambda: self.tabs.setUpdatesEnabled(True))
+
+    def rehost_comparison(self, host):
+        area = self.comparison_area
+        if area.parentWidget() is not host.image_slot:
+            if host not in area.pages: host.image.hide()
+            host.image_slot.layout().addWidget(area)
+            area.show()
+        area.set_layout_orientation(host.split.orientation())
 
     def set_compare(self, enabled):
         if enabled:
             for page in self.pages():
                 if page.saved_sizes is not None: page.maximize("image")
         self.compare_enabled = enabled
-        self.compare_button.blockSignals(True)
-        self.compare_button.setChecked(enabled)
-        self.compare_button.blockSignals(False)
-        self.checked_pages = {self.current_tab()} if enabled and self.current_tab() and self.current_tab().folder else set()
+        self.comparison_order = [self.current_tab()] if enabled and self.current_tab() and self.current_tab().folder else []
+        self.checked_pages = set(self.comparison_order)
         self.focused_compare_page = None
+        if not enabled: self.set_sync(False)
         self.sync_comparison()
         self.update_tab_titles()
 
     def check_compare_page(self, page, checked):
         if not self.compare_enabled: return
-        if checked: self.checked_pages.add(page)
-        else: self.checked_pages.discard(page)
+        if checked:
+            self.checked_pages.add(page)
+            if page not in self.comparison_order: self.comparison_order.append(page)
+        else:
+            self.checked_pages.discard(page)
+            if page in self.comparison_order: self.comparison_order.remove(page)
         self.sync_comparison()
+
+    def comparison_drag_source(self, mime):
+        if not mime.hasFormat(COMPARISON_TAB_MIME): return None
+        try: identifier = int(bytes(mime.data(COMPARISON_TAB_MIME)).decode("ascii"))
+        except (ValueError, UnicodeDecodeError): return None
+        page = next((item for item in self.pages() if id(item) == identifier and item.folder), None)
+        if page is None: return None
+        selected = None
+        if mime.hasFormat(COMPARISON_IMAGE_MIME):
+            try: selected = Path(bytes(mime.data(COMPARISON_IMAGE_MIME)).decode("utf-8"))
+            except UnicodeDecodeError: return None
+            if selected not in page.files: return None
+        return page, selected
+
+    def can_add_comparison(self, target_image):
+        target = getattr(target_image, "owner_page", None)
+        if target not in self.pages() or target.folder is None: return False
+        if self.compare_enabled and target not in self.checked_pages: return False
+        count = len(self.comparison_order) if self.compare_enabled else 1
+        host = self.current_tab() if self.compare_enabled else target
+        if host is None: return False
+        available = self.comparison_area.split.size() if self.compare_enabled else host.image_slot.size()
+        side_by_side = host.split.orientation() == Qt.Orientation.Vertical
+        span = available.width() if side_by_side else available.height() - (0 if self.compare_enabled else 42)
+        minimum = 150 if side_by_side else 120
+        return span >= minimum * (count + 1)
+
+    def add_comparison_drop(self, target_image, mime):
+        source = self.comparison_drag_source(mime)
+        if source is None: return False
+        if not self.can_add_comparison(target_image):
+            self.notification_bar.showMessage(self.t["compare_too_small"], 5000)
+            return False
+        page, selected = source
+        if not self.compare_enabled:
+            self.set_compare(True)
+            target = target_image.owner_page
+            if target not in self.checked_pages:
+                self.checked_pages = {target}
+                self.comparison_order = [target]
+        if page in self.checked_pages:
+            page = self.duplicate_page(page, activate=False, add_to_compare=False, selected=selected)
+        elif selected is not None:
+            page.thumbs.select(selected)
+        self.checked_pages.add(page)
+        self.comparison_order.append(page)
+        self.focused_compare_page = target_image.owner_page
+        self.sync_comparison()
+        self.update_tab_titles()
+        return True
+
+    def remove_comparison_page(self, page):
+        if page not in self.checked_pages: return
+        self.checked_pages.discard(page)
+        self.comparison_order.remove(page)
+        if len(self.comparison_order) < 2:
+            self.set_compare(False)
+        else:
+            self.focused_compare_page = self.comparison_order[0]
+            self.sync_comparison()
+
+    def set_sync(self, enabled):
+        self.sync_enabled = bool(enabled) and self.compare_enabled and len(self.comparison_order) > 1
+        for page in self.pages():
+            button = page.image.sync_button
+            button.blockSignals(True)
+            button.setChecked(self.sync_enabled and page in self.checked_pages)
+            button.blockSignals(False)
+            button.refresh_icon()
+
+    def apply_comparison_tool(self, source, action, value):
+        if not self.sync_enabled or self._syncing_tools or source not in self.checked_pages: return
+        self._syncing_tools = True
+        try:
+            for page in self.comparison_order:
+                if page is source: continue
+                image = page.image
+                if action in ("rotate", "mirror_h", "mirror_v"):
+                    getattr(image, action)()
+                elif action == "zoom":
+                    if image.slider.value() == value: image.set_zoom_percent(value)
+                    else: image.slider.setValue(value)
+                elif action == "fit":
+                    image.fit_b.setChecked(value)
+                elif action == "background":
+                    image.set_background(value)
+                elif action in ("scroll_x", "scroll_y"):
+                    horizontal = action == "scroll_x"
+                    source_bar = (source.image.scroll.horizontalScrollBar() if horizontal
+                                  else source.image.scroll.verticalScrollBar())
+                    target_bar = (image.scroll.horizontalScrollBar() if horizontal
+                                  else image.scroll.verticalScrollBar())
+                    source_span = source_bar.maximum() - source_bar.minimum()
+                    if source_span > 0:
+                        fraction = (value - source_bar.minimum()) / source_span
+                        target_span = target_bar.maximum() - target_bar.minimum()
+                        target_bar.setValue(round(target_bar.minimum() + fraction * target_span))
+        finally:
+            self._syncing_tools = False
 
     def sync_comparison(self):
         area = self.comparison_area
-        area.release_toolbar()
         pages = self.pages()
-        chosen = [page for page in pages if page in self.checked_pages] if self.compare_enabled else []
+        chosen = [page for page in self.comparison_order if page in pages] if self.compare_enabled else []
+        host = self.current_tab()
+        if (self.compare_enabled and host is not None and area.pages == chosen
+                and any(area.parentWidget() is page.image_slot for page in pages)):
+            self.rehost_comparison(host)
+            area.select_toolbar(self.image_target())
+            return
+        area.release_toolbar()
         # Return panes to their owners before moving the shared comparison area.
         area.hide()
         area.setParent(self.centralWidget())
@@ -2403,6 +2742,8 @@ class PicView(QMainWindow):
             page.image.show()
             visible = page in chosen
             page.image.set_comparison_mode((page.folder.name or str(page.folder)) if visible else None)
+            page.image.sync_button.setEnabled(visible and len(chosen) > 1)
+            page.image.sync_button.setChecked(visible and len(chosen) > 1 and self.sync_enabled)
             if page.comparison_visible != visible: page.set_comparison_visible(visible)
         area.pages = chosen
         area.maximized_page = None
@@ -2426,21 +2767,26 @@ class PicView(QMainWindow):
             QTimer.singleShot(0, area, area.equalize)
 
     def image_target(self):
+        page = self.navigation_page()
+        return page.image if page is not None else None
+
+    def navigation_page(self):
         if self.compare_enabled:
-            page = self.focused_compare_page
-            if page not in self.checked_pages:
-                page = next((item for item in self.pages() if item in self.checked_pages), None)
-            return page.image if page else None
-        return self.image
+            if self.focused_compare_page in self.checked_pages:
+                return self.focused_compare_page
+            return next((page for page in self.comparison_order if page in self.checked_pages), None)
+        return self.current_tab()
+
+    def navigation_action(self, action, *args):
+        page = self.navigation_page()
+        if page is not None: getattr(page, action)(*args)
 
     def image_action(self, action, *args):
         image = self.image_target()
         if image is not None: getattr(image, action)(*args)
 
     def advance_or_check(self):
-        focus = QApplication.focusWidget()
-        if isinstance(focus, TabFolderControl) and focus.comparing: focus.toggle()
-        else: self.current_tab().select_relative(1)
+        self.navigation_action("select_relative", 1)
 
     def show_notification(self, page, message):
         if page is self.current_tab(): self.notification_bar.showMessage(message, 8000)
@@ -2450,12 +2796,12 @@ class PicView(QMainWindow):
                     (QKeySequence.StandardKey.Close, lambda: self.close_tab()),
                     (QKeySequence.StandardKey.NextChild, lambda: self.switch_tab(1)),
                     (QKeySequence.StandardKey.PreviousChild, lambda: self.switch_tab(-1)),
-                    (QKeySequence.StandardKey.Copy, lambda: self.current_tab().copy_selected_file()),
-                    ("Left", lambda: self.current_tab().select_relative(-1)), ("Right", lambda: self.current_tab().select_relative(1)),
-                    ("Up", lambda: self.current_tab().select_row(-1)), ("Down", lambda: self.current_tab().select_row(1)),
-                    ("Home", lambda: self.current_tab().select_boundary(False)), ("End", lambda: self.current_tab().select_boundary(True)),
-                    ("PgUp", lambda: self.current_tab().select_relative(-1)), ("PgDown", lambda: self.current_tab().select_relative(1)),
-                    ("Space", self.advance_or_check), ("Backspace", lambda: self.current_tab().select_relative(-1)),
+                    (QKeySequence.StandardKey.Copy, lambda: self.navigation_action("copy_selected_file")),
+                    ("Left", lambda: self.navigation_action("select_relative", -1)), ("Right", lambda: self.navigation_action("select_relative", 1)),
+                    ("Up", lambda: self.navigation_action("select_row", -1)), ("Down", lambda: self.navigation_action("select_row", 1)),
+                    ("Home", lambda: self.navigation_action("select_boundary", False)), ("End", lambda: self.navigation_action("select_boundary", True)),
+                    ("PgUp", lambda: self.navigation_action("select_relative", -1)), ("PgDown", lambda: self.navigation_action("select_relative", 1)),
+                    ("Space", self.advance_or_check), ("Backspace", lambda: self.navigation_action("select_relative", -1)),
                     ("Alt+F", lambda: self.image_action("toggle_fit")),
                     ("Alt+C", lambda: self.image_action("rotate")),
                     ("Alt+V", lambda: self.image_action("mirror_v")), ("Alt+H", lambda: self.image_action("mirror_h")),
@@ -2497,8 +2843,6 @@ class PicView(QMainWindow):
         self.open_button.setToolTip(shortcut_tooltip(self.t["open"], QKeySequence.StandardKey.Open))
         self.vertical_button.setToolTip(shortcut_tooltip(self.t["vertical"], "Alt+Shift+V"))
         self.horizontal_button.setToolTip(shortcut_tooltip(self.t["horizontal"], "Alt+Shift+H"))
-        self.compare_button.setToolTip(self.t["compare"])
-        self.compare_button.refresh_icon()
         self.comparison_area.empty.setText(self.t["compare_empty"])
         self.language_button.set_kind(LANGUAGE_ICONS[self.language_mode], self.t[f"lang_{self.language_mode}"])
         self.language_button.setAccessibleName(self.language_button.toolTip())
@@ -2647,13 +2991,13 @@ class PicView(QMainWindow):
         return self.current_tab().maximize(*args)
 
     def select_relative(self, *args):
-        return self.current_tab().select_relative(*args)
+        return self.navigation_action("select_relative", *args)
 
     def select_boundary(self, *args):
-        return self.current_tab().select_boundary(*args)
+        return self.navigation_action("select_boundary", *args)
 
     def copy_selected_file(self, *args):
-        return self.current_tab().copy_selected_file(*args)
+        return self.navigation_action("copy_selected_file", *args)
 
 
 def set_application_identity(app: QApplication) -> None:

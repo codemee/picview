@@ -9,6 +9,7 @@ def smoke_test(report_path):
     from pathlib import Path
 
     from PIL import Image
+    from PySide6.QtCore import QMimeData
     from PySide6.QtWidgets import QApplication
 
     from picview import __version__, qt_app
@@ -45,9 +46,9 @@ def smoke_test(report_path):
         window.image.choose_zoom(2000)
         window.image.rotate()
         assert not window.image.label.pixmap().isNull(), "SVG rendering failed"
-        window.set_compare(True)
-        window.checked_pages.update(window.pages())
-        window.sync_comparison()
+        mime = QMimeData()
+        mime.setData(qt_app.COMPARISON_TAB_MIME, str(id(window.pages()[0])).encode("ascii"))
+        assert window.add_comparison_drop(window.image, mime), "SVG comparison drop failed"
         app.processEvents()
         assert len(window.comparison_area.pages) == 2, "SVG comparison failed"
         window.show_about()
