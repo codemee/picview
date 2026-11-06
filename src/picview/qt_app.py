@@ -241,7 +241,11 @@ class IconButton(QToolButton):
         self.kind = icon; self.setToolTip(tip); self.refresh_icon()
 
     def refresh_icon(self) -> None:
-        self.setStyleSheet(f"QToolButton{{background:transparent;border:0;border-radius:8px;padding:4px;}}QToolButton:hover{{background:{toolbar_hover_color()};}}QToolButton:pressed{{background:{PALETTE['pressed']};}}QToolButton:checked{{background:{toolbar_hover_color()};}}QToolButton::menu-indicator{{image:none;width:0;height:0;}}")
+        self.setStyleSheet(
+            f"QToolButton{{background:transparent;border:0;border-radius:8px;padding:4px;}}"
+            f"QToolButton:hover,QToolButton:checked{{background:{toolbar_hover_color()};}}"
+            f"QToolButton:pressed,QToolButton:checked:hover{{background:{PALETTE['pressed']};}}"
+            "QToolButton::menu-indicator{image:none;width:0;height:0;}")
         # Keep a 2x raster of the 24 px source artwork. Qt reduces it to the
         # button's 20 px icon size when the icon is displayed.
         pm = QPixmap(48, 48)
@@ -250,7 +254,6 @@ class IconButton(QToolButton):
         if self.kind == "rotate": icon_color = QColor(PALETTE["warm"])
         if self.kind.startswith(("lang-", "theme-")) or self.kind in ("中", "A", "shell-integration"):
             icon_color = QColor(PALETTE["muted"])
-        if self.isChecked(): icon_color = QColor(PALETTE["focus"])
         p = QPainter(pm); p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.scale(2, 2)
         # Use a 1 px outline in the 24 px source artwork.
@@ -319,14 +322,13 @@ class IconButton(QToolButton):
             folder.lineTo(16, 8); folder.quadTo(17, 8, 17, 9)
             folder.lineTo(17, 17); folder.closeSubpath()
             p.drawPath(folder)
-            page = QPainterPath(QPointF(10, 10))
-            page.lineTo(17, 10); page.lineTo(20, 13)
-            page.lineTo(20, 20); page.quadTo(20, 21, 19, 21)
-            page.lineTo(11, 21); page.quadTo(10, 21, 10, 20)
-            page.closeSubpath()
-            p.drawPath(page)
-            line(17, 10, 17, 13); line(17, 13, 20, 13)
-            line(12.5, 15.5, 18, 15.5); line(12.5, 18, 18, 18)
+            menu = QPainterPath()
+            menu.addRoundedRect(QRectF(10, 11, 11, 10), 1, 1)
+            p.setBrush(QColor(PALETTE["card"]))
+            p.drawPath(menu)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            for y in (13.5, 16, 18.5):
+                line(12, y, 19, y)
         elif self.kind == "sort-name":
             font = self.font(); font.setPixelSize(12); p.setFont(font)
             p.drawText(QRectF(2, 2, 9, 10), Qt.AlignmentFlag.AlignCenter, "A")
@@ -1398,7 +1400,7 @@ class ImagePane(QFrame):
         if self.comparison_selected:
             painter = QPainter(self)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            painter.setPen(QPen(QColor(PALETTE["focus"]), 2))
+            painter.setPen(QPen(QColor(PALETTE["accent"]), 2))
             painter.drawRoundedRect(self.rect().adjusted(1, 1, -2, -2), 10, 10)
             painter.end()
 
@@ -2451,9 +2453,9 @@ class ComparisonFullscreen(QMainWindow):
             active = tab is page
             frame.setStyleSheet(
                 f"QFrame#comparisonFullscreenPane{{border:2px solid "
-                f"{PALETTE['focus'] if active else 'transparent'};border-radius:8px;}}")
+                f"{PALETTE['accent'] if active else 'transparent'};border-radius:8px;}}")
             self.titles[tab].setStyleSheet(
-                f"color:{PALETTE['focus'] if active else PALETTE['text']};"
+                f"color:{PALETTE['accent'] if active else PALETTE['text']};"
                 f"font-weight:{'600' if active else '400'};")
         self.image_toolbar.refresh()
 
@@ -2675,7 +2677,7 @@ class FolderTabBar(QTabBar):
             selected = index == self.currentIndex()
             if selected:
                 painter.fillRect(option.rect, QColor(PALETTE["card"]))
-                painter.fillRect(option.rect.left(), option.rect.bottom() - 1, option.rect.width(), 2, QColor(PALETTE["focus"]))
+                painter.fillRect(option.rect.left(), option.rect.bottom() - 1, option.rect.width(), 2, QColor(PALETTE["accent"]))
             elif option.state & QStyle.StateFlag.State_MouseOver:
                 painter.fillRect(option.rect, QColor(PALETTE["pane"]))
             font = self.font()

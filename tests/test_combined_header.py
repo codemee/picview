@@ -72,7 +72,7 @@ def test_selected_underline_does_not_leak_below_scroll_arrows(browser, theme):
         left.setGeometry(selected.left() + 2, 3, 16, 28)
         right.setGeometry(selected.right() - 15, 3, 16, 28)
         pixels = bar.grab().toImage()
-        accent = QColor(PALETTE["focus"])
+        accent = QColor(PALETTE["accent"])
         for button in (left, right):
             for x in range(button.x(), button.x() + button.width()):
                 assert pixels.pixelColor(x, bar.height() - 1) != accent

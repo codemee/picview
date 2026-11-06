@@ -77,14 +77,15 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 - 單圖窗格的符合窗格與全螢幕工具位於右側縮放比例與滑桿之前；比圖模式的共用工具列也採用相同排列。
 - 將滑鼠停在按鈕或縮放控制上，可從提示查看已設定的快捷鍵；收合選單也會顯示對應按鍵。
 - 淺色與深色配色的縮圖卡片皆採用獨立底色與細邊框，捲動時也能清楚辨識卡片邊界。
-- 符合窗格、同步等狀態按鈕以 hover 底色與主題強調色圖示表示啟用，線條粗細不變。
+- 符合窗格、同步等狀態按鈕以底色表示啟用，圖示維持原本的顏色與線條粗細；滑鼠移入時底色會加深。
+- 滑桿手把、目前標籤的底線，以及比圖作用中窗格的外框採用相同的主題強調色。
 - 主工具列、縮圖與單圖工具列放不下的工具會收進 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="更多工具" title="更多工具"></picture>。
 - 放寬視窗後，收起的工具會自動恢復。
 - 縮圖會優先載入可見範圍，其餘在背景逐步製作。
 - 縮圖使用共用的記憶體快取（上限 64 MiB），不另存縮圖檔案。
 - 調整窗格大小只重新排列縮圖，不會重新解碼所有圖片。
 - 滑桿收起時，可從更多工具選單輸入縮放比例或縮圖大小。
-- 視窗標題會顯示目前版本，例如 **PicView v0.1.8**。
+- 視窗標題會顯示目前版本，例如 **PicView v0.1.9**。
 
 ### 開啟與拖放圖片
 

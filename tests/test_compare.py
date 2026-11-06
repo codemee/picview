@@ -392,7 +392,7 @@ def test_fullscreen_comparison_marks_the_active_image(browser):
     other = first if active is second else second
     QTest.mouseClick(full.scrollers[other].viewport(), Qt.MouseButton.LeftButton)
     assert full.image_toolbar.page is other
-    assert "transparent" not in full.frames[other].styleSheet()
+    assert qt_app.PALETTE["accent"] in full.frames[other].styleSheet()
     assert "transparent" in full.frames[active].styleSheet()
     assert full.centralWidget().layout().contentsMargins().left() == 16
     assert full.centralWidget().layout().contentsMargins().top() == 16

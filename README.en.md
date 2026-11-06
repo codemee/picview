@@ -77,14 +77,15 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Fit and full screen sit on the right, before the zoom value and slider. The shared comparison toolbar uses the same order.
 - Hover over buttons or zoom controls to see their assigned keyboard shortcuts. The overflow menu also shows the corresponding keys.
 - Thumbnail cards use distinct backgrounds and thin borders in both light and dark themes, keeping their boundaries visible while scrolling.
-- Toggle tools such as sync and fit-to-pane use the hover background and theme accent-colored icons to indicate their active state, keeping the original stroke widths.
+- Toggle tools such as sync and fit-to-pane use a background to indicate their active state. Icons keep their original color and stroke width; the background deepens on hover.
+- The slider handles, active tab underline, and selected comparison pane border share the theme accent color.
 - Tools that no longer fit move into <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="More tools" title="More tools"></picture> on the main, thumbnail, and image toolbars.
 - Widen the window to restore the hidden tools automatically.
 - Visible thumbnails load first; the rest are decoded progressively in the background.
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - When sliders are hidden, use the overflow menu to enter zoom or thumbnail-size values.
-- The window title shows the current version, for example **PicView v0.1.8**.
+- The window title shows the current version, for example **PicView v0.1.9**.
 
 ### Open and drag images
 

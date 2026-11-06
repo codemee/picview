@@ -160,11 +160,11 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     selected_tile = window.thumbs.buttons[paths[0]]
     assert selected_tile.grab().toImage().pixelColor(selected_tile.name.mapTo(selected_tile, QPoint(2, 2))).name() == THUMBNAIL_SELECTED
     assert "#toolbar{background:transparent;border:0;}" in window.main_toolbar.styleSheet()
-    assert "QToolButton:checked{background:#e2e6ed;" in window.image.fit_b.styleSheet()
+    assert "QToolButton:hover,QToolButton:checked{background:#e2e6ed;" in window.image.fit_b.styleSheet()
     assert PALETTE["accent"] in window.image.slider.styleSheet()
     checked_icon = window.image.fit_b.icon().pixmap(window.image.fit_b.iconSize()).toImage()
     assert any(
-        checked_icon.pixelColor(x, y).alpha() and checked_icon.pixelColor(x, y).name() == PALETTE["focus"]
+        checked_icon.pixelColor(x, y).alpha() and checked_icon.pixelColor(x, y).name() == PALETTE["text"]
         for x in range(checked_icon.width()) for y in range(checked_icon.height())
     )
     assert window.image.slider.value() < 1000
