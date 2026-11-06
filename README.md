@@ -70,10 +70,11 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 ### 視窗與工具列
 
 - 視窗最小可縮至 **260 × 220 px**。
-- 主工具列獨立一列：左側為開啟與版面工具，右側為修改時間顯示、語言、配色與設定工具。
+- 主工具列獨立一列：左側為開啟與目前標籤的排序工具，右側為修改時間顯示、檔案總管／Finder 整合、語言與配色工具。
+- 拖曳縮圖窗格標籤列左側或單圖窗格工具列左側的點狀把手到視窗上、下、左、右邊緣，可調整兩窗格的排列與先後位置；拖曳分隔條可調整比例。窗格版面由所有標籤共用，切換標籤時不會改變。
 - 資料夾標籤位於縮圖窗格內，與右側的縮圖工具共用一列；切換標籤時會跟隨目前的縮圖窗格。
 - 標籤超出可見範圍時，左右捲動箭頭分別顯示於標籤列兩側；左右箭頭與標籤清單的向下箭頭採細線條樣式。
-- 單圖窗格的符合窗格、最大化窗格與全螢幕工具位於右側縮放比例與滑桿之前；比圖模式的共用工具列也採用相同排列。
+- 單圖窗格的符合窗格與全螢幕工具位於右側縮放比例與滑桿之前；比圖模式的共用工具列也採用相同排列。
 - 將滑鼠停在按鈕或縮放控制上，可從提示查看已設定的快捷鍵；收合選單也會顯示對應按鍵。
 - 淺色與深色配色的縮圖卡片皆採用獨立底色與細邊框，捲動時也能清楚辨識卡片邊界。
 - 符合窗格、同步等狀態按鈕以 hover 底色與主題強調色圖示表示啟用，線條粗細不變。
@@ -83,12 +84,13 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 - 縮圖使用共用的記憶體快取（上限 64 MiB），不另存縮圖檔案。
 - 調整窗格大小只重新排列縮圖，不會重新解碼所有圖片。
 - 滑桿收起時，可從更多工具選單輸入縮放比例或縮圖大小。
-- 視窗標題會顯示目前版本，例如 **PicView v0.1.7**。
+- 視窗標題會顯示目前版本，例如 **PicView v0.1.8**。
 
 ### 開啟與拖放圖片
 
 - 點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-light.png" width="34" height="34" alt="開啟資料夾" title="開啟資料夾"></picture>，選擇要檢視的資料夾。
 - 將資料夾或圖片檔案拖曳至視窗，也能開啟檢視。
+- 新開啟的資料夾標籤沿用目前的窗格排列與比例；拖曳窗格或分隔條會同步調整所有標籤的版面。
 - 按住縮圖或檔名拖曳，可將原始圖檔拖放至接受檔案的其他應用程式。
 - 旋轉與鏡射只影響檢視畫面，不會修改圖檔。
 
@@ -118,20 +120,18 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mirror-h-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mirror-h-light.png" width="34" height="34" alt="水平鏡射" title="水平鏡射"></picture> | 水平鏡射目前圖片 |
 | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mirror-v-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mirror-v-light.png" width="34" height="34" alt="垂直鏡射" title="垂直鏡射"></picture> | 垂直鏡射目前圖片 |
 | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fit-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fit-light.png" width="34" height="34" alt="符合窗格" title="符合窗格"></picture> | 切換符合窗格與原始大小 |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/expand-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/expand-light.png" width="34" height="34" alt="最大化窗格" title="最大化窗格"></picture> | 最大化縮圖或單圖窗格 |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shrink-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shrink-light.png" width="34" height="34" alt="還原窗格" title="還原窗格"></picture> | 還原窗格布局 |
 | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fullscreen-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fullscreen-light.png" width="34" height="34" alt="全螢幕" title="全螢幕"></picture> | 開啟目前圖片的全螢幕檢視 |
 
 ### 縮圖排序、日期與檔案操作
 
-- 縮圖工具列的排序方式按鈕，在 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-light.png" width="34" height="34" alt="檔名排序" title="檔名排序"></picture> **檔名（自然排序）** 與 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-light.png" width="34" height="34" alt="修改時間排序" title="修改時間排序"></picture> **修改時間** 間切換。
+- 主工具列的排序方式按鈕，在 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-light.png" width="34" height="34" alt="檔名排序" title="檔名排序"></picture> **檔名（自然排序）** 與 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-light.png" width="34" height="34" alt="修改時間排序" title="修改時間排序"></picture> **修改時間** 間切換，只影響目前標籤。
 - 旁邊的排序方向按鈕，在 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-ascending-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-ascending-light.png" width="34" height="34" alt="順向排序" title="順向排序"></picture> **順向** 與 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-descending-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-descending-light.png" width="34" height="34" alt="逆向排序" title="逆向排序"></picture> **逆向** 間切換；修改時間順向為舊到新，逆向為新到舊。排序不會切換目前圖片或重設檢視狀態。
 - 主工具列語言按鈕前的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-light.png" width="34" height="34" alt="顯示修改日期時間" title="顯示修改日期時間"></picture> 切換 **顯示修改日期時間**，立即套用到所有標籤，並保留至下次開啟程式；新開與複製標籤也沿用此全域設定。
 - 縮圖卡片底部預設顯示本機時間的修改日期時間；卡片太窄時，將滑鼠停在日期上可查看完整時間。
 - 各標籤獨立保存排序方式與方向，複製標籤及重開程式時也會保留。新增或修改檔案後，排序與日期會自動更新。
 - 在縮圖卡片按滑鼠右鍵，選 **複製** 可將原始圖檔複製到剪貼簿，再貼至其他應用程式或資料夾。
 - 右鍵選單的 **內容** 在 Windows 開啟檔案總管原生內容視窗；其他平台或系統視窗無法開啟時，顯示檔名、類型、位置、大小、修改時間、圖片尺寸，以及可取得的建立時間。
-- 工具列空間不足時，可從對應工具列的 **⋯ 更多工具** 操作排序與日期顯示按鈕。
+- 主工具列空間不足時，可從 **⋯ 更多工具** 操作排序與日期顯示按鈕。
 
 ### 支援格式
 
@@ -170,7 +170,7 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 - 左右捲動箭頭固定在標籤列兩端，統一採用細線角括號樣式，與右側的下拉箭頭一致。
 - 新增、切換或調整視窗大小後，目前標籤會自動保持可見。
 - 點擊標籤的關閉按鈕可關閉；關閉最後一頁後，會保留空白標籤。
-- 各標籤獨立保留選圖、縮放、旋轉、鏡射、捲動、縮圖大小與窗格布局。
+- 各標籤獨立保留選圖、縮放、旋轉、鏡射、捲動與縮圖大小；窗格布局共用。
 - 語言與配色由所有標籤共用。
 - 重開程式會還原所有標籤、順序與目前標籤。
 - 暫時不存在的資料夾會保留標籤，重新出現後自動恢復。
@@ -181,11 +181,14 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 - 將標籤或縮圖拖到單圖窗格，會保留原窗格並加入拖入的圖片，立即開始比圖。
 - 繼續拖到任一比圖窗格，可依拖入順序加入更多窗格；各窗格平均分配空間，過小時會停止加入。
 - 再拖入已在比圖中的標籤或縮圖，會建立獨立標籤，方便比較同一資料夾的不同圖片。
-- <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-h-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-h-light.png" width="34" height="34" alt="上下版面" title="上下版面"></picture> 上下版面：比較圖片左右並排。
-- <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-v-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/split-v-light.png" width="34" height="34" alt="左右版面" title="左右版面"></picture> 左右版面：比較圖片上下排列。
+- 縮圖與單圖窗格上下排列時，比圖中的圖片左右並排；兩窗格左右排列時，比圖中的圖片上下排列。
+- 切換目前選中的比圖窗格或標籤時，外層的縮圖與單圖版面維持不變；離開比圖後也保留當下版面。
+- 比圖模式下開啟全螢幕會顯示所有比圖圖片；寬畫面左右並排，直向畫面上下排列，螢幕邊緣與窗格之間留有空隙。預設各圖片縮至可用空間，不放大超過原尺寸。作用中的圖片窗格會以強調色標示；點擊窗格或按 <kbd>Tab</kbd>／<kbd>Shift</kbd>+<kbd>Tab</kbd> 即可切換，也可開啟同步操作。
 - 切換到各標籤，從縮圖選擇該資料夾要比較的圖片。
 - 比較窗格共用上方工具列。
 - 點擊圖片窗格，會選取該窗格、切換到對應標籤與縮圖，並將共用工具列指向該窗格；選中窗格會顯示重點色外框。
+- 比圖時按 <kbd>Tab</kbd> 可依比圖順序循環選取窗格，按 <kbd>Shift</kbd>+<kbd>Tab</kbd> 可反向切換。
+- 離開比圖時，切換到比圖順序最後一個資料夾，並保留當下的窗格版面。
 - 使用方向鍵、<kbd>Home</kbd>／<kbd>End</kbd>、<kbd>Page Up</kbd>／<kbd>Page Down</kbd>、<kbd>Space</kbd> 或 <kbd>Backspace</kbd> 切換圖片時，只操作選中窗格所屬的資料夾。
 - 預設各窗格可獨立縮放、旋轉、鏡射、設定背景色及捲動。
 - 點擊單圖工具列的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-light.png" width="34" height="34" alt="同步操作" title="同步操作"></picture>，可同步旋轉、鏡射、縮放、符合窗格、背景色，以及水平與垂直捲動到所有比圖窗格。不同尺寸的圖片會依捲動比例對齊；再次點擊恢復獨立操作。
@@ -199,7 +202,7 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 - 點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fit-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/fit-light.png" width="34" height="34" alt="符合窗格" title="符合窗格"></picture>，切換符合窗格與原始大小。
 - 拖曳縮放滑桿，或按 <kbd>+</kbd> / <kbd>-</kbd>，調整顯示比例。
 - 按 <kbd>0</kbd> 回到 **100%**。
-- 全螢幕只將超出螢幕的圖片等比例縮小；小圖維持原尺寸並置中，完整顯示、不裁切。
+- 全螢幕預設只將超出螢幕的圖片等比例縮小；小圖維持原尺寸並置中，螢幕邊緣留有空隙。浮動工具列可旋轉、鏡射、切換背景色、符合畫面與縮放；拖曳左側把手可移動工具列，放大後可捲動檢視。
 - 離開全螢幕後保留原本窗格的縮放、旋轉與鏡射設定。
 - 點擊滑桿左側的數值，輸入精確的縮放百分比或縮圖大小。
 - 在數值輸入視窗按 <kbd>Enter</kbd> 套用。
@@ -228,7 +231,6 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 | 切換符合窗格（Fit） | <kbd>Alt</kbd>+<kbd>F</kbd> |
 | 順時針旋轉 | <kbd>Alt</kbd>+<kbd>C</kbd> |
 | 上下／左右鏡射 | <kbd>Alt</kbd>+<kbd>V</kbd> / <kbd>Alt</kbd>+<kbd>H</kbd> |
-| 上下／左右版面 | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> / <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> |
 | 開啟全螢幕 | <kbd>F11</kbd> |
 | 關閉全螢幕 | <kbd>Esc</kbd> |
 | 開啟資料夾 | 系統的「開啟」快捷鍵 |
@@ -256,6 +258,7 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 - 圖示依序為 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-system-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-system-light.png" width="34" height="34" alt="配色跟隨系統" title="配色跟隨系統"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-light-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-light-light.png" width="34" height="34" alt="淺色" title="淺色"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-dark-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-dark-light.png" width="34" height="34" alt="深色" title="深色"></picture>。
 - 預設為 **跟隨系統**。
 - 深色介面採初號機風格：深紫色窗格、螢光綠選取提示與滑桿，以及少量橘色工具點綴。
+- 切換配色時會先更新目前看得到的縮圖卡片；其他卡片在捲入畫面或切換到該標籤時更新。
 - 圖片本身的顏色不會改變。
 
 ## 授權

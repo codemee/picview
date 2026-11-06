@@ -19,6 +19,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "folder": "",
     "selected_file": "",
     "orientation": "vertical",
+    "thumbnail_first": True,
     "sash_fraction": 0.45,
     "maximized_pane": "",
     "thumbnail_size": 140,
@@ -41,6 +42,7 @@ def normalize_tab_state(value: Any) -> dict[str, Any] | None:
              if key in ("folder", "selected_file", "orientation", "sash_fraction", "thumbnail_size", "image_zoom")}
     if not isinstance(state["selected_file"], str): state["selected_file"] = ""
     if state["orientation"] not in ("vertical", "horizontal"): state["orientation"] = "vertical"
+    state["thumbnail_first"] = value.get("thumbnail_first") is not False
     for key, minimum, maximum, default in (("sash_fraction", .05, .95, .45), ("thumbnail_size", 72, 260, 140), ("image_zoom", .001, 4, 1.0)):
         item = state[key]
         state[key] = min(maximum, max(minimum, item)) if isinstance(item, (int, float)) and not isinstance(item, bool) and math.isfinite(item) else default

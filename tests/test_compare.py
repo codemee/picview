@@ -273,14 +273,168 @@ def test_comparison_order_layout_shared_toolbar_and_close_one(browser):
     assert window.comparison_area.pages == [second, first, third]
     QTest.mouseClick(first.image.scroll.viewport(), Qt.MouseButton.LeftButton)
     assert window.comparison_area.toolbar_image is first.image
-    first.image.max_button.click()
-    assert first.image.isVisible() and not second.image.isVisible()
-    first.image.max_button.click()
+    assert first.image.isVisible() and second.image.isVisible()
     third.image.comparison_close.click()
     assert window.comparison_area.pages == [second, first]
     window.toggle_theme()
     window.toggle_lang()
     assert QKeySequence("Alt+C").toString(QKeySequence.SequenceFormat.NativeText) in first.image.rotate_b.toolTip()
+
+
+def test_comparison_switch_keeps_outer_layout_and_exit_keeps_current_layout(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    window.tabs.setCurrentWidget(first)
+    first.dock_pane("image", "left")
+    first.split.setSizes([300, 700])
+    window.comparison_layout_changed(first)
+    add(window, second, first)
+    fraction = first.layout_spec()[2]
+    QTest.mouseClick(second.image.scroll.viewport(), Qt.MouseButton.LeftButton)
+    wait_until(lambda: window.current_tab() is second)
+    assert second.split.orientation() == Qt.Orientation.Horizontal
+    assert second.split.widget(0) is second.image_slot
+    assert abs(second.layout_spec()[2] - fraction) < .03
+    assert window.comparison_area.split.orientation() == Qt.Orientation.Vertical
+    window.set_compare(False)
+    assert window.current_tab() is second
+    assert second.split.orientation() == Qt.Orientation.Horizontal
+    assert second.split.widget(0) is second.image_slot
+    assert abs(second.layout_spec()[2] - fraction) < .03
+    window.tabs.setCurrentWidget(first)
+    assert first.split.orientation() == Qt.Orientation.Horizontal
+    assert first.split.widget(0) is first.image_slot
+
+
+def test_switching_tabs_during_comparison_keeps_shared_layout(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    third = window.duplicate_page(second)
+    window.tabs.setCurrentWidget(first)
+    first.dock_pane("image", "left")
+    second.dock_pane("thumb", "top")
+    third.dock_pane("image", "bottom")
+    first.split.setSizes([300, 700])
+    second.split.setSizes([700, 300])
+    window.tabs.setCurrentWidget(first)
+    add(window, second, first)
+    expected = first.layout_spec()
+    for page in (second, third, first, second, third, first):
+        window.tabs.setCurrentWidget(page)
+        QTest.qWait(30)
+        assert page.split.orientation() == expected[0]
+        assert (page.split.widget(0) is page.thumbs) == expected[1]
+        assert abs(page.layout_spec()[2] - expected[2]) < .03
+        assert window._compare_layout[0:2] == expected[0:2]
+        assert abs(window._compare_layout[2] - expected[2]) < .03
+
+
+def test_fullscreen_comparison_follows_screen_aspect_ratio(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    add(window, first, second)
+    second.image.open_full()
+    full = window.compare_full_window
+    assert full is not None and full.isFullScreen()
+    assert full.pages == [second, first]
+    full.setWindowState(Qt.WindowState.WindowNoState)
+    full.resize(800, 400)
+    wait_until(lambda: full.split.orientation() == Qt.Orientation.Horizontal)
+    full.resize(400, 800)
+    wait_until(lambda: full.split.orientation() == Qt.Orientation.Vertical)
+    for page in (first, second):
+        label = full.labels[page]
+        assert not label.pixmap().isNull()
+        assert label.pixmap().deviceIndependentSize().width() <= page.image.image_size()[0]
+        assert label.pixmap().deviceIndependentSize().height() <= page.image.image_size()[1]
+    QTest.keyClick(full, Qt.Key.Key_Escape)
+    assert window.compare_full_window is None and window.compare_enabled
+
+
+def test_fullscreen_comparison_toolbar_targets_chosen_image(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    add(window, first, second)
+    second.image.open_full()
+    full = window.compare_full_window
+    toolbar = full.image_toolbar
+    assert toolbar.isVisible() and not hasattr(toolbar, "folder_choice")
+    QTest.mouseClick(full.scrollers[first].viewport(), Qt.MouseButton.LeftButton)
+    assert toolbar.page is first
+    QTest.mouseClick(toolbar.rotate_button, Qt.MouseButton.LeftButton)
+    assert first.image.rotation == 90 and second.image.rotation == 0
+    toolbar.set_zoom(1500)
+    assert first.image.fullscreen_zoom == 1.5
+    assert full.labels[first].pixmap().deviceIndependentSize().width() > first.image.image_size()[0]
+    assert second.image.fullscreen_zoom is None
+    QTest.mouseClick(toolbar.sync_button, Qt.MouseButton.LeftButton)
+    toolbar.set_zoom(1800)
+    assert first.image.fullscreen_zoom == second.image.fullscreen_zoom == 1.8
+    QTest.mouseClick(toolbar.fit_button, Qt.MouseButton.LeftButton)
+    assert first.image.fullscreen_zoom is None and second.image.fullscreen_zoom is None
+    QTest.keyClick(full, Qt.Key.Key_Escape)
+    assert window.compare_full_window is None
+
+
+def test_fullscreen_comparison_marks_the_active_image(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    add(window, first, second)
+    second.image.open_full()
+    full = window.compare_full_window
+    active = full.image_toolbar.page
+    assert window.focused_compare_page is active
+    other = first if active is second else second
+    QTest.mouseClick(full.scrollers[other].viewport(), Qt.MouseButton.LeftButton)
+    assert full.image_toolbar.page is other
+    assert "transparent" not in full.frames[other].styleSheet()
+    assert "transparent" in full.frames[active].styleSheet()
+    assert full.centralWidget().layout().contentsMargins().left() == 16
+    assert full.centralWidget().layout().contentsMargins().top() == 16
+    assert full.split.handleWidth() == 12
+    QTest.mouseClick(full.scrollers[active].viewport(), Qt.MouseButton.LeftButton)
+    assert full.image_toolbar.page is active
+    assert "transparent" not in full.frames[active].styleSheet()
+    assert "transparent" in full.frames[other].styleSheet()
+    QTest.keyClick(full, Qt.Key.Key_Tab)
+    assert full.image_toolbar.page is other
+    QTest.keyClick(full, Qt.Key.Key_Tab, Qt.KeyboardModifier.ShiftModifier)
+    assert full.image_toolbar.page is active
+
+
+def test_leaving_comparison_activates_last_compared_folder_with_current_layout(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    second.dock_pane("image", "right")
+    add(window, first, second)
+    assert window.comparison_order == [second, first]
+    expected = second.layout_spec()
+    window.set_compare(False)
+    assert window.current_tab() is first
+    assert first.layout_spec()[0:2] == expected[0:2]
+    assert abs(first.layout_spec()[2] - expected[2]) < .03
+
+
+def test_tab_and_shift_tab_cycle_compared_panes(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    add(window, first, second)
+    assert window.focused_compare_page is second
+    QTest.keyClick(second.image.scroll.viewport(), Qt.Key.Key_Tab)
+    wait_until(lambda: window.focused_compare_page is first and window.current_tab() is first)
+    QTest.keyClick(first.image.scroll.viewport(), Qt.Key.Key_Tab)
+    wait_until(lambda: window.focused_compare_page is second and window.current_tab() is second)
+    QTest.keyClick(second.image.scroll.viewport(), Qt.Key.Key_Backtab)
+    wait_until(lambda: window.focused_compare_page is first and window.current_tab() is first)
+    window.set_compare(False)
+    assert all(not shortcut.isEnabled() for shortcut in window.compare_tab_shortcuts)
 
 
 def test_compared_image_updates_and_deletion(browser):

@@ -10,8 +10,8 @@ from test_tabs import browser, wait_until
 
 
 def visible_controls(window):
-    return [button for button in (window.open_button, window.vertical_button,
-            window.horizontal_button, window.language_button,
+    return [button for button in (window.open_button, window.sort_button,
+            window.direction_button, window.language_button,
             window.theme_button) if not button.isHidden()]
 
 
@@ -29,7 +29,7 @@ def current_tab_visible(window):
 
 def test_scroll_arrows_stay_at_opposite_edges(browser):
     window, folders = browser
-    for _ in range(12): window.open_folder(folders[0])
+    for _ in range(20): window.open_folder(folders[0])
     bar = window.tabs.bar
     for width in (1100, 650, 260):
         window.resize(width, 500)
@@ -110,12 +110,12 @@ def test_tabs_share_thumbnail_header_below_main_toolbar(browser):
     assert window.main_toolbar.height() == 42
     assert window.tabs.strip.parentWidget() is page.thumbs.tab_slot
     assert window.tabs.layout().count() == 1
-    assert window.tabs.strip.mapTo(window, QPoint(window.tabs.strip.width(), 0)).x() <= page.thumbs.max_button.mapTo(window, QPoint()).x()
+    assert page.thumbs.drag_handle.mapTo(window, QPoint(page.thumbs.drag_handle.width(), 0)).x() <= window.tabs.strip.mapTo(window, QPoint()).x()
     assert window.language_button.geometry().right() < window.theme_button.geometry().left()
     assert window.modified_button.geometry().right() < window.integration_button.geometry().left()
     assert window.integration_button.geometry().right() < window.language_button.geometry().left()
     assert window.theme_button.geometry().right() == window.main_toolbar.width() - 9
-    assert window.language_button.x() > window.horizontal_button.geometry().right() + 100
+    assert window.language_button.x() > window.direction_button.geometry().right() + 100
     toolbar_bottom = window.main_toolbar.mapTo(window, QPoint(0, window.main_toolbar.height())).y()
     page_top = page.mapTo(window, QPoint(0, 0)).y()
     assert page_top == toolbar_bottom
@@ -133,7 +133,7 @@ def test_many_tabs_scroll_without_continuing_to_hide_tools(browser):
     wait_until(lambda: window.tabs.count() == 3 and current_tab_visible(window))
     window.toolbar_overflow.update()
     controls = visible_controls(window)
-    assert window.open_button in controls and window.horizontal_button in controls
+    assert window.open_button in controls and window.direction_button in controls
     for _ in range(12): window.open_folder(folders[1])
     wait_until(lambda: current_tab_visible(window))
     window.toolbar_overflow.update()
@@ -154,7 +154,7 @@ def test_switching_reordering_and_resizing_keep_current_tab_visible(browser):
             wait_until(lambda: current_tab_visible(window))
         if width == 420:
             assert not window.open_button.isHidden()
-            assert not window.horizontal_button.isHidden()
+            assert not window.direction_button.isHidden()
         if width == 260:
             assert window.toolbar_overflow.more_button.isVisible()
             assert window.tabs.strip.width() >= 180

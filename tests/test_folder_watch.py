@@ -340,7 +340,7 @@ def test_modified_image_preserves_fit_and_updates_fullscreen(viewer):
     Image.new("RGB", (160, 100), "blue").save(paths[0])
     wait_until(lambda: window.image.frames[0][0].size == (160, 100))
     assert window.image.fit_to_pane and window.image.fit_b.isChecked()
-    pixmap = window.image.full_window.centralWidget().pixmap()
+    pixmap = window.image.full_window.image_label.pixmap()
     assert pixmap.toImage().pixelColor(0, 0).name() == "#0000ff"
     window.image.open_full()
 

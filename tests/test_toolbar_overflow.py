@@ -97,7 +97,7 @@ def test_compared_pane_actions_still_target_own_image(browser):
     trigger_control(controller, first.image.rotate_b)
     assert first.image.rotation == 90 and second.image.rotation == 0
     trigger_control(controller, first.image.full)
-    assert first.image.full_window is not None
+    assert window.compare_full_window is not None
     first.image.open_full()
     window.focus_compare_page(second)
     QTest.qWait(50)

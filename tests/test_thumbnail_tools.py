@@ -21,6 +21,23 @@ def populate_folder(folder):
     (folder / "image0.png").unlink(missing_ok=True)
 
 
+def test_theme_restyles_visible_thumbnails_then_updates_scrolled_rows(browser):
+    window, folders = browser
+    for index in range(60):
+        Image.new("RGB", (24, 16), "blue").save(folders[0] / f"extra{index:02}.png")
+    page = window.open_folder(folders[0])
+    QTest.qWait(30)
+    first = page.thumbs.buttons[page.files[0]]
+    last = page.thumbs.buttons[page.files[-1]]
+    previous_revision = last._theme_revision
+    assert page.thumbs.scroll.verticalScrollBar().maximum() > 0
+    window.toggle_theme()
+    assert first._theme_revision == qt_app.THEME_REVISION
+    assert last._theme_revision == previous_revision
+    page.thumbs.scroll.verticalScrollBar().setValue(page.thumbs.scroll.verticalScrollBar().maximum())
+    wait_until(lambda: last._theme_revision == qt_app.THEME_REVISION)
+
+
 @pytest.mark.parametrize("mode,descending,names", [
     ("natural", False, ["image1.png", "image2.png", "image10.png"]),
     ("natural", True, ["image10.png", "image2.png", "image1.png"]),
@@ -47,25 +64,28 @@ def test_sort_buttons_global_dates_settings_and_duplicate_tab(browser):
     window, folders = browser
     populate_folder(folders[0])
     first = window.open_folder(folders[0])
-    assert first.thumbs.sort_button.kind == "sort-name"
-    assert first.thumbs.direction_button.kind == "sort-ascending"
-    first.thumbs.sort_button.click()
-    first.thumbs.direction_button.click()
-    assert first.thumbs.sort_button.kind == "sort-date" and first.thumbs.sort_button.isChecked()
-    assert first.thumbs.direction_button.kind == "sort-descending" and first.thumbs.direction_button.isChecked()
+    assert window.sort_button.kind == "sort-name"
+    assert window.direction_button.kind == "sort-ascending"
+    window.sort_button.click()
+    window.direction_button.click()
+    assert window.sort_button.kind == "sort-date" and window.sort_button.isChecked()
+    assert window.direction_button.kind == "sort-descending" and window.direction_button.isChecked()
     tile = first.thumbs.buttons[first.files[0]]
     assert not tile.modified_label.isHidden()
     shown_height = tile.height()
     window.modified_button.click()
     assert tile.modified_label.isHidden() and tile.height() == shown_height - 20
     window.toggle_lang()
-    assert window.t["sort_modified"] in first.thumbs.sort_button.toolTip()
+    assert window.t["sort_modified"] in window.sort_button.toolTip()
     assert window.modified_button.toolTip() == window.t["show_modified"]
     duplicate = window.duplicate_page(first)
     assert duplicate.thumbs.sort_mode == "modified" and duplicate.thumbs.sort_descending
     assert not duplicate.thumbs.show_modified
     other = window.open_folder(folders[1])
     assert other.thumbs.sort_mode == "natural" and not other.thumbs.show_modified
+    assert window.sort_button.kind == "sort-name" and window.direction_button.kind == "sort-ascending"
+    window.tabs.setCurrentWidget(first)
+    assert window.sort_button.kind == "sort-date" and window.direction_button.kind == "sort-descending"
     window.modified_button.click()
     assert all(page.thumbs.show_modified for page in window.pages())
     window.modified_button.click()
@@ -152,13 +172,15 @@ def test_sort_and_date_state_buttons_work_from_narrow_overflow(browser):
     page = window.open_folder(folders[0])
     window.resize(260, 300)
     QTest.qWait(100)
-    overflow = page.thumbs.toolbar_overflow
-    assert page.thumbs.sort_button in overflow.overflowed
+    overflow = window.toolbar_overflow
     overflow.populate_menu()
-    for button in (page.thumbs.sort_button, page.thumbs.direction_button):
-        action = next(item for item in overflow.menu.actions() if item.text() == button.toolTip())
-        assert action.isCheckable() and not action.isChecked()
-        action.trigger()
+    for button in (window.sort_button, window.direction_button):
+        if button in overflow.overflowed:
+            action = next(item for item in overflow.menu.actions() if item.text() == button.toolTip())
+            assert action.isCheckable() and not action.isChecked()
+            action.trigger()
+        else:
+            button.click()
         assert button.isChecked()
     assert page.thumbs.sort_mode == "modified" and page.thumbs.sort_descending
     main = window.toolbar_overflow

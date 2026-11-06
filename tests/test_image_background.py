@@ -46,7 +46,8 @@ def test_default_follows_theme_and_custom_background_stays_fixed(browser):
     window.toggle_theme()
     assert pane.background_color() == "#ffffff"
     assert "#ffffff" in pane.scroll.viewport().styleSheet()
-    assert PALETTE["pane"] in window.thumbs.scroll.viewport().styleSheet()
+    viewport = window.thumbs.scroll.viewport()
+    assert viewport.palette().color(viewport.backgroundRole()).name() == PALETTE["pane"]
     pane.set_background("default")
     assert pane.background_color() == PALETTE["pane"]
     window.toggle_lang()

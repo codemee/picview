@@ -6,12 +6,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 from PIL import Image
-from PySide6.QtCore import QEventLoop, QMimeData, QPoint, QTimer, QUrl, Qt
-from PySide6.QtGui import QKeySequence
+from PySide6.QtCore import QEvent, QEventLoop, QMimeData, QPoint, QPointF, QTimer, QUrl, Qt
+from PySide6.QtGui import QKeySequence, QMouseEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QFileDialog, QMenu, QTabBar
 
-from picview.qt_app import FolderTab, PicView
+from picview import qt_app
+from picview.qt_app import PALETTE, FolderTab, PicView
 from picview.settings import load_settings, save_settings
 
 
@@ -55,6 +56,7 @@ def test_shortcut_tooltips_follow_language_and_new_tabs(browser):
             assert QKeySequence(key).toString(QKeySequence.SequenceFormat.NativeText) in button.toolTip()
         assert window.tab_list_button.toolTip() == window.t["tab_list"]
         for tab in window.pages():
+            window.tabs.setCurrentWidget(tab)
             assert tab.image.full.toolTip() == f"{window.t['full']} (F11)"
             assert tab.image.zoom_label.toolTip() == f"{window.t['edit_zoom']} (+ / - / 0)"
             assert tab.image.zoom_label.reset_button.toolTip() == "100% (0)"
@@ -62,7 +64,7 @@ def test_shortcut_tooltips_follow_language_and_new_tabs(browser):
 
 
 @pytest.mark.parametrize("compare", [False, True])
-def test_alt_image_and_layout_shortcuts_target_active_view(browser, compare):
+def test_alt_image_shortcuts_target_active_view(browser, compare):
     window, folders = browser
     first = window.open_folder(folders[0])
     second = window.open_folder(folders[1])
@@ -83,12 +85,7 @@ def test_alt_image_and_layout_shortcuts_target_active_view(browser, compare):
     QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_H, Qt.KeyboardModifier.AltModifier)
     assert target.rotation == 90 and target.fv and target.fh
     assert other.rotation == 0 and not other.fv and not other.fh
-    modifiers = Qt.KeyboardModifier.AltModifier | Qt.KeyboardModifier.ShiftModifier
-    QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_H, modifiers)
-    assert second.split.orientation() == Qt.Orientation.Horizontal
-    QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_V, modifiers)
-    assert second.split.orientation() == Qt.Orientation.Vertical
-    assert target.fv and target.fh  # Layout shortcuts do not also mirror.
+    assert target.fv and target.fh
 
 
 def test_tabs_share_the_active_thumbnail_toolbar(browser):
@@ -102,7 +99,7 @@ def test_tabs_share_the_active_thumbnail_toolbar(browser):
         assert window.tabs.strip.isVisible()
         assert window.tabs.strip.height() == 34
         strip_top = window.tabs.strip.mapToGlobal(QPoint()).y()
-        tools_top = page.thumbs.max_button.mapToGlobal(QPoint()).y()
+        tools_top = page.thumbs.drag_handle.mapToGlobal(QPoint()).y()
         assert strip_top == tools_top
         assert window.main_toolbar not in window.tabs.strip.parentWidget().findChildren(type(window.main_toolbar))
     window.close_tab(window.tabs.indexOf(first))
@@ -196,7 +193,8 @@ def test_each_tab_keeps_its_own_view_and_global_styles(browser):
     QTest.qWait(50)
     second.image.slider.setValue(800)
     assert second.thumbs.size == 140
-    assert second.split.orientation() == Qt.Orientation.Vertical
+    assert second.split.orientation() == Qt.Orientation.Horizontal
+    second.set_orientation(Qt.Orientation.Vertical)
     window.toggle_theme()
     window.toggle_lang()
     assert first.image.frames is frames
@@ -206,8 +204,41 @@ def test_each_tab_keeps_its_own_view_and_global_styles(browser):
     assert first.t is window.t and second.t is window.t
     window.tabs.setCurrentWidget(first)
     assert first.thumbs.selected_path == first.files[1]
-    assert first.split.orientation() == Qt.Orientation.Horizontal
+    assert first.split.orientation() == Qt.Orientation.Vertical
     assert first.image.frames is frames
+
+
+def test_switching_tabs_keeps_current_pane_layout(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    first.dock_pane("image", "left")
+    second.dock_pane("thumb", "top")
+    second.split.setSizes([700, 300])
+    window.comparison_layout_changed(second)
+    expected = second.layout_spec()
+    for page in (first, second, first):
+        window.tabs.setCurrentWidget(page)
+        assert page.split.orientation() == expected[0]
+        assert (page.split.widget(0) is page.thumbs) == expected[1]
+        assert abs(page.layout_spec()[2] - expected[2]) < .03
+
+
+def test_hidden_tab_applies_theme_and_language_when_activated(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    window.open_folder(folders[1])
+    tile = first.thumbs.buttons[first.files[0]]
+    previous_revision = tile._theme_revision
+    window.toggle_theme()
+    window.toggle_lang()
+    assert first._pending_restyle is True
+    assert tile._theme_revision == previous_revision
+    window.tabs.setCurrentWidget(first)
+    assert first._pending_restyle is None
+    assert tile._theme_revision == qt_app.THEME_REVISION
+    assert first.thumbs.grid_host.palette().color(first.thumbs.grid_host.backgroundRole()).name() == PALETTE["pane"]
+    assert first.image.rotate_b.toolTip().startswith(window.t["rotate"])
 
 
 def test_background_modification_is_loaded_on_activation(browser):
@@ -280,6 +311,68 @@ def test_animation_pauses_and_fullscreen_closes_on_switch(browser):
     assert second.active and not first.active
     window.tabs.setCurrentWidget(first)
     assert first.image.timer.isActive()
+
+
+def test_fullscreen_image_toolbar_controls_visible_image(browser):
+    window, folders = browser
+    page = window.open_folder(folders[0])
+    page.image.open_full()
+    full = page.image.full_window
+    toolbar = full.image_toolbar
+    assert full.isFullScreen() and toolbar.isVisible()
+    QTest.mouseClick(toolbar.rotate_button, Qt.MouseButton.LeftButton)
+    QTest.mouseClick(toolbar.mirror_h_button, Qt.MouseButton.LeftButton)
+    assert page.image.rotation == 90 and page.image.fh
+    toolbar.set_zoom(1500)
+    assert page.image.fullscreen_zoom == 1.5
+    assert full.image_label.pixmap().deviceIndependentSize().width() > page.image.image_size()[0]
+    QTest.mouseClick(toolbar.fit_button, Qt.MouseButton.LeftButton)
+    assert page.image.fullscreen_zoom is None
+    toolbar.choose_background("black")
+    assert page.image.background_mode == "black"
+    QTest.keyClick(full, Qt.Key.Key_Escape)
+    assert page.image.full_window is None or not full.isVisible()
+
+
+def test_fullscreen_toolbar_drag_and_single_image_edge_spacing(browser):
+    window, folders = browser
+    page = window.open_folder(folders[0])
+    page.image.open_full()
+    full = page.image.full_window
+    toolbar = full.image_toolbar
+    assert full.centralWidget().layout().contentsMargins().left() == 16
+    assert full.centralWidget().layout().contentsMargins().top() == 16
+    start = toolbar.pos()
+    grip = toolbar.drag_grip
+    local = grip.rect().center()
+    global_start = grip.mapToGlobal(local)
+    QTest.mousePress(grip, Qt.MouseButton.LeftButton, pos=local)
+    global_target = global_start + QPoint(-100, -100)
+    move = QMouseEvent(QEvent.Type.MouseMove, QPointF(grip.mapFromGlobal(global_target)),
+                       QPointF(global_target), Qt.MouseButton.NoButton,
+                       Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    QApplication.sendEvent(grip, move)
+    QTest.mouseRelease(grip, Qt.MouseButton.LeftButton, pos=grip.rect().center())
+    assert toolbar.user_positioned and toolbar.pos() != start
+    assert toolbar.x() >= 8 and toolbar.y() >= 8
+    full.setWindowState(Qt.WindowState.WindowNoState)
+    full.resize(640, 360)
+    QTest.qWait(20)
+    assert toolbar.x() <= full.width() - toolbar.width() - 8
+    assert toolbar.y() <= full.height() - toolbar.height() - 8
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_fullscreen_zoom_slider_has_no_background_block(browser, theme):
+    window, folders = browser
+    while window.theme_mode != theme:
+        window.toggle_theme()
+    page = window.open_folder(folders[0])
+    page.image.open_full()
+    toolbar = page.image.full_window.image_toolbar
+    slider = toolbar.zoom_slider
+    point = slider.mapTo(toolbar, slider.rect().topLeft()) + QPoint(3, 3)
+    assert toolbar.grab().toImage().pixelColor(point).name() == PALETTE["card"]
 
 
 def test_tab_shortcuts_route_to_active_page(browser):
@@ -459,6 +552,25 @@ def test_drop_multiple_folders_and_images(browser):
     assert window.thumbs.selected_path.name == "image1.png"
 
 
+def test_dropped_folder_inherits_current_pane_layout(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    first.dock_pane("image", "left")
+    first.split.setSizes([300, 700])
+    expected = first.layout_spec()
+    data = QMimeData()
+    data.setUrls([QUrl.fromLocalFile(str(folders[1]))])
+    class Drop:
+        def source(self): return None
+        def mimeData(self): return data
+    window.dropEvent(Drop())
+    second = window.current_tab()
+    assert second is not first and second.folder == folders[1]
+    assert second.split.orientation() == expected[0]
+    assert (second.split.widget(0) is second.thumbs) == expected[1]
+    assert abs(second.layout_spec()[2] - expected[2]) < .03
+
+
 def test_legacy_settings_restore_one_tab(browser):
     window, folders = browser
     save_settings({"folder": str(folders[0]), "selected_file": str(folders[0] / "image1.png"), "thumbnail_size": 200, "orientation": "horizontal"})
@@ -490,7 +602,6 @@ def test_restore_scroll_split_ratio_and_normal_panes(browser):
     page.image.scroll.horizontalScrollBar().setValue(35)
     page.image.scroll.verticalScrollBar().setValue(75)
     assert page.thumbs.scroll.verticalScrollBar().value() == 60
-    page.maximize("thumb")
     window.close()
     assert load_settings()["tabs"][0]["thumbnail_scroll"] == 60
     restored = PicView()
@@ -499,7 +610,7 @@ def test_restore_scroll_split_ratio_and_normal_panes(browser):
     try:
         other = restored.current_tab()
         wait_until(lambda: other._pending_scroll is None)
-        assert other.saved_sizes is None and not other.image.isHidden()
+        assert not other.image.isHidden()
         assert abs(other.snapshot()["sash_fraction"] - .4) < .03
         assert other.thumbs.scroll.verticalScrollBar().value() == 60
         assert other.image.scroll.horizontalScrollBar().value() == 35

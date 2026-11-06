@@ -6,7 +6,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PIL import Image
-from PySide6.QtCore import QLocale, Qt
+from PySide6.QtCore import QLocale, QPoint, Qt
 from PySide6.QtGui import QColor, QKeySequence
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
@@ -104,17 +104,17 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     assert window.open_button.icon().pixmap(window.open_button.iconSize()).width() == 20
     assert window.image.mh.icon().availableSizes()[0].width() == 48
     widgets = [toolbar.itemAt(i).widget() for i in range(toolbar.count()) if toolbar.itemAt(i).widget() and not toolbar.itemAt(i).widget().isHidden()]
-    assert widgets[:3] == [window.image.rotate_b, window.image.mh, window.image.mv]
-    assert widgets[3].width() == 1
-    assert widgets[4:7] == [window.image.background_button, window.image.sync_button, window.image.filename_label]
-    assert widgets[-5:] == [window.image.fit_b, window.image.max_button, window.image.full, window.image.zoom_label, window.image.slider]
+    assert widgets[:4] == [window.image.drag_handle, window.image.rotate_b, window.image.mh, window.image.mv]
+    assert widgets[4].width() == 1
+    assert widgets[5:8] == [window.image.background_button, window.image.sync_button, window.image.filename_label]
+    assert widgets[-4:] == [window.image.fit_b, window.image.full, window.image.zoom_label, window.image.slider]
     assert window.image.slider.width() == window.thumbs.slider.width()
     for slider in (window.image.slider, window.thumbs.slider):
         assert abs(slider.reference_x() - slider.width() / 2) <= 2
         assert slider.height() == 30
     thumbnail_toolbar = window.thumbs.layout().itemAt(0).layout()
     thumbnail_widgets = [thumbnail_toolbar.itemAt(i).widget() for i in range(thumbnail_toolbar.count()) if thumbnail_toolbar.itemAt(i).widget() and not thumbnail_toolbar.itemAt(i).widget().isHidden()]
-    assert thumbnail_widgets[:5] == [window.thumbs.tab_slot, window.thumbs.tab_tools_separator, window.thumbs.sort_button, window.thumbs.direction_button, window.thumbs.max_button]
+    assert thumbnail_widgets[:2] == [window.thumbs.drag_handle, window.thumbs.tab_slot]
     assert thumbnail_widgets[-2] is window.thumbs.size_label
     assert window.thumbs.size_label.text() == "140px"
     window.thumbs.size_label.click()
@@ -151,18 +151,17 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     assert PALETTE["accent"] == THUMBNAIL_SELECTED
     assert IMAGE_BACKGROUND in window.image.scroll.viewport().styleSheet()
     assert window.image.scroll.viewport().grab().toImage().pixelColor(2, 2).name() == IMAGE_BACKGROUND
-    assert IMAGE_BACKGROUND in window.thumbs.grid_host.styleSheet()
+    assert window.thumbs.grid_host.palette().color(window.thumbs.grid_host.backgroundRole()).name() == IMAGE_BACKGROUND
     grid_image = window.thumbs.grid_host.grab().toImage()
     thumbnail_background = grid_image.pixelColor(grid_image.width() - 2, grid_image.height() - 2)
     expected_background = QColor(IMAGE_BACKGROUND)
     assert all(abs(a - b) <= 1 for a, b in zip(thumbnail_background.getRgb()[:3], expected_background.getRgb()[:3]))
-    assert THUMBNAIL_SELECTED in window.thumbs.buttons[paths[0]].styleSheet()
-    assert "border:0" in window.thumbs.buttons[paths[0]].styleSheet()
-    assert window.thumbs.buttons[paths[0]].name.grab().toImage().pixelColor(2, 2).name() == THUMBNAIL_SELECTED
-    assert "#toolbar{background:transparent;border:0;}" in window.styleSheet()
-    assert f"#card{{background:{PALETTE['card']};border:0;border-radius:12px;}}" in window.styleSheet()
+    assert window.thumbs.buttons[paths[0]].grab().toImage().pixelColor(12, 12).name() == THUMBNAIL_SELECTED
+    selected_tile = window.thumbs.buttons[paths[0]]
+    assert selected_tile.grab().toImage().pixelColor(selected_tile.name.mapTo(selected_tile, QPoint(2, 2))).name() == THUMBNAIL_SELECTED
+    assert "#toolbar{background:transparent;border:0;}" in window.main_toolbar.styleSheet()
     assert "QToolButton:checked{background:#e2e6ed;" in window.image.fit_b.styleSheet()
-    assert PALETTE["accent"] in window.styleSheet()
+    assert PALETTE["accent"] in window.image.slider.styleSheet()
     checked_icon = window.image.fit_b.icon().pixmap(window.image.fit_b.iconSize()).toImage()
     assert any(
         checked_icon.pixelColor(x, y).alpha() and checked_icon.pixelColor(x, y).name() == PALETTE["focus"]

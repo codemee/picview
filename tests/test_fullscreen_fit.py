@@ -7,11 +7,11 @@ from test_svg import write_svg
 
 
 def fits_screen(pane):
-    label = pane.full_window.centralWidget()
+    label = pane.full_window.image_label
     pixmap = label.pixmap()
     if pixmap.isNull(): return False
     original = QSize(*pane.image_size())
-    expected = original.scaled(label.contentsRect().size(), Qt.AspectRatioMode.KeepAspectRatio).boundedTo(original)
+    expected = original.scaled(pane.full_window.image_scroll.viewport().size(), Qt.AspectRatioMode.KeepAspectRatio).boundedTo(original)
     logical = pixmap.deviceIndependentSize()
     return abs(logical.width() - expected.width()) <= 1 and abs(logical.height() - expected.height()) <= 1
 
@@ -29,8 +29,8 @@ def test_fullscreen_fits_large_portrait_and_small_images_without_changing_view(b
     pane.open_full()
     wait_until(lambda: pane.full_window.isFullScreen() and fits_screen(pane))
     if size == (20, 10):
-        assert pane.full_window.centralWidget().pixmap().deviceIndependentSize().toSize() == QSize(20, 10)
-    assert pane.full_window.centralWidget().alignment() == Qt.AlignmentFlag.AlignCenter
+        assert pane.full_window.image_label.pixmap().deviceIndependentSize().toSize() == QSize(20, 10)
+    assert pane.full_window.image_label.alignment() == Qt.AlignmentFlag.AlignCenter
     assert (pane.zoom, pane.fit_to_pane, pane.rotation, pane.fh, pane.fv) == state
     # A screen-size change must update the raster too, without a new image load.
     pane.full_window.setWindowState(Qt.WindowState.WindowNoState)
@@ -50,7 +50,7 @@ def test_fullscreen_fit_tracks_file_changes_and_device_pixel_ratio(browser, monk
     pane = window.open_folder(folders[0], path).image
     pane.open_full()
     wait_until(lambda: fits_screen(pane))
-    label = pane.full_window.centralWidget()
+    label = pane.full_window.image_label
     rendered = []
     set_pixmap = label.setPixmap
 
@@ -63,7 +63,7 @@ def test_fullscreen_fit_tracks_file_changes_and_device_pixel_ratio(browser, monk
     pane.update_full_image()
     assert rendered[-1][1] == 2
     original_size = QSize(*pane.image_size())
-    expected = original_size.scaled(label.size(), Qt.AspectRatioMode.KeepAspectRatio).boundedTo(original_size)
+    expected = original_size.scaled(pane.full_window.image_scroll.viewport().size(), Qt.AspectRatioMode.KeepAspectRatio).boundedTo(original_size)
     assert rendered[-1][0] == expected * 2
     assert fits_screen(pane)
     if svg: write_svg(path, "lime")

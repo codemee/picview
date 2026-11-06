@@ -35,7 +35,7 @@ def test_svg_thumbnail_zoom_transforms_and_fullscreen(browser):
     assert image.pixelColor(15, 20).red() == 255
     page.image.open_full()
     QTest.qWait(50)
-    assert not page.image.full_window.centralWidget().pixmap().isNull()
+    assert not page.image.full_window.image_label.pixmap().isNull()
     page.image.open_full()
     raster = page.files[0]
     page.thumbs.select(raster)
