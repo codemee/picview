@@ -1,6 +1,6 @@
 [project]
 name = "picview"
-version = "0.1.9"
+version = "0.1.10"
 description = "A lightweight Windows image folder viewer"
 readme = "README.md"
 license = "GPL-3.0-or-later"
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-picview = "picview.qt_app:main"
+picview = "picview.entrypoint:main"
 
 [project.urls]
 Homepage = "https://github.com/codemee/picview"

@@ -1,3 +1,3 @@
-from .qt_app import main
+from .entrypoint import main
 
 main()

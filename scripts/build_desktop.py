@@ -10,7 +10,9 @@ import plistlib
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
+import zipfile
 from pathlib import Path
 
 from PIL import Image
@@ -94,7 +96,7 @@ def main():
         "--distpath", output, "--workpath", build / "pyinstaller",
         ROOT / "packaging" / "picview.spec", cwd=ROOT, env=build_env)
 
-    executable = output / ("PicView.app/Contents/MacOS/PicView" if macos else "PicView.exe")
+    executable = output / ("PicView.app/Contents/MacOS/PicView" if macos else "PicView/PicView.exe")
     if macos: bundle_finder_service(output / "PicView.app")
     report = build / "desktop-smoke.json"
     report.unlink(missing_ok=True)
@@ -107,7 +109,7 @@ def main():
     assert json.loads(report.read_text()) == {"version": version, "ok": True}
     print("Frozen application smoke test passed.", flush=True)
 
-    artifact = release / f"PicView-{version}-{target}{'.dmg' if macos else '.exe'}"
+    artifact = release / f"PicView-{version}-{target}{'.dmg' if macos else '.zip'}"
     if macos:
         # ditto preserves the bundle's symlinks, permissions and ad-hoc signature.
         staging = build / "dmg"
@@ -124,7 +126,20 @@ def main():
             "-srcfolder", staging, artifact)
         run("hdiutil", "verify", artifact)
     else:
-        shutil.copy2(executable, artifact)
+        with zipfile.ZipFile(artifact, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+            for path in sorted((output / "PicView").rglob("*")):
+                if path.is_file():
+                    archive.write(path, path.relative_to(output))
+            archive.write(ROOT / "LICENSE", "PicView/LICENSE.txt")
+        with zipfile.ZipFile(artifact) as archive:
+            assert archive.testzip() is None, "Desktop ZIP is corrupt"
+            assert "PicView/PicView.exe" in archive.namelist()
+            with tempfile.TemporaryDirectory(dir=build) as temporary:
+                archive.extractall(temporary)
+                extracted_report = Path(temporary) / "smoke.json"
+                run(Path(temporary) / "PicView" / "PicView.exe", "--smoke-test", extracted_report,
+                    env={**build_env, "QT_QPA_PLATFORM": "offscreen"}, timeout=120)
+                assert json.loads(extracted_report.read_text()) == {"version": version, "ok": True}
     with artifact.open("rb") as stream:
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
     artifact.with_suffix(artifact.suffix + ".sha256").write_text(f"{digest}  {artifact.name}\n")

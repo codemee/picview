@@ -78,6 +78,6 @@ if __name__ == "__main__":
             Path(sys.argv[2]).write_text(traceback.format_exc(), encoding="utf-8")
             sys.exit(1)
     else:
-        from picview.qt_app import main
+        from picview.entrypoint import main
 
         main()

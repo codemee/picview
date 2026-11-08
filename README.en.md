@@ -21,7 +21,8 @@ An image folder viewer built with Qt, focused on **fast loading** and **image co
 ### Desktop downloads
 
 - Download desktop builds from [GitHub Releases](https://github.com/codemee/picview/releases) when attached to a release. Python and uv are not required.
-- **Windows x64**: run `PicView-<version>-windows-x64.exe` directly.
+- **Windows x64**: extract `PicView-<version>-windows-x64.zip`, keep the entire **PicView** folder, and run `PicView.exe` inside it. Close the app before replacing the whole folder for an update. If you move the folder, re-enable File Explorer context-menu integration.
+- The folder build avoids extraction on every launch. When PicView is already open, file-open requests are forwarded before loading the full interface. See the [same-machine startup measurements](docs/STARTUP_PERFORMANCE.md).
 - **macOS Apple Silicon**: open `PicView-<version>-macos-arm64.dmg`, then drag **PicView.app** into **Applications**.
 - Desktop builds currently have no Windows publisher signature or Apple Developer ID notarization, so the operating system may prompt or block the first launch.
 
@@ -85,7 +86,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - When sliders are hidden, use the overflow menu to enter zoom or thumbnail-size values.
-- The window title shows the current version, for example **PicView v0.1.9**.
+- The window title shows the current version, for example **PicView v0.1.10**.
 
 ### Open and drag images
 

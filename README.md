@@ -21,7 +21,8 @@
 ### 桌面版下載
 
 - 已附加桌面版的版本可從 [GitHub Releases](https://github.com/codemee/picview/releases) 下載，不需要安裝 Python 或 uv。
-- **Windows x64**：直接執行 `PicView-<版本>-windows-x64.exe`。
+- **Windows x64**：解壓 `PicView-<版本>-windows-x64.zip`，保留整個 **PicView** 資料夾，再執行其中的 `PicView.exe`。更新時先關閉程式，替換整個資料夾；若曾啟用檔案總管右鍵整合，搬移資料夾後須重新啟用。
+- 資料夾版避免每次啟動時重複解壓；已有 PicView 視窗時，開檔要求會在載入完整介面前交給該視窗。[同機啟動量測與方法](docs/STARTUP_PERFORMANCE.md)。
 - **macOS Apple Silicon**：開啟 `PicView-<版本>-macos-arm64.dmg`，將 **PicView.app** 拖曳到 **Applications**。
 - 桌面版目前沒有 Windows 發行者簽章或 Apple Developer ID 公證，首次開啟時可能會出現系統提示或遭到阻擋。
 
@@ -85,7 +86,7 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 - 縮圖使用共用的記憶體快取（上限 64 MiB），不另存縮圖檔案。
 - 調整窗格大小只重新排列縮圖，不會重新解碼所有圖片。
 - 滑桿收起時，可從更多工具選單輸入縮放比例或縮圖大小。
-- 視窗標題會顯示目前版本，例如 **PicView v0.1.9**。
+- 視窗標題會顯示目前版本，例如 **PicView v0.1.10**。
 
 ### 開啟與拖放圖片
 

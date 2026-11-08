@@ -1,4 +1,4 @@
-"""Windows one-file EXE; macOS application bundle for DMG distribution."""
+"""Windows folder bundle; macOS application bundle for DMG distribution."""
 
 import sys
 import tomllib
@@ -49,7 +49,8 @@ if is_macos:
     )
 else:
     exe = EXE(
-        pyz, a.scripts, a.binaries, a.datas,
+        pyz, a.scripts, [], exclude_binaries=True,
         version=str(root / "build" / "windows-version.txt"),
         **options,
     )
+    contents = COLLECT(exe, a.binaries, a.datas, name="PicView", upx=False)

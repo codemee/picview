@@ -5,7 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from PySide6.QtCore import QEventLoop, QObject, QTimer
+from PySide6.QtCore import QCoreApplication, QEventLoop, QObject, QTimer
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
 
@@ -37,6 +37,22 @@ def forward_paths(paths: list[str]) -> bool:
     timeout.stop()
     socket.disconnectFromServer()
     return acknowledged == [True]
+
+
+def forward_paths_early(paths: list[str]) -> bool:
+    """Forward before importing Qt Widgets or the image viewer."""
+    if not paths:
+        return False
+    app = None
+    if QCoreApplication.instance() is None:
+        app = QCoreApplication([])
+    try:
+        return forward_paths(paths)
+    finally:
+        if app is not None:
+            import shiboken6
+
+            shiboken6.delete(app)
 
 
 class InstanceReceiver(QObject):
