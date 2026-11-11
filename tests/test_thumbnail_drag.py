@@ -89,6 +89,8 @@ def test_click_and_small_movement_do_not_start_drag(drag_setup):
 
 
 def test_ctrl_shift_and_select_all_drag_multiple_files(drag_setup):
+    import sys
+    selection_modifier = Qt.KeyboardModifier.MetaModifier if sys.platform == "darwin" else Qt.KeyboardModifier.ControlModifier
     window, first, drags = drag_setup
     second = first.parent / "second.png"
     third = first.parent / "third.png"
@@ -97,7 +99,7 @@ def test_ctrl_shift_and_select_all_drag_multiple_files(drag_setup):
     files = window.thumbs.files
     window.thumbs.select(files[0])
     QTest.mouseClick(window.thumbs.buttons[files[1]], Qt.MouseButton.LeftButton,
-                     Qt.KeyboardModifier.ControlModifier)
+                     selection_modifier)
     assert window.thumbs.selected_paths == {files[0], files[1]}
     QTest.mouseClick(window.thumbs.buttons[files[2]], Qt.MouseButton.LeftButton,
                      Qt.KeyboardModifier.ShiftModifier)
@@ -105,7 +107,7 @@ def test_ctrl_shift_and_select_all_drag_multiple_files(drag_setup):
     window.thumbs.select(files[0])
     QTest.keyClick(window.thumbs.scroll, Qt.Key.Key_Right, Qt.KeyboardModifier.ShiftModifier)
     assert window.thumbs.selected_paths == {files[0], files[1]}
-    QTest.keyClick(window.thumbs.scroll, Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
+    QTest.keyClick(window.thumbs.scroll, Qt.Key.Key_A, selection_modifier)
     assert window.thumbs.selected_paths == set(files)
     tile = window.thumbs.buttons[files[1]]
     QTest.mousePress(tile, Qt.MouseButton.LeftButton, pos=QPoint(20, 30))
