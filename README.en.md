@@ -90,6 +90,14 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 
 ### Open and drag images
 
+- The main toolbar's right-side “…” menu contains Explorer/Finder integration, language, and theme controls.
+
+- The folder picker starts in the active tab's parent folder, or the folder itself when it has no parent.
+- Use <kbd>Ctrl</kbd>-click to toggle individual thumbnails, <kbd>Shift</kbd>-click or <kbd>Shift</kbd>+arrow keys to select a range, or <kbd>Ctrl</kbd>+<kbd>A</kbd> to select all. Use <kbd>Command</kbd> instead of <kbd>Ctrl</kbd> on macOS. Drag across empty thumbnail space to select an area, or click empty space to clear the selection.
+- Drag multiple selected images to another folder tab, or onto an image pane to compare them together.
+- Cross-tab drops copy or move files according to the operating system's drag action. Name collisions prompt to replace, keep both, skip, or cancel. Tabs for the same folder simply select the image.
+- After hovering to activate a tab, drop into its thumbnail area to move files. Hold <kbd>Ctrl</kbd> on Windows/Linux or <kbd>Option</kbd> on macOS to copy instead.
+
 - Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-light.png" width="34" height="34" alt="Open folder" title="Open folder"></picture> to choose a folder to view.
 - Drop a folder or image file onto the window to open it.
 - A newly opened folder tab inherits the current pane order and split ratio. Dragging a pane or divider updates the layout shared by all tabs.
@@ -98,7 +106,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 
 ### File Explorer and Finder context menus
 
-- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-light.png" width="34" height="34" alt="File Explorer and Finder integration" title="File Explorer and Finder integration"></picture> to the left of the language tool to toggle the Windows File Explorer command or macOS Finder Services command. It is off by default; the active button uses the accent color.
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-light.png" width="34" height="34" alt="File Explorer and Finder integration" title="File Explorer and Finder integration"></picture> in the main toolbar settings menu to toggle the Windows File Explorer command or macOS Finder Services command. It is off by default; the active button uses the accent color.
 - **Windows:** Right-click a folder, a folder background, or a supported image and choose **Open in PicView**. On Windows 11, the command may be under **Show more options**. It registers only for the current user and does not change the default image viewer.
 
 macOS provides two separate ways to open items. Both require the packaged `PicView.app` in Applications:
@@ -130,7 +138,7 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 
 - The sort-method button in the main toolbar toggles between <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-light.png" width="34" height="34" alt="Sort by name" title="Sort by name"></picture> **Name (natural order)** and <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-light.png" width="34" height="34" alt="Sort by date modified" title="Sort by date modified"></picture> **Date modified** for the active tab only.
 - The adjacent direction button toggles between <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-ascending-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-ascending-light.png" width="34" height="34" alt="Ascending" title="Ascending"></picture> **ascending** and <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-descending-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-descending-light.png" width="34" height="34" alt="Descending" title="Descending"></picture> **descending**. Dates ascend from oldest to newest and descend from newest to oldest. Sorting preserves the selected image and its view settings.
-- <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-light.png" width="34" height="34" alt="Show date modified" title="Show date modified"></picture> before the language button in the main toolbar toggles **Show date modified** for all tabs. This global preference survives restarting and applies to new and duplicated tabs.
+- <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-light.png" width="34" height="34" alt="Show date modified" title="Show date modified"></picture> on the right side of the main toolbar toggles **Show date modified** for all tabs. This global preference survives restarting and applies to new and duplicated tabs.
 - Cards show the local modification date and time at the bottom by default; hover over a truncated date to see the full timestamp.
 - Each tab remembers its sort method and direction when duplicated or restored after restarting. New or modified files update their order and timestamps automatically.
 - Right-click a thumbnail card and choose **Copy** to copy the original file to the clipboard for pasting into another application or folder.
@@ -184,12 +192,18 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 
 - Drag a tab or thumbnail onto an image pane to keep that image and add the dragged image to a comparison.
 - Drag onto any comparison pane to add more images in drop order. Space is shared equally; adding stops when the panes would become too small.
-- Drag a tab or thumbnail already in the comparison again to create an independent tab for another image from that folder.
+- Dropping multiple selected thumbnails adds each image to the comparison without adding visible folder tabs.
+- Multiple-image drops skip images already shown in the comparison. Hover over another folder tab during a thumbnail drag to activate it.
+- A translucent overlay and spinner indicate loading during a drop; raster images decode in the background.
+- Hold a thumbnail drag over either tab scroll arrow to keep scrolling toward hidden tabs.
+- Drag another thumbnail from a folder already in the comparison to add an independent image pane without adding a visible folder tab. Selecting these panes shows each image in the same folder tab's thumbnails.
+- Hold and drag an image or pane title toward another comparison pane to reorder them. An image preview follows the pointer, a dashed placeholder marks its position, and other images shift to preview the order. Release in the first or second half to place it before or after that pane.
 - When thumbnails and images are stacked, comparison images sit side by side. When thumbnails and images sit side by side, comparison images are stacked.
 - Switching the selected comparison image or tab keeps the outer pane layout fixed. Leaving comparison keeps that layout across tabs.
 - Full screen in comparison mode shows every compared image, with space around the screen edges and between panes. Images sit side by side on wide screens and stack on portrait screens. Each image initially fits without enlarging beyond its original size. The active image has an accent outline; click a pane or press <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> to switch. The toolbar also toggles synchronized operations.
 - Switch to each tab and select its image from the thumbnails.
 - Comparison panes share one toolbar above the images.
+- The shared image toolbar has an End comparison button that closes comparison mode at once.
 - Click an image pane to select it, show its corresponding tab and thumbnails, and target it with the shared toolbar; an accent-colored border marks the selection.
 - Press <kbd>Tab</kbd> to cycle through comparison panes in order, or <kbd>Shift</kbd>+<kbd>Tab</kbd> to cycle backward.
 - Leaving comparison activates the last folder in comparison order and keeps the current pane layout.
@@ -197,7 +211,7 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 - By default, zoom, rotate, mirror, set the background, and scroll each pane independently.
 - Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-light.png" width="34" height="34" alt="Sync tools" title="Sync tools"></picture> in the image toolbar to apply rotation, mirroring, zoom, fit, background, and horizontal and vertical scrolling to every comparison pane. Images of different sizes align by scroll position as a proportion of their scrollable range. Click again to return to independent controls.
 - Visible background images continue updating when files change.
-- Click the close button in the upper-right corner of a comparison pane to remove that folder. When one pane remains, normal viewing resumes with each tab's selection and adjustments intact.
+- Click the close button in the upper-right corner of a comparison pane to remove that image. When one pane remains, normal viewing resumes with that image selected in the thumbnails.
 
 ### Zoom and thumbnail size
 
@@ -251,14 +265,14 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 
 ### Language
 
-- Click the language button to cycle through **Follow system → Chinese → English**.
+- Open the main toolbar settings menu and click the language item to cycle through **Follow system → Chinese → English**.
 - The icons are <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-system-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-system-light.png" width="34" height="34" alt="Follow system language" title="Follow system language"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-zh-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-zh-light.png" width="34" height="34" alt="Chinese" title="Chinese"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-en-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-en-light.png" width="34" height="34" alt="English" title="English"></picture>.
 - The default is **Follow system**: Chinese for Chinese locales and English otherwise.
 - Your language choice is remembered across restarts.
 
 ### Theme
 
-- Click the theme button to cycle through **Follow system → Light → Dark**.
+- Open the main toolbar settings menu and click the theme item to cycle through **Follow system → Light → Dark**.
 - The icons are <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-system-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-system-light.png" width="34" height="34" alt="Follow system theme" title="Follow system theme"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-light-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-light-light.png" width="34" height="34" alt="Light" title="Light"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-dark-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-dark-light.png" width="34" height="34" alt="Dark" title="Dark"></picture>.
 - The default is **Follow system**.
 - The dark theme uses a Unit-01-inspired palette: deep purple surfaces, neon green indicators and sliders, and orange tool accents.

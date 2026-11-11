@@ -155,6 +155,16 @@ def test_startup_paths_open_folders_and_select_images(tmp_path):
     assert opened == [(folder, None), (folder, image)]
 
 
+def test_open_folder_dialog_starts_from_current_folders_parent(browser, monkeypatch):
+    window, folders = browser
+    window.open_folder(folders[0])
+    initial = []
+    monkeypatch.setattr(qt_app.QFileDialog, "getExistingDirectory",
+                        lambda _parent, _title, path: initial.append(path) or "")
+    window.choose()
+    assert initial == [str(folders[0].parent)]
+
+
 def test_toolbar_button_can_toggle_shell_integration(browser, monkeypatch):
     window, _ = browser
     state = {"enabled": False}

@@ -1,8 +1,9 @@
 from test_tabs import browser, wait_until
 
+import pytest
 from PIL import Image
-from PySide6.QtCore import QMimeData, QPoint, QPointF, Qt
-from PySide6.QtGui import QDragEnterEvent, QDropEvent, QKeySequence, QWheelEvent
+from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, Qt
+from PySide6.QtGui import QDragEnterEvent, QDropEvent, QKeySequence, QMouseEvent, QWheelEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
@@ -21,6 +22,87 @@ def comparison_mime(page, image=None):
 def add(window, source, target=None, image=None):
     target = target or window.current_tab()
     assert window.add_comparison_drop(target.image, comparison_mime(source, image))
+
+
+def test_comparison_panes_reorder_and_end_from_shared_toolbar(browser):
+    window, folders = browser
+    third_folder = folders[0].parent / "three"
+    third_folder.mkdir()
+    Image.new("RGB", (40, 30), "green").save(third_folder / "third.png")
+    first, second, third = (window.open_folder(folder) for folder in (*folders, third_folder))
+    add(window, first, second)
+    add(window, third, second)
+    assert window.comparison_order == [second, first, third]
+    mime = QMimeData()
+    mime.setData(qt_app.COMPARISON_REORDER_MIME, str(id(third)).encode("ascii"))
+    target = second.image
+    event = QDropEvent(QPointF(target.width() / 4, target.height() / 2),
+                       Qt.DropAction.MoveAction, mime, Qt.MouseButton.LeftButton,
+                       Qt.KeyboardModifier.NoModifier)
+    assert target.handle_comparison_drag(event, target)
+    assert window.comparison_order == window.comparison_area.pages == [third, second, first]
+    assert window.focused_compare_page is second
+    assert second.image.end_compare_button.isVisible()
+    second.image.end_compare_button.click()
+    assert not window.compare_enabled
+    assert window.current_tab() is first
+
+
+def test_thumbnail_drop_on_another_tab_copies_without_overwriting(browser):
+    window, folders = browser
+    source = window.open_folder(folders[0])
+    target = window.open_folder(folders[1])
+    image = source.files[0]
+    original = target.folder / image.name
+    before = original.read_bytes()
+    mime = comparison_mime(source, image)
+    window.resolve_transfer_conflict = lambda _destination: "keep_both"
+    bar = window.tabs.bar
+    event = QDropEvent(QPointF(bar.tabRect(window.tabs.indexOf(target)).center()),
+                       Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton,
+                       Qt.KeyboardModifier.NoModifier)
+    bar.dropEvent(event)
+    copied = target.folder / f"{image.stem} (2){image.suffix}"
+    assert event.isAccepted()
+    assert copied.read_bytes() == image.read_bytes()
+    assert original.read_bytes() == before
+    assert target.thumbs.selected_path == copied
+
+
+def test_multiple_thumbnails_move_to_another_tab(browser):
+    window, folders = browser
+    source = window.open_folder(folders[0])
+    target = window.open_folder(folders[1])
+    for path in target.files: path.unlink()
+    target.refresh_folder()
+    source.thumbs.select_all()
+    original_paths = source.files.copy()
+    mime = comparison_mime(source, source.files[0])
+    mime.setData(qt_app.THUMBNAIL_FILES_MIME,
+                 __import__("json").dumps([str(path) for path in original_paths]).encode("utf-8"))
+    assert window.transfer_thumbnails_to_tab(mime, target, Qt.DropAction.MoveAction)
+    assert all(not path.exists() for path in original_paths)
+    assert len(target.files) == 2
+    assert target.thumbs.selected_path == target.files[-1]
+
+
+def test_name_conflict_requires_choice_before_move(browser):
+    window, folders = browser
+    source = window.open_folder(folders[0])
+    target = window.open_folder(folders[1])
+    image = source.files[0]
+    destination = target.folder / image.name
+    image.write_bytes(b"replacement")
+    destination.write_bytes(b"original")
+    mime = comparison_mime(source, image)
+    window.resolve_transfer_conflict = lambda _destination: "skip"
+    assert window.transfer_thumbnails_to_tab(mime, target, Qt.DropAction.MoveAction)
+    assert image.read_bytes() == b"replacement"
+    assert destination.read_bytes() == b"original"
+    window.resolve_transfer_conflict = lambda _destination: "replace"
+    assert window.transfer_thumbnails_to_tab(mime, target, Qt.DropAction.MoveAction)
+    assert not image.exists()
+    assert destination.read_bytes() == b"replacement"
 
 
 def test_drag_sources_keep_the_original_image_as_target(browser, monkeypatch):
@@ -103,7 +185,8 @@ def test_drop_on_image_starts_comparison_and_close_button_restores_view(browser)
                       Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     QApplication.sendEvent(viewport, drop)
     assert drop.isAccepted()
-    assert window.compare_enabled
+    assert not window.compare_enabled  # Native drop returns before image loading.
+    wait_until(lambda: window.compare_enabled)
     assert window.comparison_area.pages == [second, first]
     assert first.image.comparison_close.isVisible()
     assert second.image.comparison_close.isVisible()
@@ -117,18 +200,50 @@ def test_drop_on_image_starts_comparison_and_close_button_restores_view(browser)
     assert first.image.rotation == 90
 
 
-def test_repeated_thumbnail_drop_creates_independent_tabs_until_too_small(browser):
+def test_loading_overlay_animates_while_background_decode_waits(browser, monkeypatch):
+    import threading
+    window, folders = browser
+    source = window.open_folder(folders[0])
+    target = window.open_folder(folders[1])
+    original = qt_app.ImagePane.read_frames
+    release = threading.Event()
+
+    def slow_decode(path):
+        release.wait(2)
+        return original(path)
+
+    monkeypatch.setattr(qt_app.ImagePane, "read_frames", staticmethod(slow_decode))
+    window.queue_comparison_drop(target.image, comparison_mime(source, source.files[0]))
+    overlay = window.findChild(qt_app.ComparisonLoadingOverlay)
+    assert overlay.isVisible()
+    initial = overlay.angle
+    try:
+        wait_until(lambda: overlay.angle != initial)
+        assert not window.compare_enabled
+    finally:
+        release.set()
+    wait_until(lambda: window.compare_enabled)
+
+
+def test_repeated_thumbnail_drop_keeps_one_visible_folder_tab_until_too_small(browser):
     window, folders = browser
     first = window.open_folder(folders[0])
     original = first.image.path
+    visible_before = sum(window.tabs.bar.isTabVisible(i) for i in range(window.tabs.count()))
     add(window, first, image=first.files[1])
     second = window.comparison_area.pages[1]
     assert second is not first and second.folder == first.folder
     assert first.image.path == original
     assert second.image.path == first.files[1]
+    assert sum(window.tabs.bar.isTabVisible(i) for i in range(window.tabs.count())) == visible_before
+    window.focus_compare_page(second)
+    QApplication.processEvents()
+    assert window.tabs.bar.display_current_index == window.tabs.indexOf(first)
+    assert window.current_tab().thumbs.selected_path == first.files[1]
     add(window, first, image=first.files[0])
     assert len(window.comparison_area.pages) == 3
     assert window.comparison_area.pages[-1].image.path == first.files[0]
+    assert sum(window.tabs.bar.isTabVisible(i) for i in range(window.tabs.count())) == visible_before
     count = 3
     while window.can_add_comparison(first.image):
         add(window, first)
@@ -137,6 +252,205 @@ def test_repeated_thumbnail_drop_creates_independent_tabs_until_too_small(browse
     assert not window.add_comparison_drop(first.image, comparison_mime(first))
     assert len(window.comparison_area.pages) == count
     assert window.notification_bar.currentMessage() == window.t["compare_too_small"]
+
+
+def test_multiple_thumbnail_drop_compares_each_image_without_visible_tabs(browser):
+    import json
+
+    window, folders = browser
+    window.resize(1400, 900)
+    QApplication.processEvents()
+    source = window.open_folder(folders[0])
+    target = window.open_folder(folders[1])
+    visible_before = sum(window.tabs.bar.isTabVisible(i) for i in range(window.tabs.count()))
+    mime = comparison_mime(source, source.files[0])
+    mime.setData(qt_app.THUMBNAIL_FILES_MIME,
+                 json.dumps([str(path) for path in source.files]).encode("utf-8"))
+    assert window.add_comparison_drop(target.image, mime)
+    assert [page.image.path for page in window.comparison_order] == [target.image.path, *source.files]
+    assert sum(window.tabs.bar.isTabVisible(i) for i in range(window.tabs.count())) == visible_before
+    assert all(path.exists() for path in source.files)
+    transient = window.comparison_order[-1]
+    window.focus_compare_page(transient)
+    QApplication.processEvents()
+    assert window.navigation_page() is transient
+    window.remove_comparison_page(transient)
+    assert transient not in window.pages()
+    assert sum(window.tabs.bar.isTabVisible(i) for i in range(window.tabs.count())) == visible_before
+    window.set_compare(False)
+    assert window.tabs.count() == visible_before
+
+
+def test_closing_comparison_panes_keeps_last_image_selected_in_thumbnails(browser):
+    window, folders = browser
+    source = window.open_folder(folders[0])
+    first, second = source.files[:2]
+    assert source.thumbs.selected_path == first
+    add(window, source, image=second)
+    last_page = window.comparison_order[-1]
+    assert last_page.thumbs.selected_path == second
+    assert not window.tabs.bar.isTabVisible(window.tabs.indexOf(last_page))
+    window.remove_comparison_page(source)
+    assert not window.compare_enabled
+    assert window.current_tab() is source
+    assert source.thumbs.selected_path == second
+    assert source.thumbs.selected_paths == {second}
+    assert source.image.path == second
+    assert window.tabs.count() == 1
+
+
+def test_multiple_drop_skips_image_already_in_comparison(browser):
+    import json
+    window, folders = browser
+    source = window.open_folder(folders[0])
+    paths = source.files.copy()
+    mime = comparison_mime(source, paths[0])
+    mime.setData(qt_app.THUMBNAIL_FILES_MIME, json.dumps([str(p) for p in paths]).encode())
+    assert window.add_comparison_drop(source.image, mime)
+    assert [page.image.path for page in window.comparison_order] == paths
+
+
+def test_drag_hover_activates_folder_tab(browser):
+    from PySide6.QtGui import QDragMoveEvent
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    bar = window.tabs.bar
+    mime = comparison_mime(second, second.files[0])
+    event = QDragMoveEvent(bar.tabRect(window.tabs.indexOf(first)).center(),
+                           Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton,
+                           Qt.KeyboardModifier.NoModifier)
+    bar.dragMoveEvent(event)
+    wait_until(lambda: window.current_tab() is first)
+
+
+def test_drop_into_thumbnail_area_moves_files_without_new_tabs(browser):
+    window, folders = browser
+    source = window.open_folder(folders[0])
+    target = window.open_folder(folders[1])
+    image = source.files[0]
+    destination = target.folder / image.name
+    destination.unlink()
+    mime = comparison_mime(source, image)
+    mime.setData(qt_app.THUMBNAIL_FILES_MIME, b"[]")
+    mime.setData(qt_app.THUMBNAIL_FILES_MIME, __import__("json").dumps([str(image)]).encode())
+    event = QDropEvent(QPointF(20, 20), Qt.DropAction.CopyAction | Qt.DropAction.MoveAction,
+                       mime, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    assert target.thumbs.eventFilter(target.thumbs.grid_host, event)
+    assert event.dropAction() == Qt.DropAction.MoveAction
+    assert not image.exists() and destination.exists()
+    assert window.tabs.count() == 2
+
+
+def test_close_focused_comparison_aligns_thumbnail_tab_with_remaining_image(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    add(window, first, second)
+    add(window, first, second, first.files[1])
+    transient = window.comparison_order[-1]
+    window.focus_compare_page(transient)
+    wait_until(lambda: window.current_tab() is transient)
+    window.remove_comparison_page(transient)
+    wait_until(lambda: window.current_tab() is window.navigation_page())
+    assert window.current_tab().image.comparison_selected
+
+
+def test_drag_hover_scroll_arrow_repeats_until_pointer_leaves(browser):
+    from PySide6.QtWidgets import QToolButton
+    window, _ = browser
+    bar = qt_app.FolderTabBar()
+    for index in range(15): bar.addTab(f"Folder {index}")
+    bar.resize(300, 34)
+    bar.show()
+    QApplication.processEvents()
+    button = next(button for button in bar.findChildren(QToolButton)
+                  if button.objectName().startswith("Scroll") and button.isEnabled())
+    mime = QMimeData()
+    mime.setData(qt_app.THUMBNAIL_FILES_MIME, b"[]")
+    enter = QDragEnterEvent(button.rect().center(), Qt.DropAction.CopyAction, mime,
+                            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    QApplication.sendEvent(button, enter)
+    assert enter.isAccepted()
+    assert bar.drag_scroll_timer.isActive()
+    QApplication.sendEvent(button, QEvent(QEvent.Type.DragLeave))
+    assert not bar.drag_scroll_timer.isActive()
+    bar.close()
+
+
+def test_closing_three_same_folder_comparison_images_keeps_survivor(browser):
+    window, folders = browser
+    third = folders[0] / "third.png"
+    Image.new("RGB", (40, 30), "green").save(third)
+    source = window.open_folder(folders[0])
+    second = source.files[1]
+    add(window, source, image=second)
+    middle = window.comparison_order[-1]
+    add(window, source, image=third)
+    window.remove_comparison_page(source)
+    assert window.compare_enabled
+    window.remove_comparison_page(middle)
+    assert not window.compare_enabled
+    assert window.current_tab() is source
+    assert source.image.path == third
+    assert source.thumbs.selected_paths == {third}
+    assert window.tabs.count() == 1
+
+
+def test_comparison_drag_preview_pushes_panes_and_restores_on_leave(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    add(window, first, second)
+    split = window.comparison_area.split
+    assert [split.widget(i) for i in range(split.count())] == [second.image, first.image]
+    window.preview_comparison_reorder(first, second, False)
+    assert [split.widget(i) for i in range(split.count())] == [first.image, second.image]
+    window.restore_comparison_order()
+    assert [split.widget(i) for i in range(split.count())] == [second.image, first.image]
+    assert window.reorder_comparison_page(first, second, False)
+    assert window.comparison_order == [first, second]
+
+
+@pytest.mark.parametrize("drag_area", ["comparison_label", "label", "viewport"])
+def test_dragging_comparison_header_reorders_with_live_preview(browser, drag_area):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    add(window, first, second)
+    label = (first.image.scroll.viewport() if drag_area == "viewport"
+             else getattr(first.image, drag_area))
+    start = label.rect().center()
+    QTest.mousePress(label, Qt.MouseButton.LeftButton, pos=start)
+    QApplication.processEvents()
+    assert window.current_tab() is second
+    target = second.image
+    horizontal = window.comparison_area.split.orientation() == Qt.Orientation.Horizontal
+    target_point = QPoint(target.width() // 4, target.height() // 2) if horizontal else QPoint(target.width() // 2, target.height() // 4)
+    global_end = target.mapToGlobal(target_point)
+    end = label.mapFromGlobal(global_end)
+    move = QMouseEvent(QEvent.Type.MouseMove, QPointF(end), QPointF(global_end),
+                       Qt.MouseButton.NoButton, Qt.MouseButton.LeftButton,
+                       Qt.KeyboardModifier.NoModifier)
+    QApplication.sendEvent(label, move)
+    assert [window.comparison_area.split.widget(i) for i in range(2)] == [first.image, second.image]
+    release = QMouseEvent(QEvent.Type.MouseButtonRelease, QPointF(end), QPointF(global_end),
+                          Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton,
+                          Qt.KeyboardModifier.NoModifier)
+    QApplication.sendEvent(label, release)
+    assert window.comparison_order == [first, second]
+
+
+def test_clicking_other_comparison_image_focuses_after_release(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    add(window, first, second)
+    QTest.mousePress(first.image.label, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert window.current_tab() is second
+    QTest.mouseRelease(first.image.label, Qt.MouseButton.LeftButton)
+    wait_until(lambda: window.current_tab() is first)
 
 
 def test_sync_button_applies_image_tools_only_when_enabled(browser):

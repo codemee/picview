@@ -9,10 +9,12 @@ from PySide6.QtGui import QImageReader
 from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QVBoxLayout
 
 
-def copy_file(path: Path) -> None:
-    if not path.is_file(): return
+def copy_file(path: Path | list[Path]) -> None:
+    paths = path if isinstance(path, list) else [path]
+    paths = [item for item in paths if item.is_file()]
+    if not paths: return
     data = QMimeData()
-    data.setUrls([QUrl.fromLocalFile(str(path.resolve()))])
+    data.setUrls([QUrl.fromLocalFile(str(item.resolve())) for item in paths])
     QApplication.clipboard().setMimeData(data)
 
 

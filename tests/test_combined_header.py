@@ -11,8 +11,8 @@ from test_tabs import browser, wait_until
 
 def visible_controls(window):
     return [button for button in (window.open_button, window.sort_button,
-            window.direction_button, window.language_button,
-            window.theme_button) if not button.isHidden()]
+            window.direction_button, window.modified_button,
+            window.settings_button) if not button.isHidden()]
 
 
 def current_tab_visible(window):
@@ -111,11 +111,9 @@ def test_tabs_share_thumbnail_header_below_main_toolbar(browser):
     assert window.tabs.strip.parentWidget() is page.thumbs.tab_slot
     assert window.tabs.layout().count() == 1
     assert page.thumbs.drag_handle.mapTo(window, QPoint(page.thumbs.drag_handle.width(), 0)).x() <= window.tabs.strip.mapTo(window, QPoint()).x()
-    assert window.language_button.geometry().right() < window.theme_button.geometry().left()
-    assert window.modified_button.geometry().right() < window.integration_button.geometry().left()
-    assert window.integration_button.geometry().right() < window.language_button.geometry().left()
-    assert window.theme_button.geometry().right() == window.main_toolbar.width() - 9
-    assert window.language_button.x() > window.direction_button.geometry().right() + 100
+    assert window.modified_button.geometry().right() < window.settings_button.geometry().left()
+    assert window.settings_button.geometry().right() == window.main_toolbar.width() - 9
+    assert window.settings_button.x() > window.direction_button.geometry().right() + 100
     toolbar_bottom = window.main_toolbar.mapTo(window, QPoint(0, window.main_toolbar.height())).y()
     page_top = page.mapTo(window, QPoint(0, 0)).y()
     assert page_top == toolbar_bottom
@@ -156,7 +154,7 @@ def test_switching_reordering_and_resizing_keep_current_tab_visible(browser):
             assert not window.open_button.isHidden()
             assert not window.direction_button.isHidden()
         if width == 260:
-            assert window.toolbar_overflow.more_button.isVisible()
+            assert window.settings_button.isVisible()
             assert window.tabs.strip.width() >= 180
     page = window.current_tab()
     window.tabs.bar.moveTab(window.tabs.currentIndex(), 0)

@@ -90,6 +90,14 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 
 ### 開啟與拖放圖片
 
+- 主工具列右側的「…」選單提供檔案總管／Finder 整合、語言與配色設定。
+
+- 開啟資料夾對話框預設顯示目前標籤資料夾的上一層；若沒有上一層，則顯示目前資料夾。
+- 在縮圖上使用 <kbd>Ctrl</kbd> 點選切換個別選取、<kbd>Shift</kbd> 點選或 <kbd>Shift</kbd>+方向鍵選取連續範圍，或按 <kbd>Ctrl</kbd>+<kbd>A</kbd> 全選；macOS 以 <kbd>Command</kbd> 取代 <kbd>Ctrl</kbd>。也可在縮圖空白處拖曳框選，點擊空白處則取消選取。
+- 可一次拖曳多張已選圖片到其他資料夾標籤，或拖到單圖／比圖窗格一次加入比圖。
+- 跨標籤拖放依作業系統的拖曳動作複製或搬移檔案；遇到同名檔會詢問取代、保留兩者、略過或取消。同一資料夾的標籤之間則直接選取圖片。
+- 拖曳切換標籤後，也可放進該標籤的縮圖區，預設搬移檔案；Windows／Linux 按住 <kbd>Ctrl</kbd>、macOS 按住 <kbd>Option</kbd> 則複製。
+
 - 點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-light.png" width="34" height="34" alt="開啟資料夾" title="開啟資料夾"></picture>，選擇要檢視的資料夾。
 - 將資料夾或圖片檔案拖曳至視窗，也能開啟檢視。
 - 新開啟的資料夾標籤沿用目前的窗格排列與比例；拖曳窗格或分隔條會同步調整所有標籤的版面。
@@ -128,7 +136,7 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 
 - 主工具列的排序方式按鈕，在 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-light.png" width="34" height="34" alt="檔名排序" title="檔名排序"></picture> **檔名（自然排序）** 與 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-light.png" width="34" height="34" alt="修改時間排序" title="修改時間排序"></picture> **修改時間** 間切換，只影響目前標籤。
 - 旁邊的排序方向按鈕，在 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-ascending-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-ascending-light.png" width="34" height="34" alt="順向排序" title="順向排序"></picture> **順向** 與 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-descending-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-descending-light.png" width="34" height="34" alt="逆向排序" title="逆向排序"></picture> **逆向** 間切換；修改時間順向為舊到新，逆向為新到舊。排序不會切換目前圖片或重設檢視狀態。
-- 主工具列語言按鈕前的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-light.png" width="34" height="34" alt="顯示修改日期時間" title="顯示修改日期時間"></picture> 切換 **顯示修改日期時間**，立即套用到所有標籤，並保留至下次開啟程式；新開與複製標籤也沿用此全域設定。
+- 主工具列右側的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-light.png" width="34" height="34" alt="顯示修改日期時間" title="顯示修改日期時間"></picture> 切換 **顯示修改日期時間**，立即套用到所有標籤，並保留至下次開啟程式；新開與複製標籤也沿用此全域設定。
 - 縮圖卡片底部預設顯示本機時間的修改日期時間；卡片太窄時，將滑鼠停在日期上可查看完整時間。
 - 各標籤獨立保存排序方式與方向，複製標籤及重開程式時也會保留。新增或修改檔案後，排序與日期會自動更新。
 - 在縮圖卡片按滑鼠右鍵，選 **複製** 可將原始圖檔複製到剪貼簿，再貼至其他應用程式或資料夾。
@@ -182,12 +190,18 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 
 - 將標籤或縮圖拖到單圖窗格，會保留原窗格並加入拖入的圖片，立即開始比圖。
 - 繼續拖到任一比圖窗格，可依拖入順序加入更多窗格；各窗格平均分配空間，過小時會停止加入。
-- 再拖入已在比圖中的標籤或縮圖，會建立獨立標籤，方便比較同一資料夾的不同圖片。
+- 多選縮圖拖入單圖或比圖窗格時，每張圖片都會加入比圖，不會在縮圖窗格增加標籤。
+- 多檔拖入會略過比圖中已顯示的圖片；拖曳縮圖停留在其他標籤上時，會自動切換該標籤。
+- 拖入圖片載入期間，半透明遮罩與轉圈提示顯示處理狀態；點陣圖在背景解碼。
+- 拖曳縮圖停留在標籤列的左右箭頭上時，標籤列會持續捲動，方便移到目前看不到的標籤。
+- 再拖入已在比圖中的縮圖，會在比圖窗格建立獨立檢視，不增加縮圖標籤；切換這些窗格時，同一資料夾的標籤會顯示對應圖片的縮圖選取狀態。
+- 按住比圖中的圖片或窗格標題拖向另一窗格，可調整比較順序；圖片預覽會跟隨滑鼠，虛線空位標示插入位置，其他圖片即時移動預覽順序，放開滑鼠便完成排序。拖到目標窗格前半或後半可分別放在目標之前或之後。
 - 縮圖與單圖窗格上下排列時，比圖中的圖片左右並排；兩窗格左右排列時，比圖中的圖片上下排列。
 - 切換目前選中的比圖窗格或標籤時，外層的縮圖與單圖版面維持不變；離開比圖後也保留當下版面。
 - 比圖模式下開啟全螢幕會顯示所有比圖圖片；寬畫面左右並排，直向畫面上下排列，螢幕邊緣與窗格之間留有空隙。預設各圖片縮至可用空間，不放大超過原尺寸。作用中的圖片窗格會以強調色標示；點擊窗格或按 <kbd>Tab</kbd>／<kbd>Shift</kbd>+<kbd>Tab</kbd> 即可切換，也可開啟同步操作。
 - 切換到各標籤，從縮圖選擇該資料夾要比較的圖片。
 - 比較窗格共用上方工具列。
+- 共用單圖工具列的「取消比圖」按鈕可一次結束整個比圖模式。
 - 點擊圖片窗格，會選取該窗格、切換到對應標籤與縮圖，並將共用工具列指向該窗格；選中窗格會顯示重點色外框。
 - 比圖時按 <kbd>Tab</kbd> 可依比圖順序循環選取窗格，按 <kbd>Shift</kbd>+<kbd>Tab</kbd> 可反向切換。
 - 離開比圖時，切換到比圖順序最後一個資料夾，並保留當下的窗格版面。
@@ -195,7 +209,7 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 - 預設各窗格可獨立縮放、旋轉、鏡射、設定背景色及捲動。
 - 點擊單圖工具列的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-light.png" width="34" height="34" alt="同步操作" title="同步操作"></picture>，可同步旋轉、鏡射、縮放、符合窗格、背景色，以及水平與垂直捲動到所有比圖窗格。不同尺寸的圖片會依捲動比例對齊；再次點擊恢復獨立操作。
 - 比較中的背景圖片也會即時更新。
-- 點擊各比圖窗格右上角的關閉按鈕可將該資料夾移出比圖；剩下一個窗格時自動回到一般檢視，並保留各標籤的選圖與操作狀態。
+- 點擊各比圖窗格右上角的關閉按鈕可將該圖片移出比圖；剩下一張時自動回到一般檢視，並在縮圖窗格選取最後保留的圖片。
 
 ### 縮放與縮圖大小
 
@@ -249,14 +263,14 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 
 ### 語言
 
-- 點擊語言按鈕，依序切換 **跟隨系統 → 中文 → 英文**。
+- 展開主工具列右側「…」選單，點擊語言項目，依序切換 **跟隨系統 → 中文 → 英文**。
 - 圖示依序為 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-system-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-system-light.png" width="34" height="34" alt="語言跟隨系統" title="語言跟隨系統"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-zh-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-zh-light.png" width="34" height="34" alt="中文" title="中文"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-en-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-en-light.png" width="34" height="34" alt="英文" title="英文"></picture>。
 - 預設跟隨系統：中文系統顯示中文，其餘顯示英文。
 - 重開程式會保留語言選擇。
 
 ### 配色
 
-- 點擊配色按鈕，依序切換 **跟隨系統 → 淺色 → 深色**。
+- 展開主工具列右側「…」選單，點擊配色項目，依序切換 **跟隨系統 → 淺色 → 深色**。
 - 圖示依序為 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-system-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-system-light.png" width="34" height="34" alt="配色跟隨系統" title="配色跟隨系統"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-light-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-light-light.png" width="34" height="34" alt="淺色" title="淺色"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-dark-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-dark-light.png" width="34" height="34" alt="深色" title="深色"></picture>。
 - 預設為 **跟隨系統**。
 - 深色介面採初號機風格：深紫色窗格、螢光綠選取提示與滑桿，以及少量橘色工具點綴。

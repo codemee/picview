@@ -28,10 +28,13 @@ def test_narrow_and_short_window_overflows_and_restores(browser, orientation):
     assert window.width() == 260 and window.height() == 220
     controllers = (window.toolbar_overflow, window.thumbs.toolbar_overflow, window.image.toolbar_overflow)
     for controller in controllers:
-        assert controller.overflowed and controller.more_button.isVisible()
-        assert controller.more_button.geometry().right() < controller.host.width()
-        controller.populate_menu()
-        assert controller.menu.actions()
+        if controller is window.toolbar_overflow:
+            assert window.settings_button.isVisible()
+        else:
+            assert controller.overflowed and controller.more_button.isVisible()
+            assert controller.more_button.geometry().right() < controller.host.width()
+            controller.populate_menu()
+            assert controller.menu.actions()
         for widget in controller.widgets:
             if isinstance(widget, QToolButton) and not widget.isHidden():
                 assert widget.geometry().left() >= 0
@@ -42,7 +45,8 @@ def test_narrow_and_short_window_overflows_and_restores(browser, orientation):
     for controller in controllers:
         assert not controller.overflowed
         assert controller.more_button.isHidden()
-        assert all(not widget.isHidden() for widget in controller.hide_order)
+        assert all(not widget.isHidden() for widget in controller.hide_order
+                   if widget.property("toolbar_available") is not False)
 
 
 def test_main_menu_keeps_theme_and_language_controls_live(browser):
@@ -51,12 +55,15 @@ def test_main_menu_keeps_theme_and_language_controls_live(browser):
     window.resize(260, 350)
     QTest.qWait(100)
     controller = window.toolbar_overflow
-    assert window.theme_button in controller.overflowed
+    assert window.theme_button.isHidden() and window.language_button.isHidden()
+    window.populate_settings_menu()
+    assert len(window.settings_menu.actions()) == 3
     old_mode = window.theme_mode
-    action_for(controller, window.theme_button).trigger()
+    window.settings_menu.actions()[2].trigger()
     assert window.theme_mode != old_mode
     old_language = window.language_mode
-    action_for(controller, window.language_button).trigger()
+    window.populate_settings_menu()
+    window.settings_menu.actions()[1].trigger()
     assert window.language_mode != old_language
     assert window.current_tab() is page
     assert window.width() == 260
