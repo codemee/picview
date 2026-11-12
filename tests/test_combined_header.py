@@ -118,7 +118,7 @@ def test_tabs_and_tools_share_thumbnail_header_without_main_toolbar(browser):
     assert window.sort_button.geometry().right() < window.direction_button.x()
     assert window.direction_button.geometry().right() < window.settings_button.x()
     page_top = page.mapTo(window, QPoint(0, 0)).y()
-    assert page_top == 0
+    assert page_top == window.centralWidget().mapTo(window, QPoint()).y()
     assert window.tabs.strip.mapTo(window, QPoint()).y() == page_top + 4
     assert window.tabs.strip.height() == 34
     assert window.open_button.y() == 4
