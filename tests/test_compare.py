@@ -48,6 +48,22 @@ def test_comparison_panes_reorder_and_end_from_shared_toolbar(browser):
     assert window.current_tab() is first
 
 
+def test_comparison_toolbar_names_mode_and_exit_restores_filename(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    add(window, first, second)
+    for page in window.comparison_order:
+        assert page.image.filename_label.text() == window.t["compare_mode"]
+        assert page.image.path.name in page.image.comparison_label.text()
+    window.focus_compare_page(first)
+    wait_until(lambda: window.current_tab() is first)
+    assert window.comparison_area.toolbar_image.filename_label.text() == window.t["compare_mode"]
+    window.set_compare(False)
+    for page in (first, second):
+        assert page.image.filename_label.text() == page.image.path.name
+
+
 def test_thumbnail_drop_on_another_tab_copies_without_overwriting(browser):
     window, folders = browser
     source = window.open_folder(folders[0])

@@ -212,6 +212,7 @@ TEXT["en"].update({
     "bg_dark_purple": "Dark purple", "bg_dark_red": "Dark red", "bg_dark_brown": "Dark brown", "bg_dark_teal": "Dark teal",
     "more_tools": "More tools",
     "compare": "Compare images", "compare_folder": "Drag a tab or thumbnail onto an image to compare", "compare_empty": "Drag a tab or thumbnail here to compare images", "image_tools": "Image tools",
+    "compare_mode": "Comparison mode",
     "compare_loading": "Adding images to comparison…",
     "compare_close": "Remove from comparison", "compare_exit": "End comparison", "compare_too_small": "The image panes are too small for another comparison.",
     "file_conflict": "A file named {name} already exists in the destination folder.", "replace_file": "Replace", "keep_both": "Keep both", "skip_file": "Skip", "cancel_transfer": "Cancel",
@@ -247,6 +248,7 @@ TEXT["zh"].update({
     "bg_dark_purple": "深紫色", "bg_dark_red": "深紅色", "bg_dark_brown": "深棕色", "bg_dark_teal": "深青色",
     "more_tools": "更多工具",
     "compare": "比圖", "compare_folder": "拖曳標籤或縮圖到單圖窗格進行比圖", "compare_empty": "拖曳標籤或縮圖到這裡進行比圖", "image_tools": "圖片工具",
+    "compare_mode": "比圖模式",
     "compare_loading": "正在加入比圖…",
     "compare_close": "移出比圖", "compare_exit": "取消比圖", "compare_too_small": "單圖窗格太小，無法再加入比圖。",
     "file_conflict": "目標資料夾已有同名檔案：{name}", "replace_file": "取代", "keep_both": "保留兩者", "skip_file": "略過", "cancel_transfer": "取消",
@@ -1739,7 +1741,8 @@ class ImagePane(QFrame):
 
     def update_filename(self):
         name = self.path.name if self.path else ""
-        self.filename_label.setText(f"{self.comparison_title} / {name}" if self.comparison_title else name)
+        self.filename_label.setText(self.labels["compare_mode"] if self.comparison_title else name)
+        self.filename_label.setStyleSheet("font-weight:600;" if self.comparison_title else "")
         self.comparison_label.setText(f"{self.comparison_title} / {name}" if self.comparison_title else "")
         self.update_comparison_fullscreen()
 
@@ -2658,9 +2661,9 @@ class ComparisonArea(QWidget):
         self.pages = []
         self.toolbar_image = None
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(3, 3, 3, 3)
         self.header = QFrame()
-        self.header.setObjectName("card")
+        self.header.setObjectName("comparisonToolbar")
         self.header.setFixedHeight(42)
         self.header_layout = QVBoxLayout(self.header)
         self.header_layout.setContentsMargins(10, 4, 10, 4)
@@ -2680,6 +2683,11 @@ class ComparisonArea(QWidget):
         self.toolbar_image = None
 
     def select_toolbar(self, image):
+        base, accent = QColor(PALETTE["card"]), QColor(PALETTE["accent"])
+        tint = QColor(*(round(a * .86 + b * .14) for a, b in zip(
+            (base.red(), base.green(), base.blue()), (accent.red(), accent.green(), accent.blue()))))
+        self.header.setStyleSheet(f"#comparisonToolbar{{background:{tint.name()};border-radius:9px;}}")
+        self.update()
         if self.toolbar_image is not image:
             self.release_toolbar()
             self.toolbar_image = image
@@ -2689,6 +2697,14 @@ class ComparisonArea(QWidget):
         for page in self.pages:
             page.image.comparison_selected = page.image is image
             page.image.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(QColor(PALETTE["card"]))
+        painter.setPen(QPen(QColor(PALETTE["accent"]), 1.5))
+        painter.drawRoundedRect(QRectF(self.rect()).adjusted(.75, .75, -.75, -.75), 12, 12)
 
     def set_layout_orientation(self, orientation):
         target = Qt.Orientation.Horizontal if orientation == Qt.Orientation.Vertical else Qt.Orientation.Vertical
@@ -4266,6 +4282,8 @@ class PicView(QMainWindow):
         self.refresh_shell_integration_button()
         self.modified_button.setToolTip(self.t["show_modified"])
         self.modified_button.setAccessibleName(self.t["show_modified"])
+        self.settings_button.set_kind("more", self.t["more_tools"])
+        self.settings_button.setAccessibleName(self.t["more_tools"])
         if palette_changed: self.modified_button.refresh_icon()
         self.open_button.setToolTip(shortcut_tooltip(self.t["open"], QKeySequence.StandardKey.Open))
         self.comparison_area.empty.setText(self.t["compare_empty"])

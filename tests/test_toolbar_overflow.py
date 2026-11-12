@@ -69,6 +69,18 @@ def test_main_menu_keeps_theme_and_language_controls_live(browser):
     assert window.width() == 260
 
 
+def test_settings_ellipsis_repaints_with_theme(browser):
+    from picview.qt_app import IconButton
+    window, _ = browser
+    for _ in range(3):
+        window.toggle_theme()
+        expected = IconButton("more", "")
+        actual_image = window.settings_button.icon().pixmap(20, 20).toImage()
+        expected_image = expected.icon().pixmap(20, 20).toImage()
+        assert actual_image == expected_image
+        expected.deleteLater()
+
+
 def test_hidden_zoom_and_thumbnail_size_editors(browser):
     window, folders = browser
     window.open_folder(folders[0])

@@ -203,6 +203,7 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 - Full screen in comparison mode shows every compared image, with space around the screen edges and between panes. Images sit side by side on wide screens and stack on portrait screens. Each image initially fits without enlarging beyond its original size. The active image has an accent outline; click a pane or press <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> to switch. The toolbar also toggles synchronized operations.
 - Switch to each tab and select its image from the thumbnails.
 - Comparison panes share one toolbar above the images.
+- The shared toolbar shows “Comparison mode” while individual panes show their filenames. An accent outline and tinted toolbar distinguish comparison from normal viewing.
 - The shared image toolbar has an End comparison button that closes comparison mode at once.
 - Click an image pane to select it, show its corresponding tab and thumbnails, and target it with the shared toolbar; an accent-colored border marks the selection.
 - Press <kbd>Tab</kbd> to cycle through comparison panes in order, or <kbd>Shift</kbd>+<kbd>Tab</kbd> to cycle backward.
