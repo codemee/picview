@@ -203,6 +203,10 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 - Full screen in comparison mode shows every compared image, with space around the screen edges and between panes. Images sit side by side on wide screens and stack on portrait screens. Each image initially fits without enlarging beyond its original size. The active image has an accent outline; click a pane or press <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> to switch. The toolbar also toggles synchronized operations.
 - Switch to each tab and select its image from the thumbnails.
 - Comparison panes share one toolbar above the images.
+- When an image is large enough to scroll, hold the left mouse button and drag to pan. Comparison panes can still be reordered by dragging their titles.
+- The thumbnail or image pane outline marks input focus. Use <kbd>+</kbd>/<kbd>-</kbd>, optionally with <kbd>Ctrl</kbd>, to zoom the focused pane; <kbd>0</kbd> or <kbd>Ctrl</kbd>+<kbd>0</kbd> restores the default thumbnail size or actual image size. Use <kbd>Command</kbd> on macOS. Hold <kbd>Ctrl</kbd> (or <kbd>Command</kbd> on macOS) while scrolling the mouse wheel to zoom.
+- Full screen supports the same panning and zoom shortcuts, with flat scrollbars matching the main window. Full-screen comparison zoom targets the selected image.
+- Input focus outlines use the same theme accent as the slider handles. In full screen, <kbd>Alt</kbd>+<kbd>F</kbd> toggles fit for the selected image.
 - The shared toolbar shows “Comparison mode” while individual panes show their filenames. An accent outline and tinted toolbar distinguish comparison from normal viewing.
 - The shared image toolbar has an End comparison button that closes comparison mode at once.
 - Click an image pane to select it, show its corresponding tab and thumbnails, and target it with the shared toolbar; an accent-colored border marks the selection.

@@ -121,7 +121,50 @@ def paint_card_background(widget):
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(QColor(PALETTE["card"]))
     painter.drawRoundedRect(QRectF(widget.rect()), 12, 12)
+    if widget.property("inputFocused"):
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor(PALETTE["accent"]), 2))
+        painter.drawRoundedRect(QRectF(widget.rect()).adjusted(1, 1, -1, -1), 11, 11)
     painter.end()
+
+
+class ViewportInteraction(QObject):
+    """Keep drag coordinates in screen space while the scrolled label moves."""
+    def __init__(self, scroll, label, zoom, interacted=lambda: None, pan=True):
+        super().__init__(scroll)
+        self.scroll, self.zoom, self.interacted, self.pan = scroll, zoom, interacted, pan
+        self.start = None
+        scroll.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        for widget in (scroll.viewport(), label): widget.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.Wheel and event.modifiers() & (
+                Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.MetaModifier):
+            self.scroll.setFocus(Qt.FocusReason.MouseFocusReason)
+            self.zoom(1 if event.angleDelta().y() > 0 else -1)
+            event.accept()
+            return True
+        if event.type() == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
+            self.scroll.setFocus(Qt.FocusReason.MouseFocusReason)
+            bars = self.scroll.horizontalScrollBar(), self.scroll.verticalScrollBar()
+            if self.pan and any(bar.maximum() > bar.minimum() for bar in bars):
+                self.start = event.globalPosition().toPoint()
+                self.values = tuple(bar.value() for bar in bars)
+                watched.setCursor(Qt.CursorShape.ClosedHandCursor)
+                event.accept()
+                return True
+        if self.start is not None:
+            if event.type() == QEvent.Type.MouseMove and event.buttons() & Qt.MouseButton.LeftButton:
+                delta = event.globalPosition().toPoint() - self.start
+                self.scroll.horizontalScrollBar().setValue(self.values[0] - delta.x())
+                self.scroll.verticalScrollBar().setValue(self.values[1] - delta.y())
+                return True
+            if event.type() == QEvent.Type.MouseButtonRelease:
+                self.start = None
+                watched.unsetCursor()
+                self.interacted()
+                return True
+        return super().eventFilter(watched, event)
 
 
 def use_system_palette(app: QApplication) -> None:
@@ -1001,6 +1044,8 @@ class ThumbnailPane(QFrame):
             widget.installEventFilter(self)
         self.scroll.viewport().setAcceptDrops(True)
         self.grid_host.setAcceptDrops(True)
+        self.viewport_interaction = ViewportInteraction(self.scroll, self.grid_host,
+            lambda direction: self.slider.setValue(self.slider.value() + direction * 10), pan=False)
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -1533,6 +1578,8 @@ class ImagePane(QFrame):
         self.update_shortcut_tooltips()
         self.apply_background()
         for widget in self.findChildren(QWidget): widget.installEventFilter(self)
+        self.viewport_interaction = ViewportInteraction(self.scroll, self.label,
+            lambda direction: self.adjust_zoom(direction * 10), self.interacted.emit)
 
     def update_shortcut_tooltips(self):
         for button, label, keys in ((self.fit_b, "fit", "Alt+F"), (self.rotate_b, "rotate", "Alt+C"),
@@ -2002,6 +2049,10 @@ class SingleImageFullscreen(QMainWindow):
         layout.addWidget(self.image_scroll)
         self.setCentralWidget(root)
         self.image_toolbar = FullscreenImageToolbar(pane.window(), [pane.owner_page], root)
+        self.viewport_interaction = ViewportInteraction(self.image_scroll, self.image_label,
+            lambda direction: self.image_toolbar.set_zoom(self.image_toolbar.zoom_slider.value() + direction * 100))
+        for bar in (self.image_scroll.horizontalScrollBar(), self.image_scroll.verticalScrollBar()):
+            bar.setStyleSheet(pane.window().scrollbar_style)
         self.set_background(pane.background_color())
 
     def set_background(self, color):
@@ -2768,6 +2819,15 @@ class ComparisonFullscreen(QMainWindow):
                 widget.installEventFilter(self)
         for index in range(1, self.split.count()): self.split.handle(index).setEnabled(False)
         self.image_toolbar = FullscreenImageToolbar(owner, self.pages, root)
+        self.viewport_interactions = []
+        for page in self.pages:
+            scroll = self.scrollers[page]
+            self.viewport_interactions.append(ViewportInteraction(scroll, self.labels[page],
+                lambda direction, page=page: (self.set_active_page(page), self.image_toolbar.set_zoom(
+                    self.image_toolbar.zoom_slider.value() + direction * 100)),
+                lambda page=page: self.set_active_page(page)))
+            for bar in (scroll.horizontalScrollBar(), scroll.verticalScrollBar()):
+                bar.setStyleSheet(owner.scrollbar_style)
         self.set_active_page(owner.focused_compare_page if owner.focused_compare_page in self.pages else self.pages[0])
 
     def cycle_page(self, offset):
@@ -3246,6 +3306,8 @@ class PicView(QMainWindow):
         self.sync_enabled = False
         self._syncing_tools = False
         app = QApplication.instance()
+        self.input_pane = "image"
+        app.focusChanged.connect(self.track_input_focus)
         self.system_palette = QPalette(app.palette())
         self.theme_mode = self.settings.get("theme", "system")
         if self.theme_mode not in ("system", "light", "dark"): self.theme_mode = "system"
@@ -4181,8 +4243,43 @@ class PicView(QMainWindow):
         if page is not None: getattr(page, action)(*args)
 
     def image_action(self, action, *args):
+        active = QApplication.activeWindow()
+        if action == "toggle_fit" and isinstance(active, (SingleImageFullscreen, ComparisonFullscreen)):
+            active.image_toolbar.fit_button.click()
+            return
         image = self.image_target()
         if image is not None: getattr(image, action)(*args)
+
+    def track_input_focus(self, old, current):
+        widget = current
+        target = None
+        while widget is not None:
+            if isinstance(widget, (ThumbnailPane, ImagePane)):
+                target = widget
+                break
+            if hasattr(self, "comparison_area") and widget is self.comparison_area.header:
+                target = self.comparison_area.toolbar_image
+                break
+            widget = widget.parentWidget()
+        if target is None: return
+        self.input_pane = "thumb" if isinstance(target, ThumbnailPane) else "image"
+        for page in self.pages():
+            for pane in (page.thumbs, page.image):
+                pane.setProperty("inputFocused", pane is target)
+                pane.update()
+
+    def zoom_focused(self, direction):
+        active = QApplication.activeWindow()
+        if isinstance(active, (SingleImageFullscreen, ComparisonFullscreen)):
+            toolbar = active.image_toolbar
+            toolbar.set_zoom(1000 if direction == 0 else toolbar.zoom_slider.value() + direction * 100)
+        elif self.input_pane == "thumb":
+            pane = self.current_tab().thumbs
+            pane.slider.setValue(THUMBNAIL_BASE_SIZE if direction == 0 else pane.slider.value() + direction * 10)
+        elif direction == 0:
+            self.image_action("reset_zoom")
+        else:
+            self.image_action("adjust_zoom", direction * 10)
 
     def open_comparison_fullscreen(self):
         if self.compare_full_window is not None:
@@ -4215,9 +4312,11 @@ class PicView(QMainWindow):
                     ("Alt+F", lambda: self.image_action("toggle_fit")),
                     ("Alt+C", lambda: self.image_action("rotate")),
                     ("Alt+V", lambda: self.image_action("mirror_v")), ("Alt+H", lambda: self.image_action("mirror_h")),
-                    ("+", lambda: self.image_action("adjust_zoom", 10)), ("=", lambda: self.image_action("adjust_zoom", 10)),
-                    ("-", lambda: self.image_action("adjust_zoom", -10)), ("0", lambda: self.image_action("reset_zoom")), ("F11", lambda: self.image_action("open_full"))]
+                    ("+", lambda: self.zoom_focused(1)), ("=", lambda: self.zoom_focused(1)),
+                    ("-", lambda: self.zoom_focused(-1)), ("0", lambda: self.zoom_focused(0)), ("F11", lambda: self.image_action("open_full"))]
         modifier = "Meta" if sys.platform == "darwin" else "Ctrl"
+        bindings += [(f"{modifier}+{key}", lambda direction=direction: self.zoom_focused(direction))
+                     for key, direction in (("+", 1), ("=", 1), ("-", -1), ("0", 0))]
         bindings += [("Ctrl+PgDown", lambda: self.switch_tab(1)),
                      ("Ctrl+PgUp", lambda: self.switch_tab(-1)),
                      ("Ctrl+Tab", lambda: self.switch_tab(1)),

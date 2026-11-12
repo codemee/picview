@@ -208,6 +208,11 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     assert not window.image.fit_b.isChecked()
     assert window.image.slider.value() == fit_ticks + 100
     window.image.fit_b.click()
+    window.activateWindow()
+    app.processEvents()
+    window.image.scroll.setFocus()
+    app.processEvents()
+    assert window.input_pane == "image"
     QTest.keyClick(window, Qt.Key.Key_0)
     assert not window.image.fit_b.isChecked()
     assert window.image.slider.value() == 1000
