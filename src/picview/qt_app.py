@@ -1942,15 +1942,25 @@ class ImagePane(QFrame):
         return True
 
     def load(self,path):
-        self.auto_scale=False; self.path=path; self.rotation=0; self.fh=self.fv=False; self.zoom=1.0; self.fullscreen_zoom=None; self.frames=[]; self.timer.stop(); self.fit_b.setChecked(False)
+        self.auto_scale=False; self.path=path; self.rotation=0; self.fh=self.fv=False; self.zoom=1.0; self.fullscreen_zoom=None; self.frames=[]; self.timer.stop()
         self.slider.blockSignals(True); self.slider.setMaximum(4000); self.slider.setValue(1000); self.slider.blockSignals(False); self.zoom_label.set_value(1000)
         self.update_filename(); self.filename_label.setToolTip(str(path))
         try:
             self.frames = self.read_frames(path)
             self.index=0; self.auto_scale=True
+            width, height = self.image_size()
+            fit = width > max(1, self.scroll.width() - 8) or height > max(1, self.scroll.height() - 8)
+            # Set the final fit state directly instead of briefly disabling fit
+            # and adding scrollbars between two fitted comparison images.
+            self.fit_b.blockSignals(True)
+            self.fit_b.setChecked(fit)
+            self.fit_b.blockSignals(False)
+            self.fit_to_pane = fit
+            policy = Qt.ScrollBarPolicy.ScrollBarAlwaysOff if fit else Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            self.scroll.setHorizontalScrollBarPolicy(policy)
+            self.scroll.setVerticalScrollBarPolicy(policy)
             if self.isVisible():
-                self.apply_default_zoom()
-                if not self.fit_to_pane: self.render()
+                self.render()
             else:
                 QTimer.singleShot(0,self.refresh_after_resize)
             QTimer.singleShot(0,self.apply_default_zoom)
@@ -2831,7 +2841,9 @@ class ComparisonArea(QWidget):
         base, accent = QColor(PALETTE["card"]), QColor(PALETTE["accent"])
         tint = QColor(*(round(a * .86 + b * .14) for a, b in zip(
             (base.red(), base.green(), base.blue()), (accent.red(), accent.green(), accent.blue()))))
-        self.header.setStyleSheet(f"#comparisonToolbar{{background:{tint.name()};border-radius:9px;}}")
+        style = f"#comparisonToolbar{{background:{tint.name()};border-radius:9px;}}"
+        if self.header.styleSheet() != style:
+            self.header.setStyleSheet(style)
         self.update()
         if self.toolbar_image is not image:
             self.release_toolbar()
@@ -2845,11 +2857,7 @@ class ComparisonArea(QWidget):
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setBrush(QColor(PALETTE["card"]))
-        painter.setPen(QPen(QColor(PALETTE["accent"]), 1.5))
-        painter.drawRoundedRect(QRectF(self.rect()).adjusted(.75, .75, -.75, -.75), 12, 12)
+        paint_card_background(self)
 
     def set_layout_orientation(self, orientation):
         target = Qt.Orientation.Horizontal if orientation == Qt.Orientation.Vertical else Qt.Orientation.Vertical
@@ -3977,12 +3985,14 @@ class PicView(QMainWindow):
     def focus_compare_page(self, page):
         if page in self.checked_pages:
             self.focused_compare_page = page
-            self.comparison_area.select_toolbar(page.image)
-            self.update_image_status()
+            page.image.scroll.setFocus(Qt.FocusReason.OtherFocusReason)
             if self.current_tab() is not page:
                 # Move the shared area while the destination tab is still hidden.
                 # Otherwise its empty image slot briefly lets thumbnails fill the page.
-                QTimer.singleShot(0, self, lambda: self.show_compare_page(page))
+                self.show_compare_page(page)
+            else:
+                self.comparison_area.select_toolbar(page.image)
+                self.update_image_status()
 
     def show_compare_page(self, page):
         if not (self.compare_enabled and self.focused_compare_page is page and page in self.pages()):
@@ -3996,8 +4006,13 @@ class PicView(QMainWindow):
             self.tabs.setCurrentWidget(page)
             if page._layout_pending: page.apply_layout()
             page.layout().activate()
+            self.comparison_area.layout().activate()
+            self.comparison_area.header_layout.activate()
+            page.image.scroll.setFocus(Qt.FocusReason.OtherFocusReason)
         finally:
-            QTimer.singleShot(0, self.tabs, lambda: self.tabs.setUpdatesEnabled(True))
+            # Finish the layout before exposing the destination. A queued
+            # re-enable can expose a frame with an empty/moving toolbar.
+            self.tabs.setUpdatesEnabled(True)
 
     def rehost_comparison(self, host):
         area = self.comparison_area
@@ -4425,6 +4440,8 @@ class PicView(QMainWindow):
             for pane in (page.thumbs, page.image):
                 pane.setProperty("inputFocused", pane is target)
                 pane.update()
+        self.comparison_area.setProperty("inputFocused", isinstance(target, ImagePane))
+        self.comparison_area.update()
 
     def zoom_focused(self, direction):
         active = QApplication.activeWindow()

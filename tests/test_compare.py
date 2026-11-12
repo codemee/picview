@@ -64,6 +64,46 @@ def test_comparison_toolbar_names_mode_and_exit_restores_filename(browser):
         assert page.image.filename_label.text() == page.image.path.name
 
 
+def test_comparison_focus_border_follows_input_pane(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    add(window, first, second)
+    second.thumbs.scroll.setFocus()
+    wait_until(lambda: bool(second.thumbs.property("inputFocused")))
+    assert not window.comparison_area.property("inputFocused")
+    window.focus_compare_page(first)
+    wait_until(lambda: bool(window.comparison_area.property("inputFocused")))
+    assert first.image.property("inputFocused")
+    assert not any(page.thumbs.property("inputFocused") for page in window.pages())
+    assert window.comparison_area.toolbar_image is first.image
+    assert window.comparison_area.isVisible()
+    assert window.tabs.updatesEnabled()
+
+
+def test_switching_fitted_comparison_image_keeps_scrollbar_policy(browser):
+    window, folders = browser
+    for index in range(2):
+        Image.new("RGB", (1600, 1200), "blue").save(folders[0] / f"large{index}.png")
+    first = window.open_folder(folders[0], folders[0] / "large0.png")
+    second = window.open_folder(folders[1])
+    add(window, first, second)
+    window.focus_compare_page(first)
+    wait_until(lambda: first.image.fit_to_pane)
+    QTest.qWait(100)  # Settle the initial comparison layout and resize renders.
+    fit_changes = []
+    first.image.fit_b.toggled.connect(fit_changes.append)
+    other_pixmap = second.image.label.pixmap().cacheKey()
+    first.thumbs.select(folders[0] / "large1.png")
+    QTest.qWait(30)
+    assert first.image.path == folders[0] / "large1.png"
+    assert first.image.fit_to_pane
+    assert fit_changes == []
+    assert first.image.scroll.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+    assert first.image.scroll.verticalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+    assert second.image.label.pixmap().cacheKey() == other_pixmap
+
+
 def test_thumbnail_drop_on_another_tab_copies_without_overwriting(browser):
     window, folders = browser
     source = window.open_folder(folders[0])

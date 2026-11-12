@@ -214,7 +214,8 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 - The thumbnail or image pane outline marks input focus. Use <kbd>+</kbd>/<kbd>-</kbd>, optionally with <kbd>Ctrl</kbd>, to zoom the focused pane; <kbd>0</kbd> or <kbd>Ctrl</kbd>+<kbd>0</kbd> restores the default thumbnail size or actual image size. Use <kbd>Command</kbd> on macOS. Hold <kbd>Ctrl</kbd> (or <kbd>Command</kbd> on macOS) while scrolling the mouse wheel to zoom.
 - Full screen supports the same panning and zoom shortcuts, with flat scrollbars matching the main window. Full-screen comparison zoom targets the selected image.
 - Input focus outlines use the same theme accent as the slider handles. In full screen, <kbd>Alt</kbd>+<kbd>F</kbd> toggles fit for the selected image.
-- The shared toolbar shows “Comparison mode” while individual panes show their filenames. An accent outline and tinted toolbar distinguish comparison from normal viewing.
+- The shared toolbar shows “Comparison mode” with a tinted background, while individual panes show their filenames. The comparison area's outer accent outline marks input focus and is mutually exclusive with the thumbnail pane's focus outline. Individual image outlines identify the active comparison image.
+- Switching comparison images preserves fit behavior and presents the completed layout together, avoiding flashes from toolbar moves or briefly appearing scrollbars.
 - The shared image toolbar has an End comparison button that closes comparison mode at once.
 - Click an image pane to select it, show its corresponding tab and thumbnails, and target it with the shared toolbar; an accent-colored border marks the selection.
 - Press <kbd>Tab</kbd> to cycle through comparison panes in order, or <kbd>Shift</kbd>+<kbd>Tab</kbd> to cycle backward.
