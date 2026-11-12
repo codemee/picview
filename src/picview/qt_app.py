@@ -1037,6 +1037,7 @@ class ThumbnailPane(QFrame):
         tab_layout.setContentsMargins(0, 0, 0, 0)
         header.insertWidget(1, self.tab_slot, 1)
         header.takeAt(2)  # The tab slot supplies the flexible space.
+        header.insertWidget(2, ToolbarSeparator())
         self.context_menu = QMenu(self)
         self.scroll=QScrollArea(); self.scroll.setWidgetResizable(True); self.scroll.setFrameShape(QFrame.Shape.NoFrame); set_widget_background(self.scroll.viewport(), PALETTE["pane"]); self.grid_host=QWidget(); self.grid_host.setObjectName("thumbnailGrid"); set_widget_background(self.grid_host, PALETTE["pane"]); self.grid=QGridLayout(self.grid_host); self.grid.setAlignment(Qt.AlignmentFlag.AlignTop|Qt.AlignmentFlag.AlignLeft); self.scroll.setWidget(self.grid_host); layout.addWidget(self.scroll)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
@@ -1098,7 +1099,7 @@ class ThumbnailPane(QFrame):
         if self.tab_slot.layout().count():
             strip = self.tab_slot.layout().itemAt(0).widget()
             target = min(420, max(1, strip.findChild(QTabBar).count()) * 150 + 42)
-            reserved = max(0, min(target, max(190, round(width * .6)), width - 38))
+            reserved = max(0, min(target, max(190, round(width * .6)), width - 43))
             self.tab_slot.setMinimumWidth(reserved)
         return width
 
@@ -1385,13 +1386,17 @@ def separate_tools(layout):
 
 
 class ToolbarOverflow(QObject):
-    """Keep the existing controls and expose hidden ones through a live menu."""
-    def __init__(self, host, layout, hide_order, title, slider_editors=None, available_width=None, flex_widgets=()):
+    """Expose hidden controls directly in one live popup panel."""
+    def __init__(self, host, layout, hide_order, title, slider_editors=None, available_width=None, flex_widgets=(),
+                 more_button=None, extra_controls=()):
         super().__init__(host)
         self.host, self.layout = host, layout
         self.hide_order, self.title = hide_order, title
         self.slider_editors = slider_editors or {}
         self.flex_widgets = set(flex_widgets)
+        self.external_more = more_button is not None
+        self.extra_controls = list(extra_controls)
+        if more_button is not None: layout.removeWidget(more_button)
         self.available_width = available_width or (lambda: host.width() - layout.contentsMargins().left() - layout.contentsMargins().right())
         self.items = [layout.itemAt(index) for index in range(layout.count())]
         self.widgets = [item.widget() for item in self.items if item.widget() is not None]
@@ -1399,7 +1404,7 @@ class ToolbarOverflow(QObject):
                        if item.spacerItem() is not None and layout.stretch(index) == 0}
         self.separators = [index for index, item in enumerate(self.items) if isinstance(item.widget(), ToolbarSeparator)]
         self.overflowed = []
-        self.more_button = IconButton("more", title(), host)
+        self.more_button = more_button or IconButton("more", title(), host)
         self.more_button.setAccessibleName(title())
         self.menu = QMenu(self.more_button)
         self.menu.aboutToShow.connect(self.populate_menu)
@@ -1412,6 +1417,16 @@ class ToolbarOverflow(QObject):
         self.timer.timeout.connect(self.update)
         host.installEventFilter(self)
         self.timer.start(0)
+
+    def dispose(self):
+        self.timer.stop()
+        self.host.removeEventFilter(self)
+        self.menu.hide()
+        self.layout.removeWidget(self.more_button)
+        self.more_button.setMenu(None)
+        self.menu.deleteLater()
+        if not self.external_more: self.more_button.deleteLater()
+        self.deleteLater()
 
     def eventFilter(self, watched, event):
         if event.type() in (QEvent.Type.Resize, QEvent.Type.Show):
@@ -1454,14 +1469,19 @@ class ToolbarOverflow(QObject):
         visible = {widget for widget in self.widgets if not isinstance(widget, ToolbarSeparator)
                    and widget.property("toolbar_available") is not False}
         hidden = []
-        if self.required_width(visible, False) > width:
+        if self.required_width(visible, bool(self.extra_controls)) > width:
             for widget in self.hide_order:
                 if widget not in visible: continue
-                visible.discard(widget)
-                hidden.append(widget)
+                group = next(({slider, editor} for slider, editor in self.slider_editors.items()
+                              if widget in (slider, editor)), {widget})
+                for member in group:
+                    if member in visible:
+                        visible.discard(member)
+                        hidden.append(member)
                 if self.required_width(visible, True) <= width: break
             if self.required_width(visible, True) > width:
-                visible = {widget for widget in visible if widget.sizePolicy().horizontalPolicy() != QSizePolicy.Policy.Ignored}
+                visible = {widget for widget in visible if widget in self.flex_widgets
+                           or widget.sizePolicy().horizontalPolicy() != QSizePolicy.Policy.Ignored}
         if width < 120:
             visible = {widget for widget in visible if widget in self.flex_widgets or
                        (widget.sizePolicy().horizontalPolicy() != QSizePolicy.Policy.Ignored
@@ -1479,8 +1499,9 @@ class ToolbarOverflow(QObject):
                 spacer.changeSize(value, 0)
                 changed = True
         self.overflowed = [widget for widget in self.widgets if widget in hidden]
-        if self.more_button.isHidden() == bool(hidden):
-            self.more_button.setVisible(bool(hidden))
+        show_more = bool(hidden or self.extra_controls)
+        if self.more_button.isHidden() == show_more:
+            self.more_button.setVisible(show_more)
             changed = True
         self.more_button.setToolTip(self.title())
         self.more_button.setAccessibleName(self.title())
@@ -1488,23 +1509,69 @@ class ToolbarOverflow(QObject):
 
     def populate_menu(self):
         self.menu.clear()
+        panel = QWidget()
+        panel.setObjectName("overflowPanel")
+        panel.setStyleSheet(
+            f"#overflowPanel{{background:{PALETTE['card']};color:{PALETTE['text']};}}"
+            f"QToolTip{{background:{PALETTE['card']};color:{PALETTE['text']};border:1px solid {PALETTE['edge']};}}")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+        buttons = QGridLayout()
+        buttons.setSpacing(4)
+        layout.addLayout(buttons)
+        self.panel_controls = {}
         added = set()
-        for widget in self.overflowed:
+        count = 0
+        for widget in self.overflowed + self.extra_controls:
             if isinstance(widget, PaneDragHandle): continue
             control = self.slider_editors.get(widget, widget)
             if control in added: continue
             added.add(control)
             if isinstance(control, ScaleValueButton):
-                action = self.menu.addAction(f"{control.toolTip()} ({control.text()})")
-                action.triggered.connect(lambda checked=False, button=control:
-                    QTimer.singleShot(0, self.host, lambda: button.open_editor(self.more_button)))
+                source = next((slider for slider, editor in self.slider_editors.items() if editor is control), None)
+                row = QHBoxLayout()
+                value_button = ScaleValueButton(
+                    control.current_value, round(control.spin.minimum() * control.divisor),
+                    round(control.spin.maximum() * control.divisor),
+                    source.reference_value if source is not None else control.current_value,
+                    control.divisor, control.suffix, control.toolTip(), panel)
+                value_button.valueChosen.connect(control.valueChosen.emit)
+                row.addWidget(value_button)
+                self.panel_controls[control] = value_button
+                if source is not None:
+                    slider = ReferenceSlider(Qt.Orientation.Horizontal, source.reference_value, panel)
+                    slider.setRange(source.minimum(), source.maximum())
+                    slider.setValue(source.value())
+                    slider.setFixedSize(140, 30)
+                    slider.setStyleSheet(source.styleSheet())
+                    slider.logicalValueChanged.connect(source.setValue)
+                    source.logicalValueChanged.connect(slider.setValue)
+                    slider.logicalValueChanged.connect(value_button.set_value)
+                    row.addWidget(slider)
+                    self.panel_controls[source] = slider
+                layout.addLayout(row)
             elif isinstance(control, QToolButton):
-                action = self.menu.addAction(control.icon(), control.toolTip() or control.text())
-                action.setCheckable(control.isCheckable())
-                action.setChecked(control.isChecked())
-                action.triggered.connect(lambda checked=False, button=control: button.click())
+                button = IconButton(getattr(control, "kind", "more"), control.toolTip() or control.text(), panel)
+                button.setCheckable(control.isCheckable())
+                button.setChecked(control.isChecked())
+                button.setEnabled(control.isEnabled())
+                button.clicked.connect(lambda checked=False, control=control: self.activate_panel_button(control))
+                if control.isCheckable(): control.toggled.connect(button.setChecked)
+                if control.menu() is not None:
+                    button.setMenu(control.menu())
+                    button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+                buttons.addWidget(button, count // 6, count % 6)
+                self.panel_controls[control] = button
+                count += 1
             else: continue
-            action.setEnabled(control.isEnabled())
+        action = QWidgetAction(self.menu)
+        action.setDefaultWidget(panel)
+        self.menu.addAction(action)
+
+    def activate_panel_button(self, control):
+        self.menu.hide()
+        control.click()
 
 
 class ImagePane(QFrame):
@@ -3346,7 +3413,8 @@ class PicView(QMainWindow):
         self.resize(1100, 780)
         self.setAcceptDrops(True)
         self.notification_bar = QStatusBar(self)
-        self.notification_bar.setMinimumHeight(24)
+        self.notification_bar.hide()
+        self.notification_bar.setFixedHeight(max(24, self.fontMetrics().height() + 6))
         self.image_status = ImageStatusLabel(self.notification_bar)
         self.notification_bar.addWidget(self.image_status, 1)
         self.notification_bar.setSizeGripEnabled(False)
@@ -3427,9 +3495,12 @@ class PicView(QMainWindow):
         outer.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         tool = QFrame()
         tool.setObjectName("toolbar")
-        tool.setFixedHeight(42)
+        tool.setFixedHeight(34)
+        tool.setMinimumWidth(0)
+        tool.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         layout = QHBoxLayout(tool)
-        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
         self.open_button = IconButton("folder", shortcut_tooltip(self.t["open"], QKeySequence.StandardKey.Open))
         self.sort_button = IconButton("sort-name", self.t["sort_method"])
@@ -3448,8 +3519,7 @@ class PicView(QMainWindow):
         self.integration_button.setCheckable(True)
         self.integration_button.clicked.connect(self.set_shell_integration)
         self.refresh_shell_integration_button()
-        self.main_toolbar = tool
-        outer.addWidget(tool)
+        self.tool_storage = tool
         self.tabs = FolderTabs()
         self.tabs.setTabsClosable(True)
         self.tabs.setMovable(True)
@@ -3474,40 +3544,24 @@ class PicView(QMainWindow):
         self.tabs.layout().removeWidget(self.tabs.strip)
         self.open_button.clicked.connect(self.choose)
         layout.addWidget(self.open_button)
-        separate_tools(layout)
         layout.addWidget(self.sort_button)
         layout.addWidget(self.direction_button)
-        layout.addStretch(1)
-        separate_tools(layout)
-        layout.addWidget(self.modified_button)
         for button, action in ((self.language_button, self.toggle_lang), (self.theme_button, self.toggle_theme)):
             button.clicked.connect(action)
-        for button in (self.integration_button, self.language_button, self.theme_button):
+        for button in (self.modified_button, self.integration_button, self.language_button, self.theme_button):
             button.setParent(tool)
             button.hide()
-        self.settings_menu = QMenu(self)
-        self.settings_menu.aboutToShow.connect(self.populate_settings_menu)
         self.settings_button = IconButton("more", self.t["more_tools"])
-        self.settings_button.setMenu(self.settings_menu)
-        self.settings_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         layout.addWidget(self.settings_button)
-        self.toolbar_overflow = ToolbarOverflow(tool, layout,
-            [self.settings_button, self.modified_button,
-             self.direction_button, self.sort_button, self.open_button],
-            lambda: self.t["more_tools"])
+        self._tools_page = None
+        self._open_sort_separator = ToolbarSeparator()
+        tool.setParent(root)
+        tool.hide()
         outer.addWidget(self.tabs, 1)
-        outer.addSpacing(8)
-        outer.addWidget(self.notification_bar)
         self.apply_styles()
 
     def populate_settings_menu(self):
-        self.settings_menu.clear()
-        for button in (self.integration_button, self.language_button, self.theme_button):
-            action = self.settings_menu.addAction(button.icon(), button.toolTip())
-            action.setEnabled(button.isEnabled())
-            action.setCheckable(button.isCheckable())
-            action.setChecked(button.isChecked())
-            action.triggered.connect(lambda checked=False, button=button: button.click())
+        self.toolbar_overflow.populate_menu()
 
     def mount_tab_strip(self, page):
         strip = self.tabs.strip
@@ -3521,13 +3575,43 @@ class PicView(QMainWindow):
             slot.setMaximumWidth(16777215)
             slot.layout().addWidget(strip)
             strip.show()
+        if self._tools_page is not page:
+            old = self._tools_page
+            controls = (self.open_button, self._open_sort_separator, self.sort_button,
+                        self.direction_button, self.settings_button)
+            if old is not None:
+                old.thumbs.toolbar_overflow.dispose()
+                header = old.thumbs.layout().itemAt(0).layout()
+                for control in controls:
+                    header.removeWidget(control)
+                    control.setParent(self.tool_storage)
+                    control.hide()
+                thumbs = old.thumbs
+                thumbs.toolbar_overflow = ToolbarOverflow(thumbs, header,
+                    [thumbs.slider, thumbs.size_label, thumbs.drag_handle],
+                    lambda thumbs=thumbs: thumbs.labels["more_tools"], {thumbs.slider: thumbs.size_label},
+                    thumbs.toolbar_width, flex_widgets=(thumbs.tab_slot,))
+            thumbs = page.thumbs
+            thumbs.toolbar_overflow.dispose()
+            header = thumbs.layout().itemAt(0).layout()
+            for index, control in enumerate(controls[:-1], 3):
+                header.insertWidget(index, control)
+                control.show()
+            thumbs.toolbar_overflow = ToolbarOverflow(thumbs, header,
+                [thumbs.slider, thumbs.size_label, self.direction_button, self.sort_button, self.open_button, thumbs.drag_handle],
+                lambda thumbs=thumbs: thumbs.labels["more_tools"], {thumbs.slider: thumbs.size_label},
+                thumbs.toolbar_width, flex_widgets=(thumbs.tab_slot,),
+                more_button=self.settings_button,
+                extra_controls=(self.modified_button, self.integration_button, self.language_button, self.theme_button))
+            self.toolbar_overflow = thumbs.toolbar_overflow
+            self.settings_menu = self.toolbar_overflow.menu
+            self._tools_page = page
         page.thumbs.toolbar_overflow.update()
 
     def apply_styles(self):
         strip = PALETTE["card"]
         hover = PALETTE["pane"]
         set_widget_background(self.centralWidget(), PALETTE["surface"])
-        self.main_toolbar.setStyleSheet("#toolbar{background:transparent;border:0;}")
         for card in self.findChildren(QFrame, "card"):
             if isinstance(card, (ThumbnailPane, ImagePane)):
                 card.update()
@@ -3828,6 +3912,11 @@ class PicView(QMainWindow):
         self.update_image_status()
 
     def update_image_status(self):
+        host = self.comparison_area if self.compare_enabled else (
+            self.current_tab().image if self.current_tab() is not None else None)
+        if host is not None and self.notification_bar.parentWidget() is not host:
+            host.layout().addWidget(self.notification_bar)
+            self.notification_bar.show()
         page = self.navigation_page()
         pane = page.image if page is not None else None
         path = pane.path if pane is not None else None

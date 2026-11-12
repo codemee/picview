@@ -37,6 +37,7 @@ def test_docked_order_survives_tab_restore_and_edge_detection(browser):
     assert page.dock_edge(QPoint(2, page.height() // 2)) == "left"
     assert page.dock_edge(QPoint(page.width() - 3, page.height() // 2)) == "right"
     assert page.dock_edge(QPoint(page.width() // 2, 2)) == "top"
-    assert page.dock_edge(QPoint(page.width() // 2, -10)) == "top"
+    assert page.dock_edge(QPoint(page.width() // 2, 0)) == "top"
+    assert page.dock_edge(QPoint(page.width() // 2, -10)) is None
     assert page.dock_edge(QPoint(page.width() // 2, page.height() - 3)) == "bottom"
     assert page.dock_edge(QPoint(page.width() // 2, page.height() // 2)) is None

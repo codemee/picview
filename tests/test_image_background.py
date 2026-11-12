@@ -90,8 +90,8 @@ def test_background_panel_is_available_in_overflow(browser):
     controller = pane.toolbar_overflow
     wait_until(lambda: pane.background_button in controller.overflowed)
     controller.populate_menu()
-    action = next(a for a in controller.menu.actions() if a.text() == window.t["background"])
-    action.trigger()
+    action = controller.panel_controls[pane.background_button]
+    action.click()
     wait_until(pane.background_menu.isVisible)
     pane.background_choices["gray"].click()
     assert pane.background_color() == "#808080"

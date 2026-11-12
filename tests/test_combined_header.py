@@ -11,7 +11,7 @@ from test_tabs import browser, wait_until
 
 def visible_controls(window):
     return [button for button in (window.open_button, window.sort_button,
-            window.direction_button, window.modified_button,
+            window.direction_button,
             window.settings_button) if not button.isHidden()]
 
 
@@ -103,24 +103,26 @@ def test_tabs_absorb_one_pixel_overflow_without_obscuring_current_tab(browser, c
         bar.deleteLater()
 
 
-def test_tabs_share_thumbnail_header_below_main_toolbar(browser):
+def test_tabs_and_tools_share_thumbnail_header_without_main_toolbar(browser):
     window, folders = browser
     page = window.open_folder(folders[0])
-    wait_until(lambda: len(visible_controls(window)) == 5)
-    assert window.main_toolbar.height() == 42
+    wait_until(lambda: len(visible_controls(window)) == 4)
+    assert window.centralWidget().layout().count() == 1
+    assert window.open_button.height() == 34
+    assert window.open_button.parentWidget() is page.thumbs
     assert window.tabs.strip.parentWidget() is page.thumbs.tab_slot
     assert window.tabs.layout().count() == 1
     assert page.thumbs.drag_handle.mapTo(window, QPoint(page.thumbs.drag_handle.width(), 0)).x() <= window.tabs.strip.mapTo(window, QPoint()).x()
-    assert window.modified_button.geometry().right() < window.settings_button.geometry().left()
-    assert window.settings_button.geometry().right() == window.main_toolbar.width() - 9
-    assert window.settings_button.x() > window.direction_button.geometry().right() + 100
-    toolbar_bottom = window.main_toolbar.mapTo(window, QPoint(0, window.main_toolbar.height())).y()
+    assert window.modified_button.isHidden()
+    assert window.settings_button.geometry().right() == page.thumbs.width() - 11
+    assert window.sort_button.geometry().right() < window.direction_button.x()
+    assert window.direction_button.geometry().right() < window.settings_button.x()
     page_top = page.mapTo(window, QPoint(0, 0)).y()
-    assert page_top == toolbar_bottom
+    assert page_top == 0
     assert window.tabs.strip.mapTo(window, QPoint()).y() == page_top + 4
     assert window.tabs.strip.height() == 34
     assert window.open_button.y() == 4
-    assert window.open_button.x() == 8
+    assert window.open_button.x() > window.tabs.strip.geometry().right()
     assert window.open_button.height() == 34
 
 
@@ -151,10 +153,10 @@ def test_switching_reordering_and_resizing_keep_current_tab_visible(browser):
             window.tabs.setCurrentIndex(index)
             wait_until(lambda: current_tab_visible(window))
         if width == 420:
-            assert not window.open_button.isHidden()
-            assert not window.direction_button.isHidden()
+            assert not window.open_button.isHidden() or window.open_button in window.toolbar_overflow.overflowed
+            assert not window.direction_button.isHidden() or window.direction_button in window.toolbar_overflow.overflowed
         if width == 260:
-            assert window.settings_button.isVisible()
+            assert window.settings_button.isVisible() or window.toolbar_overflow.more_button.isVisible()
             assert window.tabs.strip.width() >= 180
     page = window.current_tab()
     window.tabs.bar.moveTab(window.tabs.currentIndex(), 0)

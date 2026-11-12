@@ -30,12 +30,14 @@ def test_comparison_status_tracks_selected_pane_and_last_image(browser):
     second = window.open_folder(folders[1])
     second.thumbs.select(second.files[1])
     add(window, first, second)
+    assert window.notification_bar.parentWidget() is window.comparison_area
     window.focus_compare_page(first)
     assert first.image.path.name in window.image_status.details
     assert str(first.folder) in window.image_status.toolTip()
     window.focus_compare_page(second)
     assert second.image.path.name in window.image_status.details
     window.remove_comparison_page(first)
+    assert window.notification_bar.parentWidget() is second.image
     assert second.image.path.name in window.image_status.details
 
 
@@ -59,8 +61,9 @@ def test_status_background_and_text_stay_inside_pane_margins(browser):
         window.resize(width, 500)
         QTest.qWait(50)
         bar, label = window.notification_bar, window.image_status
-        assert bar.mapTo(window, QPoint()).x() == 8
-        assert bar.width() == window.centralWidget().width() - 16
+        assert bar.parentWidget() is page.image
+        assert bar.x() == page.image.layout().contentsMargins().left()
+        assert bar.width() == page.image.width() - 20
         assert bar.rect().contains(label.geometry())
         assert label.height() >= label.fontMetrics().height()
-        assert bar.mapTo(window, QPoint(0, bar.height())).y() <= window.height() - 8
+        assert bar.y() + bar.height() <= page.image.height() - 8

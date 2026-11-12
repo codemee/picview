@@ -101,7 +101,7 @@ def test_tabs_share_the_active_thumbnail_toolbar(browser):
         strip_top = window.tabs.strip.mapToGlobal(QPoint()).y()
         tools_top = page.thumbs.drag_handle.mapToGlobal(QPoint()).y()
         assert strip_top == tools_top
-        assert window.main_toolbar not in window.tabs.strip.parentWidget().findChildren(type(window.main_toolbar))
+        assert window.open_button.parentWidget() is page.thumbs
     window.close_tab(window.tabs.indexOf(first))
     assert window.tabs.strip.parentWidget() is second.thumbs.tab_slot
     window.close_tab()

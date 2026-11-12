@@ -115,7 +115,7 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     thumbnail_toolbar = window.thumbs.layout().itemAt(0).layout()
     thumbnail_widgets = [thumbnail_toolbar.itemAt(i).widget() for i in range(thumbnail_toolbar.count()) if thumbnail_toolbar.itemAt(i).widget() and not thumbnail_toolbar.itemAt(i).widget().isHidden()]
     assert thumbnail_widgets[:2] == [window.thumbs.drag_handle, window.thumbs.tab_slot]
-    assert thumbnail_widgets[-2] is window.thumbs.size_label
+    assert thumbnail_widgets[-3:] == [window.thumbs.size_label, window.thumbs.slider, window.settings_button]
     assert window.thumbs.size_label.text() == "140px"
     window.thumbs.size_label.click()
     window.thumbs.size_label.spin.selectAll()
@@ -159,7 +159,7 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     assert window.thumbs.buttons[paths[0]].grab().toImage().pixelColor(12, 12).name() == THUMBNAIL_SELECTED
     selected_tile = window.thumbs.buttons[paths[0]]
     assert selected_tile.grab().toImage().pixelColor(selected_tile.name.mapTo(selected_tile, QPoint(2, 2))).name() == THUMBNAIL_SELECTED
-    assert "#toolbar{background:transparent;border:0;}" in window.main_toolbar.styleSheet()
+    assert not window.tool_storage.isVisible()
     assert "QToolButton:hover,QToolButton:checked{background:#e2e6ed;" in window.image.fit_b.styleSheet()
     assert PALETTE["accent"] in window.image.slider.styleSheet()
     checked_icon = window.image.fit_b.icon().pixmap(window.image.fit_b.iconSize()).toImage()
