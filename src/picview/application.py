@@ -1,10 +1,19 @@
 """Receive macOS document-open requests, including during startup."""
+import sys
 from PySide6.QtCore import QEvent, QTimer
 from PySide6.QtWidgets import QApplication
 
 
 class PicViewApplication(QApplication):
     def __init__(self, arguments):
+        if sys.platform == "win32":
+            import ctypes
+            shell = ctypes.WinDLL("shell32")
+            shell.SetCurrentProcessExplicitAppUserModelID.argtypes = [ctypes.c_wchar_p]
+            shell.SetCurrentProcessExplicitAppUserModelID.restype = ctypes.c_long
+            # Stable across versions and source/frozen launches. Set before Qt
+            # creates any native windows so Explorer does not group us as Python.
+            shell.SetCurrentProcessExplicitAppUserModelID("codemee.PicView")
         self._pending_paths = []
         self._open_paths = None
         super().__init__(arguments)

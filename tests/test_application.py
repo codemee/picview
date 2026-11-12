@@ -35,3 +35,24 @@ def test_document_open_events_before_and_after_window_ready():
         check=True,
         timeout=30,
     )
+
+
+def test_windows_taskbar_identity_before_any_window():
+    import pytest
+    if sys.platform != "win32": pytest.skip("Windows taskbar identity")
+    subprocess.run([sys.executable, "-c", textwrap.dedent('''
+        import ctypes
+        from picview.application import PicViewApplication
+        app = PicViewApplication([])
+        identifier = ctypes.c_wchar_p()
+        shell = ctypes.WinDLL("shell32")
+        shell.GetCurrentProcessExplicitAppUserModelID.argtypes = [ctypes.POINTER(ctypes.c_wchar_p)]
+        shell.GetCurrentProcessExplicitAppUserModelID.restype = ctypes.c_long
+        assert shell.GetCurrentProcessExplicitAppUserModelID(ctypes.byref(identifier)) == 0
+        try:
+            assert identifier.value == "codemee.PicView"
+        finally:
+            free = ctypes.WinDLL("ole32").CoTaskMemFree
+            free.argtypes = [ctypes.c_void_p]
+            free(ctypes.cast(identifier, ctypes.c_void_p))
+    ''')], env={**os.environ, "QT_QPA_PLATFORM": "offscreen"}, check=True, timeout=30)

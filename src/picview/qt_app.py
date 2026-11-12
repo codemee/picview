@@ -4550,7 +4550,7 @@ def set_application_identity(app: QApplication) -> None:
     app.setApplicationName("PicView")
     # macOS uses the application icon for the Dock; a window icon alone
     # leaves Python's icon in place when running outside an .app bundle.
-    icon_path = Path(__file__).parent / "assets" / "picview-icon.png"
+    icon_path = Path(__file__).parent / "assets" / ("picview-icon.ico" if sys.platform == "win32" else "picview-icon.png")
     app.setWindowIcon(QIcon(str(icon_path)))
 
 

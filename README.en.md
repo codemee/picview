@@ -20,6 +20,8 @@ An image folder viewer built with Qt, focused on **fast loading** and **image co
 
 ### Desktop downloads
 
+- Windows uses a stable PicView taskbar identity and a multi-size icon. If an existing pinned shortcut still shows an old icon after updating, unpin it and pin the new PicView window again.
+
 - Download desktop builds from [GitHub Releases](https://github.com/codemee/picview/releases) when attached to a release. Python and uv are not required.
 - **Windows x64**: extract `PicView-<version>-windows-x64.zip`, keep the entire **PicView** folder, and run `PicView.exe` inside it. Close the app before replacing the whole folder for an update. If you move the folder, re-enable File Explorer context-menu integration.
 - The folder build avoids extraction on every launch. When PicView is already open, file-open requests are forwarded before loading the full interface. See the [same-machine startup measurements](docs/STARTUP_PERFORMANCE.md).

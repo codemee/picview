@@ -20,6 +20,8 @@
 
 ### 桌面版下載
 
+- Windows 使用固定的 PicView 工作列識別碼與多尺寸圖示。更新後若已釘選的捷徑仍顯示舊圖示，取消釘選後從新版 PicView 視窗重新釘選即可更新該項目。
+
 - 已附加桌面版的版本可從 [GitHub Releases](https://github.com/codemee/picview/releases) 下載，不需要安裝 Python 或 uv。
 - **Windows x64**：解壓 `PicView-<版本>-windows-x64.zip`，保留整個 **PicView** 資料夾，再執行其中的 `PicView.exe`。更新時先關閉程式，替換整個資料夾；若曾啟用檔案總管右鍵整合，搬移資料夾後須重新啟用。
 - 資料夾版避免每次啟動時重複解壓；已有 PicView 視窗時，開檔要求會在載入完整介面前交給該視窗。[同機啟動量測與方法](docs/STARTUP_PERFORMANCE.md)。
