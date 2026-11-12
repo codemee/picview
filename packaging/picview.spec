@@ -12,6 +12,7 @@ a = Analysis(
     [str(root / "packaging" / "launcher.py")],
     pathex=[str(root / "src")],
     datas=[(str(root / "src" / "picview" / "assets" / "picview-icon.png"), "picview/assets"),
+           (str(root / "src" / "picview" / "assets" / "picview-icon.ico"), "picview/assets"),
            (str(root / "LICENSE"), "licenses")],
     # The supported entry point uses Qt, not the legacy Tk implementation.
     excludes=["tkinter", "tkinterdnd2", "customtkinter"],
