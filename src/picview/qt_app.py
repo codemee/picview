@@ -14,7 +14,7 @@ from PySide6.QtCore import QEvent, QEventLoop, QFileSystemWatcher, QLocale, QMim
 from PySide6.QtGui import QAction, QColor, QDrag, QIcon, QImage, QKeySequence, QMouseEvent, QPainter, QPainterPath, QPen, QPixmap, QPalette, QRegion, QShortcut, QTransform
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QMainWindow,
-    QMenu, QMessageBox, QPushButton, QProgressDialog, QProxyStyle, QRubberBand, QScrollArea, QScrollBar, QSlider, QSplitter, QStackedWidget, QTabBar, QStyle, QStyleOptionSlider, QStyleOptionTab, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
+    QMenu, QMessageBox, QPushButton, QProgressDialog, QProxyStyle, QRubberBand, QScrollArea, QScrollBar, QSlider, QSplitter, QStackedWidget, QStatusBar, QTabBar, QStyle, QStyleOptionSlider, QStyleOptionTab, QToolButton, QVBoxLayout, QWidget, QWidgetAction, QSizePolicy,
 )
 
 from . import __version__
@@ -165,6 +165,29 @@ class ViewportInteraction(QObject):
                 self.interacted()
                 return True
         return super().eventFilter(watched, event)
+
+
+class ImageStatusLabel(QLabel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.details = ""
+        self.setObjectName("imageStatusLabel")
+        self.setTextFormat(Qt.TextFormat.PlainText)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.setMinimumWidth(0)
+
+    def set_details(self, details, tooltip):
+        self.details = details
+        self.setToolTip(tooltip)
+        self.setAccessibleName(details)
+        self.refresh_text()
+
+    def refresh_text(self):
+        self.setText(self.fontMetrics().elidedText(self.details, Qt.TextElideMode.ElideMiddle, max(0, self.width())))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.refresh_text()
 
 
 def use_system_palette(app: QApplication) -> None:
@@ -1485,6 +1508,7 @@ class ToolbarOverflow(QObject):
 
 
 class ImagePane(QFrame):
+    informationChanged = Signal()
     interacted = Signal()
     operationApplied = Signal(str, object)
     comparisonCloseRequested = Signal()
@@ -1865,6 +1889,7 @@ class ImagePane(QFrame):
             QTimer.singleShot(0,self.apply_default_zoom)
             if len(self.frames)>1:self.timer.start(self.frames[0][1])
         except Exception: self.frames=[]; self.label.clear(); self.label.setText(self.labels["empty"]); self.label.setFixedSize(self.label.sizeHint())
+        self.informationChanged.emit()
     def clear(self):
         self.auto_scale=False; self.timer.stop(); self.frames=[]; self.path=None; self.fit_b.setChecked(False)
         self.filename_label.clear(); self.filename_label.setToolTip("")
@@ -1872,6 +1897,7 @@ class ImagePane(QFrame):
         self.label.clear(); self.label.setText(self.labels["empty"]); self.label.setFixedSize(self.label.sizeHint())
         if self.full_window is not None: self.open_full()
         self.update_comparison_fullscreen()
+        self.informationChanged.emit()
     def next_frame(self): self.index=(self.index+1)%len(self.frames); self.timer.start(self.frames[self.index][1]); self.render()
     def image(self):
         im=self.frames[self.index][0]
@@ -1915,6 +1941,7 @@ class ImagePane(QFrame):
             if size != im.size: im=im.resize(size,Image.Resampling.LANCZOS)
             pix=QPixmap.fromImage(qimage(im))
         self.label.setPixmap(pix); self.label.setFixedSize(*size)
+        self.informationChanged.emit()
         if self.full_window is not None:
             self.update_full_image()
         self.update_comparison_fullscreen()
@@ -2858,6 +2885,7 @@ class ComparisonFullscreen(QMainWindow):
                 f"color:{PALETTE['accent'] if active else PALETTE['text']};"
                 f"font-weight:{'600' if active else '400'};")
         self.image_toolbar.refresh()
+        self.owner.update_image_status()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -3317,9 +3345,11 @@ class PicView(QMainWindow):
         self.setMinimumSize(260, 220)
         self.resize(1100, 780)
         self.setAcceptDrops(True)
-        self.notification_bar = self.statusBar()
-        self.notification_bar.hide()
-        self.notification_bar.messageChanged.connect(lambda message: self.notification_bar.setVisible(bool(message)))
+        self.notification_bar = QStatusBar(self)
+        self.notification_bar.setMinimumHeight(24)
+        self.image_status = ImageStatusLabel(self.notification_bar)
+        self.notification_bar.addWidget(self.image_status, 1)
+        self.notification_bar.setSizeGripEnabled(False)
         self.build()
         if sys.platform == "darwin": self.setup_application_menu()
         self.setup_shortcuts()
@@ -3466,6 +3496,8 @@ class PicView(QMainWindow):
              self.direction_button, self.sort_button, self.open_button],
             lambda: self.t["more_tools"])
         outer.addWidget(self.tabs, 1)
+        outer.addSpacing(8)
+        outer.addWidget(self.notification_bar)
         self.apply_styles()
 
     def populate_settings_menu(self):
@@ -3502,7 +3534,13 @@ class PicView(QMainWindow):
             else:
                 card.setStyleSheet(f"#card{{background:{PALETTE['card']};border:0;border-radius:12px;}}")
         self.notification_bar.setStyleSheet(
-            f"color:{PALETTE['warm']};background:{PALETTE['card']};")
+            f"QStatusBar{{color:{PALETTE['warm']};background:{PALETTE['card']};"
+            "border:0;border-radius:8px;}"
+            "QStatusBar::item{border:0;}")
+        self.image_status.setStyleSheet(
+            f"QLabel#imageStatusLabel{{color:{PALETTE['muted']};background:transparent;}}"
+            f"QToolTip{{color:{PALETTE['text']};background-color:{PALETTE['card']};"
+            f"border:1px solid {PALETTE['edge']};padding:6px;}}")
         self.slider_style = (
             f"QSlider::groove:horizontal{{height:5px;background:{PALETTE['edge']};border-radius:2px;}}"
             f"QSlider::handle:horizontal{{background:{PALETTE['accent']};width:15px;margin:-5px 0;border-radius:7px;}}")
@@ -3535,6 +3573,7 @@ class PicView(QMainWindow):
         page = FolderTab(self.t)
         if layout_spec is not None: page.apply_layout_spec(layout_spec)
         page.image.owner_page = page
+        page.image.informationChanged.connect(self.update_image_status)
         page.thumbs.owner_page = page
         page.thumbs.show_modified = self.show_modified
         page.notification.connect(lambda message, tab=page: self.show_notification(tab, message))
@@ -3786,6 +3825,34 @@ class PicView(QMainWindow):
         page = self.current_tab()
         folder = page.folder if page is not None else None
         self.setWindowTitle(f"PicView v{__version__}" + (f" — {folder}" if folder else ""))
+        self.update_image_status()
+
+    def update_image_status(self):
+        page = self.navigation_page()
+        pane = page.image if page is not None else None
+        path = pane.path if pane is not None else None
+        if path is None:
+            self.image_status.set_details("", "")
+            return
+        parts = [path.name]
+        if pane.frames:
+            width, height = pane.frames[0][0].size
+            parts.append(f"{width} × {height} px")
+        parts.append(path.suffix.lstrip(".").upper())
+        version = page._image_versions.get(path)
+        try:
+            size = version[0] if version is not None else path.stat().st_size
+            amount = float(size)
+            unit = "B"
+            for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+                if amount < 1024 or unit == "TiB": break
+                amount /= 1024
+            parts.append(f"{size:,} B" if unit == "B" else f"{amount:.1f} {unit}")
+        except OSError:
+            pass
+        if path in page.files: parts.append(f"{page.files.index(path) + 1} / {len(page.files)}")
+        details = "  |  ".join(parts)
+        self.image_status.set_details(details, f"{path}\n{details}")
 
     def update_tab_titles(self):
         pages = self.pages()
@@ -3812,6 +3879,7 @@ class PicView(QMainWindow):
                 control.update()
             self.tabs.setTabToolTip(index, str(page.folder) if page.folder else self.t["empty"])
         self.toolbar_overflow.timer.start(0)
+        self.update_image_status()
 
     def tabs_reordered(self, *_):
         self.update_tab_titles()
@@ -3821,6 +3889,7 @@ class PicView(QMainWindow):
         if page in self.checked_pages:
             self.focused_compare_page = page
             self.comparison_area.select_toolbar(page.image)
+            self.update_image_status()
             if self.current_tab() is not page:
                 # Move the shared area while the destination tab is still hidden.
                 # Otherwise its empty image slot briefly lets thumbnails fill the page.

@@ -192,6 +192,8 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 
 ### Compare images
 
+- The bottom status bar shows the current image's filename, pixel dimensions, format, file size, and position in its folder. Comparison mode follows the active image. Hover for the full path and details; image information returns after temporary notifications end.
+
 - Drag a tab or thumbnail onto an image pane to keep that image and add the dragged image to a comparison.
 - Drag onto any comparison pane to add more images in drop order. Space is shared equally; adding stops when the panes would become too small.
 - Dropping multiple selected thumbnails adds each image to the comparison without adding visible folder tabs.
