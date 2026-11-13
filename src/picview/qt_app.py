@@ -652,6 +652,77 @@ class ScaleValueButton(QToolButton):
         self.choose(round(self.spin.value() * self.divisor))
 
 
+class HoverScalePanel(QWidget):
+    """Hover controls anchored to a viewport, independent of scrolling."""
+    def __init__(self, pane, value_button, slider):
+        super().__init__(pane.scroll.viewport())
+        self.pane = pane
+        self.hover_host = pane
+        self.available = True
+        self.value_button = value_button
+        self.slider = slider
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(8, 4, 8, 4)
+        row.setSpacing(6)
+        row.addWidget(value_button)
+        row.addWidget(slider)
+        pane.installEventFilter(self)
+        pane.scroll.viewport().installEventFilter(self)
+        value_button.editor_menu.aboutToHide.connect(
+            lambda: QTimer.singleShot(0, self, self.update_visibility))
+        self.hide()
+
+    def set_context(self, host, anchor):
+        self.hover_host.removeEventFilter(self)
+        self.parentWidget().removeEventFilter(self)
+        self.hide()
+        self.setParent(anchor)
+        self.hover_host = host
+        host.installEventFilter(self)
+        anchor.installEventFilter(self)
+        self.reposition()
+        QTimer.singleShot(0, self, self.update_visibility)
+
+    def reposition(self):
+        viewport = self.parentWidget()
+        width = min(self.value_button.sizeHint().width() + SLIDER_WIDTH + 22,
+                    max(0, viewport.width() - 16))
+        self.slider.setFixedWidth(max(0, width - self.value_button.sizeHint().width() - 22))
+        self.resize(width, 38)
+        self.move(max(0, viewport.width() - width - 8), max(0, viewport.height() - self.height() - 8))
+        self.raise_()
+
+    def update_visibility(self):
+        self.setVisible(self.available and self.hover_host.isVisible() and (
+            self.hover_host.underMouse() or self.value_button.editor_menu.isVisible()))
+        self.reposition()
+
+    def eventFilter(self, watched, event):
+        if watched is self.parentWidget() and event.type() == QEvent.Type.Resize:
+            self.reposition()
+        if watched is self.hover_host:
+            if event.type() == QEvent.Type.Enter:
+                self.reposition()
+                self.setVisible(self.available)
+            elif event.type() == QEvent.Type.Leave:
+                QTimer.singleShot(0, self, self.update_visibility)
+            elif event.type() == QEvent.Type.Hide:
+                self.hide()
+            elif event.type() == QEvent.Type.Show:
+                QTimer.singleShot(0, self, self.update_visibility)
+        return super().eventFilter(watched, event)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        color = QColor(PALETTE["card"])
+        color.setAlpha(205)
+        painter.setBrush(color)
+        painter.setPen(QPen(QColor(PALETTE["edge"]), 1))
+        painter.drawRoundedRect(QRectF(self.rect()).adjusted(.5, .5, -.5, -.5), 10, 10)
+
+
 class FullscreenToolbarGrip(QToolButton):
     def __init__(self, toolbar):
         super().__init__(toolbar)
@@ -1037,7 +1108,7 @@ class ThumbnailPane(QFrame):
         self.sort_descending = False
         self.show_modified = True
         self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,4,10,8); layout.setSpacing(4)
-        header=QHBoxLayout(); header.setSpacing(4); self.drag_handle=PaneDragHandle("thumb", labels["drag_pane"]); header.addWidget(self.drag_handle); header.addStretch(); self.size_label=ScaleValueButton(self.size,72,260,THUMBNAIL_BASE_SIZE,1,"px",labels["edit_thumb"]); header.addWidget(self.size_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,THUMBNAIL_BASE_SIZE); self.slider.setRange(72,260); self.slider.setValue(self.size); self.slider.setFixedSize(SLIDER_WIDTH,30); self.slider.logicalValueChanged.connect(self._resize); self.size_label.valueChosen.connect(self.slider.setValue); header.addWidget(self.slider); layout.addLayout(header)
+        header=QHBoxLayout(); header.setSpacing(4); self.drag_handle=PaneDragHandle("thumb", labels["drag_pane"]); header.addWidget(self.drag_handle); header.addStretch(); self.size_label=ScaleValueButton(self.size,72,260,THUMBNAIL_BASE_SIZE,1,"px",labels["edit_thumb"]); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,THUMBNAIL_BASE_SIZE); self.slider.setRange(72,260); self.slider.setValue(self.size); self.slider.setFixedSize(SLIDER_WIDTH,30); self.slider.logicalValueChanged.connect(self._resize); self.size_label.valueChosen.connect(self.slider.setValue); layout.addLayout(header)
         self.tab_slot = QWidget()
         self.tab_slot.setObjectName("thumbnailTabSlot")
         self.tab_slot.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
@@ -1054,6 +1125,7 @@ class ThumbnailPane(QFrame):
         self.setMinimumSize(54, 50)
         layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         self.scroll.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.size_panel = HoverScalePanel(self, self.size_label, self.slider)
         self.selection_band = QRubberBand(QRubberBand.Shape.Rectangle, self.grid_host)
         self._selection_start = None
         self._selection_base = set()
@@ -1070,9 +1142,9 @@ class ThumbnailPane(QFrame):
         self.scroll.verticalScrollBar().valueChanged.connect(self.schedule_previews)
         self.scroll.verticalScrollBar().valueChanged.connect(self.refresh_visible_tile_styles)
         self.scroll.horizontalScrollBar().valueChanged.connect(self.refresh_visible_tile_styles)
-        self.toolbar_overflow = ToolbarOverflow(self, header, [self.slider, self.size_label, self.drag_handle],
-            lambda: self.labels["more_tools"], {self.slider: self.size_label},
-            self.toolbar_width, flex_widgets=(self.tab_slot,))
+        self.toolbar_overflow = ToolbarOverflow(self, header, [self.drag_handle],
+            lambda: self.labels["more_tools"],
+            available_width=self.toolbar_width, flex_widgets=(self.tab_slot,))
         for widget in (self.scroll, self.scroll.viewport(), self.grid_host,
                        self.scroll.verticalScrollBar(), self.scroll.horizontalScrollBar()):
             widget.installEventFilter(self)
@@ -1649,7 +1721,7 @@ class ImagePane(QFrame):
         self.background_menu.addAction(background_action)
         self.filename_label=QLabel(); self.filename_label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.filename_label.setSizePolicy(QSizePolicy.Policy.Ignored,QSizePolicy.Policy.Fixed); bar.addWidget(self.filename_label,1)
         for button in (self.fit_b,self.full): bar.addWidget(button)
-        self.zoom_label=ScaleValueButton(1000,1,4000,1000,10,"%",labels["edit_zoom"]); bar.addWidget(self.zoom_label); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,1000); self.slider.setRange(1,4000); self.slider.setValue(1000); self.slider.logicalValueChanged.connect(self.set_zoom_percent); self.zoom_label.valueChosen.connect(self.choose_zoom); self.slider.setFixedSize(SLIDER_WIDTH,30); bar.addWidget(self.slider)
+        self.zoom_label=ScaleValueButton(1000,1,4000,1000,10,"%",labels["edit_zoom"]); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,1000); self.slider.setRange(1,4000); self.slider.setValue(1000); self.slider.logicalValueChanged.connect(self.set_zoom_percent); self.zoom_label.valueChosen.connect(self.choose_zoom); self.slider.setFixedSize(SLIDER_WIDTH,30)
         self.toolbar_widget = QWidget(self)
         self.toolbar_widget.setLayout(bar)
         bar.setContentsMargins(0, 0, 0, 0)
@@ -1659,8 +1731,8 @@ class ImagePane(QFrame):
         self.setMinimumSize(54, 50)
         layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         self.toolbar_overflow = ToolbarOverflow(self.toolbar_widget, bar,
-            [self.slider, self.zoom_label, self.end_compare_button, self.sync_button, self.background_button, self.full, self.mv, self.mh, self.rotate_b, self.fit_b, self.filename_label, self.drag_handle],
-            lambda: self.labels["more_tools"], {self.slider: self.zoom_label})
+            [self.end_compare_button, self.sync_button, self.background_button, self.full, self.mv, self.mh, self.rotate_b, self.fit_b, self.filename_label, self.drag_handle],
+            lambda: self.labels["more_tools"])
         layout.addWidget(self.toolbar_widget)
         self.comparison_header = QWidget(self)
         comparison_row = QHBoxLayout(self.comparison_header)
@@ -1680,6 +1752,7 @@ class ImagePane(QFrame):
         for target in (self, self.comparison_header, self.scroll, self.scroll.viewport(), self.label):
             target.setAcceptDrops(True)
         self.scroll.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.zoom_panel = HoverScalePanel(self, self.zoom_label, self.slider)
         self.toolbar = bar
         self.update_shortcut_tooltips()
         self.apply_background()
@@ -1705,6 +1778,7 @@ class ImagePane(QFrame):
     def apply_background(self):
         color = self.background_color()
         self.background_button.set_swatch_color(color)
+        self.zoom_panel.update()
         self.scroll.viewport().setStyleSheet(f"background:{color};")
         if self.full_window is not None:
             self.full_window.set_background(color)
@@ -1908,6 +1982,8 @@ class ImagePane(QFrame):
     def set_comparison_mode(self, title=None):
         self.comparison_title = title
         comparing = title is not None
+        self.zoom_panel.available = not comparing or self.zoom_panel.hover_host is not self
+        if not self.zoom_panel.available: self.zoom_panel.hide()
         self.toolbar_widget.setVisible(not comparing)
         self.end_compare_button.setProperty("toolbar_available", comparing)
         self.end_compare_button.setVisible(comparing)
@@ -1926,6 +2002,7 @@ class ImagePane(QFrame):
             self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.update_filename()
         self.update()
+        QTimer.singleShot(0, self.zoom_panel, self.zoom_panel.update_visibility)
     @staticmethod
     def read_frames(path):
         if path in DROP_FRAMES: return DROP_FRAMES[path]
@@ -2833,6 +2910,7 @@ class ComparisonArea(QWidget):
         super().__init__(parent)
         self.pages = []
         self.toolbar_image = None
+        self.zoom_panel = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(3, 3, 3, 3)
         self.header = QFrame()
@@ -2853,6 +2931,9 @@ class ComparisonArea(QWidget):
         if image is not None:
             image.layout().insertWidget(0, image.toolbar_widget)
             image.toolbar_widget.setVisible(image.comparison_title is None)
+            image.zoom_panel.available = image.comparison_title is None
+            image.zoom_panel.set_context(image, image.scroll.viewport())
+        self.zoom_panel = None
         self.toolbar_image = None
 
     def select_toolbar(self, image):
@@ -2866,9 +2947,14 @@ class ComparisonArea(QWidget):
         if self.toolbar_image is not image:
             self.release_toolbar()
             self.toolbar_image = image
-            if image is not None: self.header_layout.addWidget(image.toolbar_widget)
+            if image is not None:
+                self.header_layout.addWidget(image.toolbar_widget)
+                self.zoom_panel = image.zoom_panel
+                self.zoom_panel.available = True
+                self.zoom_panel.set_context(self, self)
         self.header.setVisible(image is not None)
         if image is not None: image.toolbar_widget.show()
+        if self.zoom_panel is not None: self.zoom_panel.update_visibility()
         for page in self.pages:
             page.image.comparison_selected = page.image is image
             page.image.update()
@@ -3614,9 +3700,9 @@ class PicView(QMainWindow):
                     control.hide()
                 thumbs = old.thumbs
                 thumbs.toolbar_overflow = ToolbarOverflow(thumbs, header,
-                    [thumbs.slider, thumbs.size_label, thumbs.drag_handle],
-                    lambda thumbs=thumbs: thumbs.labels["more_tools"], {thumbs.slider: thumbs.size_label},
-                    thumbs.toolbar_width, flex_widgets=(thumbs.tab_slot,))
+                    [thumbs.drag_handle],
+                    lambda thumbs=thumbs: thumbs.labels["more_tools"],
+                    available_width=thumbs.toolbar_width, flex_widgets=(thumbs.tab_slot,))
             thumbs = page.thumbs
             thumbs.toolbar_overflow.dispose()
             header = thumbs.layout().itemAt(0).layout()
@@ -3624,9 +3710,9 @@ class PicView(QMainWindow):
                 header.insertWidget(index, control)
                 control.show()
             thumbs.toolbar_overflow = ToolbarOverflow(thumbs, header,
-                [thumbs.slider, thumbs.size_label, self.direction_button, self.sort_button, self.open_button, thumbs.drag_handle],
-                lambda thumbs=thumbs: thumbs.labels["more_tools"], {thumbs.slider: thumbs.size_label},
-                thumbs.toolbar_width, flex_widgets=(thumbs.tab_slot,),
+                [self.direction_button, self.sort_button, self.open_button, thumbs.drag_handle],
+                lambda thumbs=thumbs: thumbs.labels["more_tools"],
+                available_width=thumbs.toolbar_width, flex_widgets=(thumbs.tab_slot,),
                 more_button=self.settings_button,
                 extra_controls=(self.modified_button, self.integration_button, self.language_button, self.theme_button))
             self.toolbar_overflow = thumbs.toolbar_overflow
@@ -3677,6 +3763,8 @@ class PicView(QMainWindow):
 
     def style_pane_controls(self, page):
         for slider in page.findChildren(QSlider): slider.setStyleSheet(self.slider_style)
+        page.image.slider.setStyleSheet("QSlider{background:transparent;border:0;}" + self.slider_style)
+        page.thumbs.slider.setStyleSheet("QSlider{background:transparent;border:0;}" + self.slider_style)
         for bar in page.findChildren(QScrollBar): bar.setStyleSheet(self.scrollbar_style)
 
     def add_page(self, layout_spec=None):
@@ -4324,6 +4412,7 @@ class PicView(QMainWindow):
         self.comparison_area.equalize()
 
     def set_sync(self, enabled):
+        was_enabled = self.sync_enabled
         self.sync_enabled = bool(enabled) and self.compare_enabled and len(self.comparison_order) > 1
         for page in self.pages():
             button = page.image.sync_button
@@ -4331,6 +4420,20 @@ class PicView(QMainWindow):
             button.setChecked(self.sync_enabled and page in self.checked_pages)
             button.blockSignals(False)
             button.refresh_icon()
+        if self.sync_enabled and not was_enabled:
+            if self.compare_full_window is not None:
+                toolbar = self.compare_full_window.image_toolbar
+                image = toolbar.page.image
+                scale = image.fullscreen_zoom if image.fullscreen_zoom is not None else image.fullscreen_display_scale
+                toolbar.set_zoom(max(1, round(scale * 1000)))
+            else:
+                source = self.navigation_page()
+                if source is not None:
+                    image = source.image
+                    ticks = max(1, round(image.display_scale * 1000))
+                    image.slider.setMaximum(max(4000, ticks))
+                    if image.slider.value() == ticks: image.set_zoom_percent(ticks)
+                    else: image.slider.setValue(ticks)
         if self.compare_full_window is not None:
             self.compare_full_window.image_toolbar.refresh()
 
@@ -4347,6 +4450,7 @@ class PicView(QMainWindow):
                 elif action == "zoom":
                     if self.compare_full_window is not None:
                         image.fullscreen_zoom = source.image.fullscreen_zoom
+                    image.slider.setMaximum(max(4000, value))
                     if image.slider.value() == value: image.set_zoom_percent(value)
                     else: image.slider.setValue(value)
                 elif action == "fit":

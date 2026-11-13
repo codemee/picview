@@ -52,6 +52,7 @@ def main():
         use_system_palette(app)
         for name, kind in ICONS.items():
             button = DocumentationButton(kind, name)
+            if kind == "background": button.set_swatch_color(PALETTE["pane"])
             image = QImage(102, 102, QImage.Format.Format_ARGB32_Premultiplied)
             image.setDevicePixelRatio(3)
             image.fill(Qt.GlobalColor.transparent)

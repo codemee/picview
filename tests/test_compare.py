@@ -536,6 +536,40 @@ def test_sync_button_applies_image_tools_only_when_enabled(browser):
     assert first.image.rotation == 90 and second.image.rotation == 270
 
 
+@pytest.mark.parametrize("selected_index", [0, 1])
+@pytest.mark.parametrize("ticks", [1000, 1750, 6500])
+def test_enabling_sync_uses_selected_images_current_zoom(browser, selected_index, ticks):
+    window, folders = browser
+    pages = [window.open_folder(folder) for folder in folders]
+    add(window, *pages)
+    source = pages[selected_index]
+    target = pages[1 - selected_index]
+    target.image.slider.setValue(800)
+    source.image.slider.setMaximum(max(4000, ticks))
+    source.image.slider.setValue(ticks)
+    window.focus_compare_page(source)
+    window.set_sync(True)
+    assert source.image.zoom == target.image.zoom == ticks / 1000
+    assert source.image.slider.value() == target.image.slider.value() == ticks
+    window.set_sync(False)
+    target.image.slider.setValue(900)
+    assert source.image.zoom == ticks / 1000
+
+
+def test_enabling_sync_copies_selected_images_fitted_scale(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    add(window, first, second)
+    window.focus_compare_page(first)
+    first.image.fit_b.setChecked(True)
+    first.image.render()
+    ticks = first.image.slider.value()
+    window.set_sync(True)
+    assert first.image.zoom == second.image.zoom == ticks / 1000
+    assert first.image.slider.value() == second.image.slider.value() == ticks
+
+
 def test_sync_button_scrolls_comparison_panes_proportionally(browser):
     window, folders = browser
     window.resize(700, 500)
@@ -742,6 +776,7 @@ def test_fullscreen_comparison_toolbar_targets_chosen_image(browser):
     assert full.labels[first].pixmap().deviceIndependentSize().width() > first.image.image_size()[0]
     assert second.image.fullscreen_zoom is None
     QTest.mouseClick(toolbar.sync_button, Qt.MouseButton.LeftButton)
+    assert first.image.fullscreen_zoom == second.image.fullscreen_zoom == 1.5
     toolbar.set_zoom(1800)
     assert first.image.fullscreen_zoom == second.image.fullscreen_zoom == 1.8
     QTest.mouseClick(toolbar.fit_button, Qt.MouseButton.LeftButton)

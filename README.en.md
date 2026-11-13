@@ -72,14 +72,14 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 
 ### Window and toolbars
 
-- Each toolbar has one shared “…” overflow button. Zoom value buttons and sliders overflow together and remain on one row in the panel. Click the value button to reveal numeric input and reset. Thumbnail date display, integration, language, and theme settings share this panel.
+- Each toolbar has one shared “…” overflow button, including thumbnail date display, integration, language, and theme settings. Zoom and thumbnail size controls sit in translucent panels at the bottom-right of their panes, appearing on hover and hiding when the pointer leaves. Click the value button to reveal numeric input and reset.
 
 - Resize the window down to **260 × 220 px**.
-- Open folder, sorting, and settings share the thumbnail toolbar with folder tabs and thumbnail size controls.
+- Open folder, sorting, and settings share the thumbnail toolbar with folder tabs.
 - Drag the dotted handle to the left of the thumbnail tabs or the image toolbar to a top, bottom, left, or right window edge to arrange the panes and choose their order. Drag the divider to resize them. The pane layout is shared across tabs and stays fixed when switching tabs.
 - Folder tabs sit inside the thumbnail pane, sharing a row with the thumbnail tools on the right. The tab strip follows the active thumbnail pane.
 - When tabs overflow, scroll arrows appear at opposite ends of the tab bar. Both scroll arrows and the tab-list dropdown use thin chevrons.
-- Fit and full screen sit on the right, before the zoom value and slider. The shared comparison toolbar uses the same order.
+- Fit and full screen sit on the right of the toolbar. The shared comparison toolbar uses the same order, with end-comparison and sync controls in a separate group visible only in comparison mode.
 - Hover over buttons or zoom controls to see their assigned keyboard shortcuts. The overflow menu also shows the corresponding keys.
 - Thumbnail cards use distinct backgrounds and thin borders in both light and dark themes, keeping their boundaries visible while scrolling.
 - Toggle tools such as sync and fit-to-pane use a background to indicate their active state. Icons keep their original color and stroke width; the background deepens on hover.
@@ -89,8 +89,8 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Visible thumbnails load first; the rest are decoded progressively in the background.
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
-- When zoom controls do not fit, open the “…” panel to drag the slider directly, or click its value button to enter an exact zoom or thumbnail size.
-- The window title shows the current version, for example **PicView v0.1.10**.
+- Image and thumbnail panes have their own size panels. Comparison mode uses one shared zoom panel at the bottom-right of the whole comparison area, targeting the selected image. Leaving comparison restores the image panel immediately if the pointer remains over its pane.
+- The window title shows the current version, for example **PicView v0.1.18**.
 
 ### Open and drag images
 
@@ -221,8 +221,8 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 - Press <kbd>Tab</kbd> to cycle through comparison panes in order, or <kbd>Shift</kbd>+<kbd>Tab</kbd> to cycle backward.
 - Leaving comparison activates the last folder in comparison order and keeps the current pane layout.
 - Arrow keys, <kbd>Home</kbd>/<kbd>End</kbd>, <kbd>Page Up</kbd>/<kbd>Page Down</kbd>, <kbd>Space</kbd>, and <kbd>Backspace</kbd> navigate images in the selected pane's folder.
-- By default, zoom, rotate, mirror, set the background, and scroll each pane independently.
-- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-light.png" width="34" height="34" alt="Sync tools" title="Sync tools"></picture> in the image toolbar to apply rotation, mirroring, zoom, fit, background, and horizontal and vertical scrolling to every comparison pane. Images of different sizes align by scroll position as a proportion of their scrollable range. Click again to return to independent controls.
+- By default, zoom, rotate, mirror, and scroll each pane independently. Background colors always apply to every compared image, regardless of the sync toggle.
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sync-light.png" width="34" height="34" alt="Sync tools" title="Sync tools"></picture> in the comparison toolbar to first match every compared image to the selected image’s actual zoom, then synchronize rotation, mirroring, zoom, fit, and horizontal and vertical scrolling. Images of different sizes align by scroll position as a proportion of their scrollable range. Click again to return to independent controls.
 - Visible background images continue updating when files change.
 - Click the close button in the upper-right corner of a comparison pane to remove that image. When one pane remains, normal viewing resumes with that image selected in the thumbnails.
 
@@ -247,8 +247,8 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 - Choose white, black, gray, light gray, cream, light blue, light green, or light pink to make transparent image details easier to see.
 - Dark gray, slate, dark blue, dark green, dark purple, dark red, dark brown, and dark teal backgrounds help inspect light-colored images.
 - The 16 background colors appear in four columns of swatches, with color names in tooltips. The default option keeps its text and previews the current theme's default background color.
-- The background applies immediately to image and full-screen views, without changing image files or thumbnail backgrounds.
-- Tabs and comparison panes keep independent choices, preserved when duplicating tabs or restarting.
+- The background button previews the current color and updates with color and theme changes. The background applies immediately to image and full-screen views, and to every image in comparison mode, without changing image files or thumbnail backgrounds.
+- Tabs retain their choices when duplicated or restored after restarting. Choosing a background during comparison updates every compared image.
 - When the toolbar is narrow, open the background panel from **⋯ More tools**.
 
 ### Keyboard shortcuts

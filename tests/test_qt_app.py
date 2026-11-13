@@ -106,8 +106,11 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     widgets = [toolbar.itemAt(i).widget() for i in range(toolbar.count()) if toolbar.itemAt(i).widget() and not toolbar.itemAt(i).widget().isHidden()]
     assert widgets[:4] == [window.image.drag_handle, window.image.rotate_b, window.image.mh, window.image.mv]
     assert widgets[4].width() == 1
-    assert widgets[5:8] == [window.image.background_button, window.image.sync_button, window.image.filename_label]
-    assert widgets[-4:] == [window.image.fit_b, window.image.full, window.image.zoom_label, window.image.slider]
+    assert widgets[5] is window.image.background_button
+    assert window.image.sync_button.isHidden()
+    assert widgets[-3:] == [window.image.filename_label, window.image.fit_b, window.image.full]
+    assert window.image.zoom_label.parentWidget() is window.image.zoom_panel
+    assert window.image.slider.parentWidget() is window.image.zoom_panel
     assert window.image.slider.width() == window.thumbs.slider.width()
     for slider in (window.image.slider, window.thumbs.slider):
         assert abs(slider.reference_x() - slider.width() / 2) <= 2
@@ -115,7 +118,9 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     thumbnail_toolbar = window.thumbs.layout().itemAt(0).layout()
     thumbnail_widgets = [thumbnail_toolbar.itemAt(i).widget() for i in range(thumbnail_toolbar.count()) if thumbnail_toolbar.itemAt(i).widget() and not thumbnail_toolbar.itemAt(i).widget().isHidden()]
     assert thumbnail_widgets[:2] == [window.thumbs.drag_handle, window.thumbs.tab_slot]
-    assert thumbnail_widgets[-3:] == [window.thumbs.size_label, window.thumbs.slider, window.settings_button]
+    assert thumbnail_widgets[-1] is window.settings_button
+    assert window.thumbs.size_label.parentWidget() is window.thumbs.size_panel
+    assert window.thumbs.slider.parentWidget() is window.thumbs.size_panel
     assert window.thumbs.size_label.text() == "140px"
     window.thumbs.size_label.click()
     window.thumbs.size_label.spin.selectAll()

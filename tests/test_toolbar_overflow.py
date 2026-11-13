@@ -1,5 +1,5 @@
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QToolButton
 from PIL import Image
@@ -81,23 +81,25 @@ def test_settings_ellipsis_repaints_with_theme(browser):
         expected.deleteLater()
 
 
-def test_hidden_zoom_and_thumbnail_size_editors(browser):
+def test_overlay_zoom_and_thumbnail_size_editors(browser):
     window, folders = browser
     window.open_folder(folders[0])
     window.resize(260, 350)
     QTest.qWait(100)
     image = window.image
     image.toolbar_overflow.populate_menu()
-    image.toolbar_overflow.panel_controls[image.slider].setValue(1750)
+    assert image.slider not in image.toolbar_overflow.panel_controls
+    image.slider.setValue(1750)
     assert image.zoom == 1.75
     assert not image.fit_to_pane
     thumbs = window.thumbs
     thumbs.toolbar_overflow.populate_menu()
-    thumbs.toolbar_overflow.panel_controls[thumbs.slider].setValue(200)
+    assert thumbs.slider not in thumbs.toolbar_overflow.panel_controls
+    thumbs.slider.setValue(200)
     assert thumbs.size == 200
 
 
-def test_thumbnail_has_one_ellipsis_and_immediate_live_slider(browser):
+def test_thumbnail_has_one_ellipsis_and_live_hover_slider(browser):
     from picview.qt_app import IconButton
     window, folders = browser
     window.open_folder(folders[0])
@@ -110,12 +112,23 @@ def test_thumbnail_has_one_ellipsis_and_immediate_live_slider(browser):
     assert ellipses == [window.settings_button]
     window.settings_menu.popup(window.settings_button.mapToGlobal(window.settings_button.rect().bottomLeft()))
     wait_until(window.settings_menu.isVisible)
-    slider = thumbs.toolbar_overflow.panel_controls[thumbs.slider]
-    value_button = thumbs.toolbar_overflow.panel_controls[thumbs.size_label]
+    assert thumbs.slider not in thumbs.toolbar_overflow.panel_controls
+    window.settings_menu.hide()
+    QTest.qWait(50)
+    window.resize(1100, 780)
+    QTest.qWait(50)
+    QTest.mouseMove(window.image.scroll.viewport(), QPoint(10, 10))
+    QTest.mouseMove(thumbs.scroll.viewport(), QPoint(20, 20))
+    QTest.mouseMove(window.image.scroll.viewport(), QPoint(30, 30))
+    wait_until(lambda: not thumbs.size_panel.isVisible())
+    QTest.mouseMove(thumbs.scroll.viewport(), QPoint(10, 10))
+    wait_until(thumbs.size_panel.isVisible)
+    slider = thumbs.slider
+    value_button = thumbs.size_label
     assert slider.isVisible() and value_button.isVisible()
     assert not value_button.spin.isVisible()
     assert not value_button.reset_button.isVisible()
-    assert not thumbs.size_label.editor_menu.isVisible()
+    assert not value_button.editor_menu.isVisible()
     slider.setValue(180)
     assert thumbs.size == 180 and value_button.text() == "180px"
     thumbs.slider.setValue(190)
@@ -129,18 +142,82 @@ def test_thumbnail_has_one_ellipsis_and_immediate_live_slider(browser):
     value_button.click()
     value_button.reset_button.click()
     assert thumbs.size == 140 and slider.value() == 140
-    window.settings_menu.hide()
+    QTest.mouseMove(window.image.scroll.viewport(), QPoint(10, 10))
+    wait_until(lambda: not thumbs.size_panel.isVisible())
 
 
-def test_zoom_value_and_slider_always_overflow_as_one_group(browser):
+def test_zoom_panel_stays_in_viewport_and_out_of_toolbar_overflow(browser):
     window, folders = browser
     window.open_folder(folders[0])
     for width in (1100, 800, 650, 420, 260):
         window.resize(width, 400)
         QTest.qWait(50)
-        for slider, value in ((window.thumbs.slider, window.thumbs.size_label),
-                              (window.image.slider, window.image.zoom_label)):
-            assert slider.isHidden() == value.isHidden()
+        pane = window.image
+        thumbs = window.thumbs
+        assert thumbs.slider not in thumbs.toolbar_overflow.widgets
+        assert thumbs.size_label not in thumbs.toolbar_overflow.widgets
+        assert thumbs.scroll.viewport().rect().contains(thumbs.size_panel.geometry())
+        assert pane.slider not in pane.toolbar_overflow.widgets
+        assert pane.zoom_label not in pane.toolbar_overflow.widgets
+        assert pane.scroll.viewport().rect().contains(pane.zoom_panel.geometry())
+
+
+def test_comparison_uses_one_shared_zoom_panel_and_restores_single_pane_controls(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    window.set_compare(True)
+    window.check_compare_page(first, True)
+    window.resize(1100, 780)
+    QTest.qWait(100)
+    window.focus_compare_page(first)
+    area = window.comparison_area
+    QTest.mouseMove(first.image.scroll.viewport(), QPoint(15, 15))
+    wait_until(lambda: area.zoom_panel is first.image.zoom_panel and area.zoom_panel.isVisible())
+    assert area.zoom_panel.parentWidget() is area
+    assert area.rect().contains(area.zoom_panel.geometry())
+    assert area.zoom_panel.geometry().right() == area.width() - 9
+    assert area.zoom_panel.geometry().bottom() == area.height() - 9
+    assert not second.image.zoom_panel.isVisible()
+    QTest.mouseMove(first.image.slider, first.image.slider.rect().center())
+    assert first.image.zoom_panel.isVisible()
+    first.image.slider.setValue(1750)
+    assert first.image.zoom == 1.75
+    assert second.image.zoom != 1.75
+    window.focus_compare_page(second)
+    QTest.mouseMove(second.image.scroll.viewport(), QPoint(15, 15))
+    wait_until(lambda: area.zoom_panel is second.image.zoom_panel and area.zoom_panel.isVisible())
+    assert area.zoom_panel.parentWidget() is area
+    assert not first.image.zoom_panel.isVisible()
+    window.set_sync(True)
+    area.zoom_panel.slider.setValue(1500)
+    assert first.image.zoom == second.image.zoom == 1.5
+    QTest.mouseMove(window.thumbs.scroll.viewport(), QPoint(15, 15))
+    wait_until(lambda: not area.zoom_panel.isVisible())
+    window.set_compare(False)
+    assert area.zoom_panel is None
+    for page in (first, second):
+        assert page.image.zoom_panel.parentWidget() is page.image.scroll.viewport()
+        assert page.image.zoom_panel.available
+
+
+def test_leaving_comparison_restores_hover_panel_without_moving_mouse(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    window.set_compare(True)
+    window.check_compare_page(first, True)
+    window.focus_compare_page(second)
+    window.resize(1100, 780)
+    QTest.qWait(100)
+    QTest.mouseMove(second.image.scroll.viewport(), QPoint(20, 20))
+    wait_until(lambda: window.comparison_area.zoom_panel.isVisible())
+    window.set_compare(False)
+    pane = window.image
+    wait_until(pane.zoom_panel.isVisible)
+    QTest.mouseMove(window.thumbs.scroll.viewport(), QPoint(20, 20))
+    wait_until(lambda: not pane.zoom_panel.isVisible())
+    assert window.thumbs.size_panel.isVisible()
 
 
 def test_compared_pane_actions_still_target_own_image(browser):

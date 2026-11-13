@@ -37,7 +37,7 @@ For an existing PyPI project, add the same publisher under the project's Publish
 
 ## Desktop releases
 
-- `desktop.yml` builds a single Windows x64 EXE and an Apple Silicon macOS DMG containing `PicView.app` and an Applications shortcut.
+- `desktop.yml` builds a Windows x64 ZIP containing the complete PicView application folder and an Apple Silicon macOS DMG containing `PicView.app` and an Applications shortcut.
 - Publishing a new GitHub Release triggers both the PyPI and desktop workflows. Desktop files and individual SHA-256 checksums are attached to that release after tests and frozen-app smoke checks pass.
 - Desktop builds bundle the license and attach a platform-specific `LICENSE.txt` alongside the downloads. The DMG also includes a readable `LICENSE.txt`.
 - Manually run **Build desktop apps** in GitHub Actions to validate the current branch. Manual runs store downloads as workflow artifacts and do not modify an existing release.
