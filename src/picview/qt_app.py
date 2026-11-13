@@ -363,6 +363,10 @@ class IconButton(QToolButton):
     def set_kind(self, icon: str, tip: str) -> None:
         self.kind = icon; self.setToolTip(tip); self.refresh_icon()
 
+    def set_swatch_color(self, color):
+        self.setProperty("swatch_color", color)
+        self.refresh_icon()
+
     def refresh_icon(self) -> None:
         self.setStyleSheet(
             f"QToolButton{{background:transparent;border:0;border-radius:8px;padding:4px;}}"
@@ -432,8 +436,12 @@ class IconButton(QToolButton):
         elif self.kind == "fit":
             p.drawRect(QRectF(4, 4, 16, 16)); p.drawRect(QRectF(8, 9, 8, 6))
         elif self.kind == "background":
-            p.fillRect(QRectF(4, 4, 8, 8), icon_color)
-            p.fillRect(QRectF(12, 12, 8, 8), icon_color)
+            color = self.property("swatch_color")
+            if color:
+                p.setBrush(QColor(color))
+            else:
+                p.fillRect(QRectF(4, 4, 8, 8), icon_color)
+                p.fillRect(QRectF(12, 12, 8, 8), icon_color)
             p.drawRect(QRectF(4, 4, 16, 16))
         elif self.kind == "more":
             p.setBrush(icon_color)
@@ -718,6 +726,7 @@ class FullscreenImageToolbar(QFrame):
         self.sync_button.clicked.connect(self.owner.set_sync)
         if len(self.pages) > 1:
             row.addWidget(self.sync_button)
+            row.addWidget(self.separator())
         self.background_button = IconButton("background", "")
         self.background_button.clicked.connect(self.show_background_menu)
         row.addWidget(self.background_button)
@@ -822,6 +831,7 @@ class FullscreenImageToolbar(QFrame):
                                    (self.mirror_v_button, "mv", "Alt+V")):
             button.setToolTip(shortcut_tooltip(pane.labels[label], key))
         self.background_button.setToolTip(pane.labels["background"])
+        self.background_button.set_swatch_color(pane.background_color())
         self.sync_button.blockSignals(True)
         self.sync_button.setChecked(self.owner.sync_enabled)
         self.sync_button.blockSignals(False)
@@ -1553,6 +1563,7 @@ class ToolbarOverflow(QObject):
                 layout.addLayout(row)
             elif isinstance(control, QToolButton):
                 button = IconButton(getattr(control, "kind", "more"), control.toolTip() or control.text(), panel)
+                button.set_swatch_color(control.property("swatch_color"))
                 button.setCheckable(control.isCheckable())
                 button.setChecked(control.isChecked())
                 button.setEnabled(control.isEnabled())
@@ -1603,15 +1614,19 @@ class ImagePane(QFrame):
         self.background_button = IconButton("background", labels["background"])
         self.background_button.clicked.connect(self.show_background_menu)
         bar.addWidget(self.background_button)
+        separate_tools(bar)
         self.sync_button = IconButton("sync", labels["sync_tools"])
         self.sync_button.setCheckable(True)
         self.sync_button.setEnabled(False)
+        self.sync_button.setProperty("toolbar_available", False)
+        self.sync_button.hide()
         bar.addWidget(self.sync_button)
         self.end_compare_button = IconButton("compare-exit", labels["compare_exit"])
         self.end_compare_button.clicked.connect(lambda: self.window().set_compare(False))
         self.end_compare_button.setProperty("toolbar_available", False)
         self.end_compare_button.hide()
         bar.addWidget(self.end_compare_button)
+        separate_tools(bar)
         self.background_menu = QMenu(self)
         self.background_panel = QWidget()
         choices = QGridLayout(self.background_panel)
@@ -1689,6 +1704,7 @@ class ImagePane(QFrame):
 
     def apply_background(self):
         color = self.background_color()
+        self.background_button.set_swatch_color(color)
         self.scroll.viewport().setStyleSheet(f"background:{color};")
         if self.full_window is not None:
             self.full_window.set_background(color)
@@ -1895,6 +1911,8 @@ class ImagePane(QFrame):
         self.toolbar_widget.setVisible(not comparing)
         self.end_compare_button.setProperty("toolbar_available", comparing)
         self.end_compare_button.setVisible(comparing)
+        self.sync_button.setProperty("toolbar_available", comparing)
+        self.sync_button.setVisible(comparing)
         self.toolbar_overflow.update()
         self.comparison_header.setVisible(comparing)
         if comparing:
@@ -4317,7 +4335,8 @@ class PicView(QMainWindow):
             self.compare_full_window.image_toolbar.refresh()
 
     def apply_comparison_tool(self, source, action, value):
-        if not self.sync_enabled or self._syncing_tools or source not in self.checked_pages: return
+        if self._syncing_tools or not self.compare_enabled or source not in self.checked_pages: return
+        if action != "background" and not self.sync_enabled: return
         self._syncing_tools = True
         try:
             for page in self.comparison_order:

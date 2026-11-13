@@ -97,6 +97,24 @@ def test_background_panel_is_available_in_overflow(browser):
     assert pane.background_color() == "#808080"
 
 
+def test_comparison_background_applies_to_all_compared_images_without_sync(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    window.set_compare(True)
+    window.check_compare_page(first, True)
+    window.check_compare_page(second, True)
+    excluded = window.open_folder(folders[0])
+    window.check_compare_page(excluded, False)
+    assert not window.sync_enabled
+    second.image.choose_background("blue")
+    assert first.image.background_mode == second.image.background_mode == "blue"
+    assert excluded.image.background_mode == "default"
+    window.set_compare(False)
+    second.image.choose_background("white")
+    assert first.image.background_mode == "blue"
+
+
 def test_invalid_saved_background_uses_theme_default():
     for invalid in (None, [], {}, "#ffffff", "invalid"):
         state = normalize_tab_state({"folder": "C:/Pictures", "image_background": invalid})
