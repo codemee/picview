@@ -268,7 +268,7 @@ TEXT["en"].update({
     "about_license_full": "Full license text", "about_license_missing": "The license text is unavailable locally. Use the GNU GPL link above to read the terms.",
     "sort": "Sort thumbnails", "sort_method": "Sort by", "sort_direction": "Sort direction", "sort_natural": "Name (natural order)", "sort_modified": "Date modified",
     "sort_ascending": "Ascending (A–Z / oldest first)", "sort_descending": "Descending (Z–A / newest first)",
-    "show_modified": "Show date modified", "copy": "Copy", "properties": "Properties", "file_close": "Close",
+    "show_modified": "Show date modified", "show_subfolders": "Show subfolders", "folder_back": "Back to previous folder", "folder_up": "Parent folder", "folder_unavailable": "Cannot open folder: {folder}", "copy": "Copy", "properties": "Properties", "file_close": "Close",
     "file_name": "Name", "file_type": "Type", "file_location": "Location", "file_size": "Size",
     "modified": "Modified", "created": "Created", "dimensions": "Dimensions", "bytes": "bytes",
     "background": "Image background", "bg_default": "Default (follow theme)",
@@ -304,7 +304,7 @@ TEXT["zh"].update({
     "about_license_full": "授權全文", "about_license_missing": "無法讀取本機授權文件，請使用上方 GNU GPL 連結閱讀條款。",
     "sort": "縮圖排序", "sort_method": "排序方式", "sort_direction": "排序方向", "sort_natural": "檔名（自然排序）", "sort_modified": "修改時間",
     "sort_ascending": "順向（A–Z／舊到新）", "sort_descending": "逆向（Z–A／新到舊）",
-    "show_modified": "顯示修改日期時間", "copy": "複製", "properties": "內容", "file_close": "關閉",
+    "show_modified": "顯示修改日期時間", "show_subfolders": "顯示子資料夾", "folder_back": "返回上一個資料夾", "folder_up": "上一層資料夾", "folder_unavailable": "無法開啟資料夾：{folder}", "copy": "複製", "properties": "內容", "file_close": "關閉",
     "file_name": "檔名", "file_type": "類型", "file_location": "位置", "file_size": "大小",
     "modified": "修改時間", "created": "建立時間", "dimensions": "圖片尺寸", "bytes": "位元組",
     "background": "圖片背景色", "bg_default": "預設（跟隨主題）",
@@ -395,7 +395,19 @@ class IconButton(QToolButton):
             path.closeSubpath()
             p.drawPath(path)
 
-        if self.kind == "folder":
+        if self.kind in {"folder-back", "folder-up"}:
+            p.setBrush(QColor("#ffca28"))
+            p.setPen(QPen(QColor("#dba319"), stroke))
+            polygon((3, 7), (9, 7), (11, 9), (21, 9), (21, 20), (3, 20))
+            p.setPen(QPen(QColor("#654c00"), 1.4))
+            if self.kind == "folder-back":
+                line(7, 14, 18, 14); line(7, 14, 11, 11); line(7, 14, 11, 17)
+            else:
+                line(12, 10.5, 12, 18); line(12, 10.5, 8.5, 14); line(12, 10.5, 15.5, 14)
+        elif self.kind == "subfolders":
+            p.setBrush(QColor("#ffca28"))
+            polygon((3, 7), (9, 7), (11, 9), (21, 9), (21, 19), (3, 19))
+        elif self.kind == "folder":
             back = QPainterPath(QPointF(4, 19))
             back.lineTo(4, 6); back.quadTo(4, 5, 5, 5)
             back.lineTo(10, 5); back.lineTo(12, 8)
@@ -469,9 +481,15 @@ class IconButton(QToolButton):
             p.drawEllipse(QRectF(4, 4, 16, 16))
             line(12, 7, 12, 12); line(12, 12, 17, 12)
         elif self.kind in ("sort-ascending", "sort-descending"):
-            line(12, 4, 12, 20)
-            end, wing = (4, 9) if self.kind == "sort-ascending" else (20, 15)
-            line(7, wing, 12, end); line(12, end, 17, wing)
+            ascending = self.kind == "sort-ascending"
+            # Draw letters as strokes so they remain legible without font fallback.
+            a_y, z_y = (3, 13) if ascending else (13, 3)
+            line(3, a_y + 7, 6, a_y); line(6, a_y, 9, a_y + 7)
+            line(4.3, a_y + 4, 7.7, a_y + 4)
+            line(3, z_y, 9, z_y); line(9, z_y, 3, z_y + 7); line(3, z_y + 7, 9, z_y + 7)
+            line(17, 4, 17, 20)
+            end, wing = (4, 8) if ascending else (20, 16)
+            line(13, wing, 17, end); line(17, end, 21, wing)
         elif self.kind == "modified-visible":
             p.drawRoundedRect(QRectF(4, 6, 16, 14), 2, 2)
             line(4, 11, 20, 11); line(8, 4, 8, 8); line(16, 4, 16, 8)
@@ -1035,6 +1053,47 @@ class ThumbnailTile(QFrame):
         super().mouseReleaseEvent(event)
 
 
+class FolderTile(ThumbnailTile):
+    opened = Signal(Path)
+
+    def __init__(self, path, size, show_modified):
+        super().__init__(path, None, size, False, show_modified)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+        self.setToolTip(str(path))
+        self.setAccessibleName(path.name + "/")
+
+    def set_size(self, size, show_modified):
+        super().set_size(size, show_modified)
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.scale(size / 100, size / 100)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#e4a91b"))
+        painter.drawRoundedRect(QRectF(10, 23, 36, 26), 4, 4)
+        painter.setBrush(QColor("#ffca28"))
+        painter.drawRoundedRect(QRectF(10, 32, 80, 48), 5, 5)
+        painter.end()
+        self.preview.setPixmap(pixmap)
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            if self._drag_start is not None and (event.position().toPoint() - self._drag_start).manhattanLength() >= QApplication.startDragDistance():
+                self._drag_start = None
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_start = None
+            self.opened.emit(self.path)
+            event.accept()
+        else:
+            super().mouseDoubleClickEvent(event)
+
+
 PANE_DOCK_MIME = "application/x-picview-pane-dock"
 
 
@@ -1100,6 +1159,7 @@ class PaneDragHandle(QToolButton):
 
 class ThumbnailPane(QFrame):
     selected = Signal(Path)
+    folderOpened = Signal(Path)
     rowRequested = Signal(int)
     def __init__(self, labels: dict[str, str], parent=None):
         self.columns = 1
@@ -1107,6 +1167,9 @@ class ThumbnailPane(QFrame):
         self.sort_mode = "natural"
         self.sort_descending = False
         self.show_modified = True
+        self.directories = []
+        self.folder_buttons = {}
+        self.selected_directory = None
         self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,4,10,8); layout.setSpacing(4)
         header=QHBoxLayout(); header.setSpacing(4); self.drag_handle=PaneDragHandle("thumb", labels["drag_pane"]); header.addWidget(self.drag_handle); header.addStretch(); self.size_label=ScaleValueButton(self.size,72,260,THUMBNAIL_BASE_SIZE,1,"px",labels["edit_thumb"]); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,THUMBNAIL_BASE_SIZE); self.slider.setRange(72,260); self.slider.setValue(self.size); self.slider.setFixedSize(SLIDER_WIDTH,30); self.slider.logicalValueChanged.connect(self._resize); self.size_label.valueChosen.connect(self.slider.setValue); layout.addLayout(header)
         self.tab_slot = QWidget()
@@ -1201,6 +1264,7 @@ class ThumbnailPane(QFrame):
         if watched is self.grid_host:
             if event.type() == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
                 self.scroll.setFocus(Qt.FocusReason.MouseFocusReason)
+                self.selected_directory = None
                 self._selection_start = event.position().toPoint()
                 modifier = Qt.KeyboardModifier.MetaModifier if sys.platform == "darwin" else Qt.KeyboardModifier.ControlModifier
                 self._selection_base = set(self.selected_paths) if event.modifiers() & modifier else set()
@@ -1253,6 +1317,7 @@ class ThumbnailPane(QFrame):
     def select_clicked(self, path, modifiers=Qt.KeyboardModifier.NoModifier):
         self.scroll.setFocus(Qt.FocusReason.MouseFocusReason)
         if path not in self.files: return
+        self.selected_directory = None
         selection_modifier = Qt.KeyboardModifier.MetaModifier if sys.platform == "darwin" else Qt.KeyboardModifier.ControlModifier
         if modifiers & Qt.KeyboardModifier.ShiftModifier and self.selection_anchor in self.files:
             start, end = sorted((self.files.index(self.selection_anchor), self.files.index(path)))
@@ -1274,6 +1339,7 @@ class ThumbnailPane(QFrame):
         self.refresh_selection_styles()
 
     def select_all(self):
+        self.selected_directory = None
         self.selected_paths = set(self.files)
         self.selection_anchor = self.selected_path
         self.refresh_selection_styles()
@@ -1286,11 +1352,28 @@ class ThumbnailPane(QFrame):
         return [item for item in self.files if item in self.selected_paths and item.is_file()]
 
     def refresh_selection_styles(self):
+        for path, tile in self.folder_buttons.items():
+            if tile.selected != (path == self.selected_directory):
+                tile.selected = path == self.selected_directory
+                tile.apply_style()
         for path, tile in self.buttons.items():
             selected = path in self.selected_paths
             if tile.selected != selected:
                 tile.selected = selected
                 tile.apply_style()
+
+    def select_directory(self, path, _modifiers=None):
+        if path not in self.directories: return
+        self.scroll.setFocus(Qt.FocusReason.MouseFocusReason)
+        self.selected_directory = path
+        self.selected_paths.clear()
+        self.refresh_selection_styles()
+
+    def set_directories(self, directories):
+        if directories == self.directories: return
+        self.directories = directories
+        if self.selected_directory not in directories: self.selected_directory = None
+        self.build()
 
     def set_files(self, files, selected=None, *, emit_selection=True):
         previous = self.selected_path
@@ -1299,6 +1382,7 @@ class ThumbnailPane(QFrame):
         if self.selected_path != previous or not self.selected_paths:
             self.selected_paths = {self.selected_path} if self.selected_path else set()
         if self.selection_anchor not in files: self.selection_anchor = self.selected_path
+        if self.selected_directory is not None: self.selected_paths.clear()
         self.build()
         if emit_selection and self.selected_path: self.selected.emit(self.selected_path)
     def _resize(self,v): self.size=v; self.size_label.set_value(v); self.build()
@@ -1314,10 +1398,25 @@ class ThumbnailPane(QFrame):
         self.failed_paths.intersection_update(wanted)
         self._pending_paths.intersection_update(wanted)
         cols = max(1, self.scroll.viewport().width() // (self.size + 20))
-        signature = (cols, self.size, self.show_modified, tuple(self.files))
+        signature = (cols, self.size, self.show_modified, tuple(self.directories), tuple(self.files))
         rearrange = signature != getattr(self, "_layout_signature", None)
         self._layout_signature = signature
         self.columns = cols
+        for path in list(self.folder_buttons):
+            if path not in self.directories:
+                tile = self.folder_buttons.pop(path)
+                self.grid.removeWidget(tile)
+                tile.deleteLater()
+        for index, path in enumerate(self.directories):
+            tile = self.folder_buttons.get(path)
+            if tile is None:
+                tile = FolderTile(path, self.size, self.show_modified)
+                tile.clicked_path.connect(self.select_directory)
+                tile.opened.connect(self.folderOpened.emit)
+                self.folder_buttons[path] = tile
+            tile.set_size(self.size, self.show_modified)
+            tile.apply_style()
+            self.grid.addWidget(tile, index // cols, index % cols)
         for index, path in enumerate(self.files):
             if index % 32 == 0: loading_checkpoint()
             tile = self.buttons.get(path)
@@ -1335,19 +1434,22 @@ class ThumbnailPane(QFrame):
             if resized:
                 tile.set_size(self.size, self.show_modified)
             if new or rearrange or resized:
-                self.grid.addWidget(tile, index // cols, index % cols)
+                position = index + len(self.directories)
+                self.grid.addWidget(tile, position // cols, position % cols)
             if self._loaded.get(path) != THUMBNAILS.key(path, self.size, self.devicePixelRatioF()):
                 self._pending_paths.add(path)
         self.schedule_previews()
         self.refresh_visible_tile_styles()
 
     def refresh_visible_tile_styles(self, *_):
-        if not self.isVisible() or not self.files: return
+        if not self.isVisible(): return
+        for tile in self.folder_buttons.values():
+            if getattr(tile, "_theme_revision", -1) != THEME_REVISION: tile.apply_style()
         viewport = self.scroll.viewport()
         row_height = max(1, self.tile_height() + max(0, self.grid.verticalSpacing()))
         first_row = max(0, self.scroll.verticalScrollBar().value() // row_height - 1)
         last_row = (self.scroll.verticalScrollBar().value() + viewport.height()) // row_height + 2
-        for path in self.files[first_row * self.columns:last_row * self.columns]:
+        for path in (self.directories + self.files)[first_row * self.columns:last_row * self.columns]:
             tile = self.buttons.get(path)
             if tile is not None and getattr(tile, "_theme_revision", -1) != THEME_REVISION:
                 tile.apply_style()
@@ -1365,7 +1467,7 @@ class ThumbnailPane(QFrame):
         row_height = self.tile_height() + max(0, self.grid.verticalSpacing())
         first_row = max(0, self.scroll.verticalScrollBar().value() // row_height - 1)
         last_row = (self.scroll.verticalScrollBar().value() + self.scroll.viewport().height()) // row_height + 2
-        visible = self.files[first_row * self.columns:last_row * self.columns]
+        visible = (self.directories + self.files)[first_row * self.columns:last_row * self.columns]
         priority = list(dict.fromkeys(visible + ([self.selected_path] if self.selected_path else [])))
         seen = set(priority)
         return [path for path in priority + [p for p in self.files if p not in seen] if path in self._pending_paths]
@@ -1435,6 +1537,7 @@ class ThumbnailPane(QFrame):
 
     def select(self,path):
         if path not in self.files: return
+        self.selected_directory = None
         self.selected_path=path
         self.selected_paths = {path}
         self.selection_anchor = path
@@ -2288,6 +2391,8 @@ class FolderTab(QWidget):
         super().__init__(parent)
         self.t = labels
         self.folder = None
+        self.folder_history = []
+        self.show_subfolders = True
         self.files = []
         self.active = False
         self.comparison_visible = False
@@ -2377,7 +2482,9 @@ class FolderTab(QWidget):
             self.split.setOrientation(orientation)
             self.split.insertWidget(0, self.thumbs if state.get("thumbnail_first", True) else self.image_slot)
             self._sash_fraction = state["sash_fraction"]
+        self.thumbs.selected_directory = None
         self.thumbs.set_files(self.files, selected)
+        self.refresh_subfolders()
         self._pending_image_versions = self.pending_image_versions()
         self._pending_image_retries = dict.fromkeys(self.thumbs.failed_paths, 8)
         self._image_versions = source._image_versions.copy() if source is not None else self.image_versions(self.files)
@@ -2388,6 +2495,15 @@ class FolderTab(QWidget):
             self.image.clear()
             self.update_empty_message()
         if self.active or self.comparison_visible: self.activate_image()
+
+    def refresh_subfolders(self):
+        directories = []
+        if self.show_subfolders and self.folder:
+            try:
+                directories = self.ordered_files([path for path in self.folder.iterdir() if path.is_dir()])
+            except OSError:
+                pass
+        self.thumbs.set_directories(directories)
 
     def update_empty_message(self):
         if not self.files:
@@ -2407,6 +2523,7 @@ class FolderTab(QWidget):
         self.cancel_scroll_restore()
         self.thumbs.sort_mode = mode
         self.thumbs.sort_descending = bool(descending)
+        self.refresh_subfolders()
         self.sortChanged.emit()
         selected = self.thumbs.selected_path
         self.files = self.ordered_files(self.files)
@@ -2729,6 +2846,7 @@ class FolderTab(QWidget):
 
     def refresh_folder(self):
         if self._closing or self.folder is None: return
+        self.refresh_subfolders()
         self.watch_current_folder()
         try:
             files = image_files(self.folder, strict=True)
@@ -2823,9 +2941,10 @@ class FolderTab(QWidget):
         selected = self.thumbs.selected_path
         index = self.files.index(selected) if selected in self.files else 0
         columns = self.thumbs.columns
-        target_row = index // columns + direction
-        if target_row < 0 or target_row * columns >= len(self.files): return
-        self.thumbs.select(self.files[min(len(self.files) - 1, index + direction * columns)])
+        offset = len(self.thumbs.directories)
+        target_row = (index + offset) // columns + direction
+        if target_row < 0 or (target_row + 1) * columns <= offset or target_row * columns >= offset + len(self.files): return
+        self.thumbs.select(self.files[max(0, min(len(self.files) - 1, index + direction * columns))])
 
     def navigate_row(self, direction):
         window = self.window()
@@ -3491,6 +3610,7 @@ class PicView(QMainWindow):
         super().__init__()
         self.settings = load_settings()
         self.show_modified = self.settings.get("show_modified", True) is not False
+        self.show_subfolders = self.settings.get("show_subfolders", True) is not False
         self.language_mode = self.settings.get("language", "system")
         if self.language_mode not in LANGUAGE_MODES: self.language_mode = "system"
         self.lang = resolve_language(self.language_mode)
@@ -3621,6 +3741,14 @@ class PicView(QMainWindow):
         self.direction_button = IconButton("sort-ascending", self.t["sort_direction"])
         self.direction_button.setCheckable(True)
         self.direction_button.clicked.connect(self.toggle_sort_direction)
+        self.folder_back_button = IconButton("folder-back", self.t["folder_back"])
+        self.folder_back_button.clicked.connect(self.folder_back)
+        self.folder_up_button = IconButton("folder-up", self.t["folder_up"])
+        self.folder_up_button.clicked.connect(self.folder_up)
+        self.subfolders_button = IconButton("subfolders", self.t["show_subfolders"])
+        self.subfolders_button.setCheckable(True)
+        self.subfolders_button.setChecked(self.show_subfolders)
+        self.subfolders_button.toggled.connect(self.set_show_subfolders)
         self.language_button = IconButton(LANGUAGE_ICONS[self.language_mode], self.t[f"lang_{self.language_mode}"])
         self.modified_button = IconButton("modified-visible", self.t["show_modified"])
         self.modified_button.setCheckable(True)
@@ -3656,6 +3784,7 @@ class PicView(QMainWindow):
         self.tabs.layout().removeWidget(self.tabs.strip)
         self.open_button.clicked.connect(self.choose)
         layout.addWidget(self.open_button)
+        for button in (self.folder_back_button, self.folder_up_button, self.subfolders_button): layout.addWidget(button)
         layout.addWidget(self.sort_button)
         layout.addWidget(self.direction_button)
         for button, action in ((self.language_button, self.toggle_lang), (self.theme_button, self.toggle_theme)):
@@ -3689,7 +3818,7 @@ class PicView(QMainWindow):
             strip.show()
         if self._tools_page is not page:
             old = self._tools_page
-            controls = (self.open_button, self._open_sort_separator, self.sort_button,
+            controls = (self.open_button, self.folder_back_button, self.folder_up_button, self.subfolders_button, self._open_sort_separator, self.sort_button,
                         self.direction_button, self.settings_button)
             if old is not None:
                 old.thumbs.toolbar_overflow.dispose()
@@ -3710,7 +3839,7 @@ class PicView(QMainWindow):
                 header.insertWidget(index, control)
                 control.show()
             thumbs.toolbar_overflow = ToolbarOverflow(thumbs, header,
-                [self.direction_button, self.sort_button, self.open_button, thumbs.drag_handle],
+                [self.subfolders_button, self.folder_back_button, self.folder_up_button, self.direction_button, self.sort_button, self.open_button, thumbs.drag_handle],
                 lambda thumbs=thumbs: thumbs.labels["more_tools"],
                 available_width=thumbs.toolbar_width, flex_widgets=(thumbs.tab_slot,),
                 more_button=self.settings_button,
@@ -3774,6 +3903,8 @@ class PicView(QMainWindow):
         page.image.informationChanged.connect(self.update_image_status)
         page.thumbs.owner_page = page
         page.thumbs.show_modified = self.show_modified
+        page.show_subfolders = self.show_subfolders and not self.compare_enabled
+        page.thumbs.folderOpened.connect(lambda folder, tab=page: self.navigate_folder(tab, folder))
         page.notification.connect(lambda message, tab=page: self.show_notification(tab, message))
         page.attentionChanged.connect(self.update_tab_titles)
         self.tabs.addTab(page, self.t["empty_tab"])
@@ -3818,6 +3949,69 @@ class PicView(QMainWindow):
         self.update_title()
         if self.compare_enabled and not getattr(self, "_batch_comparison_drop", False): self.sync_comparison()
         return page
+
+    def navigate_folder(self, page, folder, *, returning=False):
+        if self.compare_enabled or page is not self.current_tab(): return False
+        folder = Path(folder)
+        try:
+            if not folder.is_dir(): raise OSError()
+            next(folder.iterdir(), None)
+        except OSError:
+            self.notification_bar.showMessage(self.t["folder_unavailable"].format(folder=folder), 8000)
+            return False
+        if folder.resolve() == page.folder: return False
+        if returning:
+            state = page.folder_history[-1]
+        else:
+            state = page.snapshot() | {"folder": str(folder), "selected_file": "", "thumbnail_scroll": 0,
+                                      "image_scroll_x": 0, "image_scroll_y": 0, "image_zoom": 1.0,
+                                      "fit_to_pane": None, "rotation": 0, "fh": False, "fv": False}
+        previous = page.snapshot()
+        selected = Path(state["selected_file"]) if state["selected_file"] else None
+        page.open_folder(folder, selected, state)
+        if returning: page.folder_history.pop()
+        else: page.folder_history.append(previous)
+        if not page.files:
+            page._initial_view = None
+            page._pending_scroll = {key: state.get(key, 0) for key in ("thumbnail_scroll", "image_scroll_x", "image_scroll_y")}
+            page.scroll_restore_timer.start()
+        self.refresh_sort_buttons()
+        self.refresh_folder_navigation()
+        self.update_tab_titles()
+        self.update_title()
+        return True
+
+    def folder_back(self):
+        page = self.current_tab()
+        if page and page.folder_history:
+            self.navigate_folder(page, Path(page.folder_history[-1]["folder"]), returning=True)
+
+    def folder_up(self):
+        page = self.current_tab()
+        if page and page.folder: self.navigate_folder(page, page.folder.parent)
+
+    def set_show_subfolders(self, show):
+        self.show_subfolders = bool(show)
+        self.settings["show_subfolders"] = self.show_subfolders
+        self.refresh_folder_navigation()
+
+    def refresh_folder_navigation(self):
+        page = self.current_tab()
+        for button, key in ((self.folder_back_button, "folder_back"), (self.folder_up_button, "folder_up"),
+                            (self.subfolders_button, "show_subfolders")):
+            button.setToolTip(self.t[key])
+            button.setAccessibleName(self.t[key])
+            button.setProperty("toolbar_available", not self.compare_enabled)
+            button.setVisible(not self.compare_enabled)
+        self.folder_back_button.setEnabled(bool(page and page.folder_history))
+        self.folder_up_button.setEnabled(bool(page and page.folder and page.folder.parent != page.folder))
+        self.subfolders_button.blockSignals(True)
+        self.subfolders_button.setChecked(self.show_subfolders)
+        self.subfolders_button.blockSignals(False)
+        for tab in self.pages():
+            tab.show_subfolders = self.show_subfolders and not self.compare_enabled
+            tab.refresh_subfolders()
+        if page is not None: page.thumbs.toolbar_overflow.update()
 
     def choose(self):
         current = self.folder
@@ -4182,6 +4376,7 @@ class PicView(QMainWindow):
                 self.tabs.setCurrentWidget(target)
             self._compare_original_layouts.clear()
             self._compare_layout = None
+        self.refresh_folder_navigation()
         self.update_tab_titles()
 
     def check_compare_page(self, page, checked):
@@ -4657,6 +4852,7 @@ class PicView(QMainWindow):
             page.set_sort(page.thumbs.sort_mode, not page.thumbs.sort_descending)
 
     def refresh_sort_buttons(self):
+        self.refresh_folder_navigation()
         page = self.current_tab()
         available = page is not None and page.folder is not None
         mode = page.thumbs.sort_mode if page is not None else "natural"
@@ -4752,7 +4948,7 @@ class PicView(QMainWindow):
         active = sum(page.folder is not None for page in pages[:self.tabs.currentIndex()]) if current and current.folder else 0
         values = current.snapshot() if current is not None else {}
         values.update(tabs=states, active_tab=active, language=self.language_mode, theme=self.theme_mode,
-                      show_modified=self.show_modified, maximized_pane="")
+                      show_modified=self.show_modified, show_subfolders=self.show_subfolders, maximized_pane="")
         save_settings(values)
         for page in pages: page.shutdown()
         event.accept()

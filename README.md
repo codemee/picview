@@ -24,7 +24,7 @@
 
 - 已附加桌面版的版本可從 [GitHub Releases](https://github.com/codemee/picview/releases) 下載，不需要安裝 Python 或 uv。
 - **Windows x64**：解壓 `PicView-<版本>-windows-x64.zip`，保留整個 **PicView** 資料夾，再執行其中的 `PicView.exe`。更新時先關閉程式，替換整個資料夾；若曾啟用檔案總管右鍵整合，搬移資料夾後須重新啟用。
-- 資料夾版避免每次啟動時重複解壓；已有 PicView 視窗時，開檔要求會在載入完整介面前交給該視窗。[同機啟動量測與方法](docs/STARTUP_PERFORMANCE.md)。
+- 資料夾版避免每次啟動時重複解壓；已有 PicView 視窗時，開檔要求會在載入完整介面前交給該視窗。[同機啟動量測與方法](https://github.com/codemee/picview/blob/main/docs/STARTUP_PERFORMANCE.md)。
 - **macOS Apple Silicon**：開啟 `PicView-<版本>-macos-arm64.dmg`，將 **PicView.app** 拖曳到 **Applications**。
 - 桌面版目前沒有 Windows 發行者簽章或 Apple Developer ID 公證，首次開啟時可能會出現系統提示或遭到阻擋。
 
@@ -90,7 +90,17 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 - 縮圖使用共用的記憶體快取（上限 64 MiB），不另存縮圖檔案。
 - 調整窗格大小只重新排列縮圖，不會重新解碼所有圖片。
 - 單圖與縮圖窗格各有自己的大小調整面板；比圖時只在整個比圖區右下角顯示一個共用縮放面板，操作目前選取的圖片。取消比圖後，滑鼠仍在單圖窗格內時會立即恢復顯示面板。
-- 視窗標題會顯示目前版本，例如 **PicView v0.1.19**。
+- 視窗標題會顯示目前版本，例如 **PicView v0.1.20**。
+
+### 瀏覽子資料夾
+
+- 排序方向以 A–Z／Z–A 與箭頭標示；「返回」與「上一層」使用黃色資料夾加箭頭的圖示，方便區分。
+
+- 非比圖模式的縮圖工具列提供 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/subfolders-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/subfolders-light.png" width="34" height="34" alt="顯示子資料夾" title="顯示子資料夾"></picture>「顯示子資料夾」開關，預設開啟，關閉程式後會保存選擇。資料夾卡片排在圖片之前，以黃色資料夾圖示顯示，依目前排序方式排列。
+- 只列出目前資料夾的直接子資料夾，不遞迴彙整其中的圖片，也不為資料夾掃描封面縮圖。
+- 單擊資料夾卡片只選取，雙擊則在目前分頁進入該資料夾。資料夾卡片不參與圖片的多選、複製、拖曳或比圖操作。
+- 點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-up-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-up-light.png" width="34" height="34" alt="上一層資料夾" title="上一層資料夾"></picture>「上一層資料夾」可回到父資料夾；點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-back-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-back-light.png" width="34" height="34" alt="返回上一個資料夾" title="返回上一個資料夾"></picture>「返回上一個資料夾」可依此分頁本次開啟期間的瀏覽紀錄返回，並還原當時的選圖、縮放與捲動位置。視窗較窄時，這些工具可從「…」開啟。
+- 比圖模式隱藏資料夾卡片與瀏覽工具，離開比圖後恢復原本的顯示設定。
 
 ### 開啟與拖放圖片
 

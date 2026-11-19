@@ -26,6 +26,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "sort_mode": "natural",
     "sort_descending": False,
     "show_modified": True,
+    "show_subfolders": True,
     "image_zoom": 1.0,
     "image_background": "default",
     "language": "system",

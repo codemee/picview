@@ -16,7 +16,7 @@ from picview.qt_app import IconButton, PALETTE, themed_palette, use_system_palet
 
 
 ICONS = {
-    "folder": "folder", "split-h": "split-h", "split-v": "split-v",
+    "folder": "folder", "folder-back": "folder-back", "folder-up": "folder-up", "subfolders": "subfolders", "split-h": "split-h", "split-v": "split-v",
     "compare": "compare", "rotate": "rotate", "mirror-h": "mirror-h",
     "mirror-v": "mirror-v", "fit": "fit", "sync": "sync", "expand": "expand",
     "shrink": "shrink", "fullscreen": "fullscreen", "more": "more", "shell-integration": "shell-integration", "background": "background",

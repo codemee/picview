@@ -24,7 +24,7 @@ An image folder viewer built with Qt, focused on **fast loading** and **image co
 
 - Download desktop builds from [GitHub Releases](https://github.com/codemee/picview/releases) when attached to a release. Python and uv are not required.
 - **Windows x64**: extract `PicView-<version>-windows-x64.zip`, keep the entire **PicView** folder, and run `PicView.exe` inside it. Close the app before replacing the whole folder for an update. If you move the folder, re-enable File Explorer context-menu integration.
-- The folder build avoids extraction on every launch. When PicView is already open, file-open requests are forwarded before loading the full interface. See the [same-machine startup measurements](docs/STARTUP_PERFORMANCE.md).
+- The folder build avoids extraction on every launch. When PicView is already open, file-open requests are forwarded before loading the full interface. See the [same-machine startup measurements](https://github.com/codemee/picview/blob/main/docs/STARTUP_PERFORMANCE.md).
 - **macOS Apple Silicon**: open `PicView-<version>-macos-arm64.dmg`, then drag **PicView.app** into **Applications**.
 - Desktop builds currently have no Windows publisher signature or Apple Developer ID notarization, so the operating system may prompt or block the first launch.
 
@@ -90,7 +90,17 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - Image and thumbnail panes have their own size panels. Comparison mode uses one shared zoom panel at the bottom-right of the whole comparison area, targeting the selected image. Leaving comparison restores the image panel immediately if the pointer remains over its pane.
-- The window title shows the current version, for example **PicView v0.1.19**.
+- The window title shows the current version, for example **PicView v0.1.20**.
+
+### Browse subfolders
+
+- Sort direction uses A–Z/Z–A with an arrow. Back and parent-folder controls use arrows over yellow folders to distinguish navigation from sorting.
+
+- Outside comparison mode, the thumbnail toolbar offers a <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/subfolders-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/subfolders-light.png" width="34" height="34" alt="Show subfolders" title="Show subfolders"></picture> **Show subfolders** toggle, enabled by default and remembered after closing the app. Yellow folder cards appear before images and follow the current sort order.
+- Only direct subfolders are listed. Images are not collected recursively, and folders are not scanned for cover thumbnails.
+- Single-click a folder card to select it; double-click to open it in the current tab. Folder cards are excluded from image multiselection, copying, dragging, and comparison.
+- <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-up-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-up-light.png" width="34" height="34" alt="Parent folder" title="Parent folder"></picture> **Parent folder** opens the folder one level up. <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-back-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-back-light.png" width="34" height="34" alt="Back to previous folder" title="Back to previous folder"></picture> **Back to previous folder** follows this tab's browsing history for the current session, restoring the selected image, zoom, and scroll position. In narrow windows, these tools are available from **…**.
+- Comparison mode hides folder cards and navigation controls. Leaving comparison restores the previous display setting.
 
 ### Open and drag images
 

@@ -32,7 +32,7 @@ For an existing PyPI project, add the same publisher under the project's Publish
 - PicView uses `GPL-3.0-or-later`. Keep the root `LICENSE`, package metadata, and README license notices in sync. Python distributions include the full license text.
 - `README.md` is the default Traditional Chinese guide and the PyPI project description. Keep `README.en.md` in sync; `README.zh-TW.md` preserves the former Chinese documentation link.
 - Update usage instructions and release notes when behavior changes.
-- Keep image and language links in the published README absolute so they also resolve on PyPI.
+- Keep all links in the published README absolute, including documentation, images, and language links, so they also resolve on PyPI. Verify the built package description before publishing.
 - Regenerate light/dark button images with `uv run python scripts/export_doc_icons.py` when icon shapes change. Keep their button backgrounds and HTML `<kbd>` keycaps readable in dark Markdown viewers.
 
 ## Desktop releases
