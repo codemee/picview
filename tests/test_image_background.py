@@ -1,7 +1,7 @@
 from PIL import Image
 import pytest
 from PySide6.QtCore import QPoint, Qt
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QKeySequence
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
@@ -55,7 +55,8 @@ def test_default_follows_theme_and_custom_background_stays_fixed(browser):
     assert pane.background_color() == PALETTE["pane"]
     window.toggle_lang()
     assert pane.background_choices["default"].text() == window.t["bg_default"]
-    assert pane.background_button.toolTip() == f"{window.t['background']} (Alt+B)"
+    binding = QKeySequence("Alt+B").toString(QKeySequence.SequenceFormat.NativeText)
+    assert pane.background_button.toolTip() == f"{window.t['background']} ({binding})"
     window.toggle_theme()  # Restore the application palette for other tests.
 
 

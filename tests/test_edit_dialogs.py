@@ -1,4 +1,5 @@
 import pytest
+import sys
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 
@@ -19,7 +20,9 @@ def test_unsaved_dialog_buttons_follow_app_language(browser, monkeypatch, langua
         assert dialog.escapeButton() is dialog.button(QMessageBox.StandardButton.Cancel)
         assert dialog.textFormat() == Qt.TextFormat.PlainText
         assert pane.path.name in dialog.text()
-        assert dialog.windowTitle() == window.t["unsaved_title"]
+        # macOS message boxes omit window titles by platform convention.
+        if sys.platform != "darwin":
+            assert dialog.windowTitle() == window.t["unsaved_title"]
         return QMessageBox.StandardButton.Cancel
     monkeypatch.setattr(QMessageBox, "exec", inspect)
     assert pane.ask_unsaved_changes() == QMessageBox.StandardButton.Cancel

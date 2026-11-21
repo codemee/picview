@@ -52,6 +52,8 @@ def smoke_test(report_path):
         window.image.choose_zoom(2000)
         window.image.rotate()
         assert not window.image.label.pixmap().isNull(), "SVG rendering failed"
+        window.image.undo()
+        assert not window.image.is_modified, "Undo did not restore the saved image"
         mime = QMimeData()
         mime.setData(qt_app.COMPARISON_TAB_MIME, str(id(window.pages()[0])).encode("ascii"))
         assert window.add_comparison_drop(window.image, mime), "SVG comparison drop failed"

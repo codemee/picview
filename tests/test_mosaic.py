@@ -175,7 +175,8 @@ def test_mosaic_available_in_overflow_and_language_updates(browser):
     controller.panel_controls[pane.mosaic_button].click()
     assert pane.label.mosaic_active
     window.toggle_lang()
-    assert pane.mosaic_button.toolTip() == f"{window.t['mosaic']} (Alt+M)"
+    binding = QKeySequence("Alt+M").toString(QKeySequence.SequenceFormat.NativeText)
+    assert pane.mosaic_button.toolTip() == f"{window.t['mosaic']} ({binding})"
 
 
 def test_mosaic_animation_all_frames_and_svg_save(browser):

@@ -108,7 +108,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - Image and thumbnail panes have their own size panels. Comparison mode uses one shared zoom panel at the bottom-right of the whole comparison area, targeting the selected image. Leaving comparison restores the image panel immediately if the pointer remains over its pane.
-- The window title shows the current version, for example **PicView v0.1.21**.
+- The window title shows the current version, for example **PicView v0.1.22**.
 
 ### Browse subfolders
 

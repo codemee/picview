@@ -17,7 +17,7 @@ For an existing PyPI project, add the same publisher under the project's Publish
 ## Release
 
 1. Update the version in `pyproject.toml`, `src/picview/__init__.py`, and the examples in `README.md` and `README.en.md`, then run `uv lock`.
-2. Commit and push the changes.
+2. Run the test suite and the source launcher smoke check (`uv run python packaging/launcher.py --smoke-test build/source-smoke.json`, with `QT_QPA_PLATFORM=offscreen` and the `build` directory present). The smoke check must close without waiting for any dialog. Commit and push the changes.
 3. Publish a GitHub Release with a matching tag, such as `v0.1.0`.
 4. The `Publish to PyPI` workflow tests the Windows application, builds and validates the distributions, and uploads them using Trusted Publishing.
 5. Verify the published command with `uvx --refresh picview --version`.
