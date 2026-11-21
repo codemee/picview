@@ -70,6 +70,24 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 
 ## Usage
 
+### Crop and mosaic images
+
+| Tool | Icon | Shortcut |
+| --- | --- | --- |
+| Crop | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/crop-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/crop-light.png" width="34" height="34" alt="Crop"></picture> | Click the tool button |
+| Mosaic | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mosaic-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mosaic-light.png" width="34" height="34" alt="Mosaic"></picture> | Alt+M |
+| Save | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-light.png" width="34" height="34" alt="Save"></picture> | Ctrl+S |
+| Save As | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-as-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-as-light.png" width="34" height="34" alt="Save As"></picture> | Ctrl+Shift+S |
+
+- Outside comparison mode, click “Crop image” in the image toolbar and drag any of the eight corner or edge handles to crop the current image live. Look in “…” if the tool is collapsed.
+- Click the crop tool again to hide the handles and view the result. **Ctrl+Z** undoes cropping, rotation, and mirroring one step at a time; **Ctrl+Y** redoes them. Each handle drag counts as one step.
+- Cropping also applies to full-screen viewing and supports rotation, mirroring, SVG, and GIF. Entering comparison mode closes the crop handles.
+- The image toolbar provides Save (**Ctrl+S**) and Save As (**Ctrl+Shift+S**), saving edits at source resolution regardless of viewing zoom. Save As switches the current document to the new file. On macOS use Command instead of Ctrl and Command+Shift+Z to redo.
+- PNG, GIF, WebP, and TIFF retain multiple frames. JPEG and BMP save the current frame, with a warning before conversion. SVG sources can retain vector content when saved as SVG or be exported as bitmaps. JPEG fills transparency with white.
+- An asterisk beside the filename indicates unsaved edits. Changing images, folders, or tabs, closing a tab, or quitting prompts to Save, Discard, or Cancel. Comparison panes retain independent edit states.
+- Click Mosaic or press **Alt+M**, then drag a rectangle on the image and release to pixelate it. Repeat to cover additional regions; each rectangle is one undo step. Press **Alt+M** again to leave the tool. **Esc** cancels the current rectangle or leaves the tool when no selection is in progress.
+- Mosaic works outside comparison mode in the image pane and full screen, and is mutually exclusive with cropping. Use **Ctrl+Z/Ctrl+Y** to undo/redo, then Save or Save As to write the result. Animations apply the effect to every frame. SVG files containing mosaic edits are saved with embedded raster content.
+
 ### Window and toolbars
 
 - Each toolbar has one shared “…” overflow button, including thumbnail date display, integration, language, and theme settings. Zoom and thumbnail size controls sit in translucent panels at the bottom-right of their panes, appearing on hover and hiding when the pointer leaves. Click the value button to reveal numeric input and reset.
@@ -90,7 +108,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - Image and thumbnail panes have their own size panels. Comparison mode uses one shared zoom panel at the bottom-right of the whole comparison area, targeting the selected image. Leaving comparison restores the image panel immediately if the pointer remains over its pane.
-- The window title shows the current version, for example **PicView v0.1.20**.
+- The window title shows the current version, for example **PicView v0.1.21**.
 
 ### Browse subfolders
 
@@ -252,6 +270,7 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 
 ### Background colors for transparent images
 
+- Press **Alt+B** to open the panel with the current color focused. Navigate with arrow keys, apply with **Enter/Space**, or cancel with **Esc**. **Tab/Shift+Tab** cycle through colors; **Home/End** jump to the first/last option. Available in single-image, comparison, and full-screen views.
 - Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/background-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/background-light.png" width="34" height="34" alt="Image background" title="Image background"></picture> in the image toolbar to open the background color panel.
 - Choose **Default (follow theme)** to use the current theme's image background.
 - Choose white, black, gray, light gray, cream, light blue, light green, or light pink to make transparent image details easier to see.
@@ -272,6 +291,8 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 | Toggle fit to pane | <kbd>Alt</kbd>+<kbd>F</kbd> |
 | Rotate clockwise | <kbd>Alt</kbd>+<kbd>C</kbd> |
 | Mirror vertically / horizontally | <kbd>Alt</kbd>+<kbd>V</kbd> / <kbd>Alt</kbd>+<kbd>H</kbd> |
+| Open background color panel | <kbd>Alt</kbd>+<kbd>B</kbd> |
+| Toggle mosaic tool | <kbd>Alt</kbd>+<kbd>M</kbd> |
 | Open full screen | <kbd>F11</kbd> |
 | Close full screen | <kbd>Esc</kbd> |
 | Open a folder | System Open shortcut |

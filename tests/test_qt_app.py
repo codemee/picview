@@ -104,9 +104,10 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     assert window.open_button.icon().pixmap(window.open_button.iconSize()).width() == 20
     assert window.image.mh.icon().availableSizes()[0].width() == 48
     widgets = [toolbar.itemAt(i).widget() for i in range(toolbar.count()) if toolbar.itemAt(i).widget() and not toolbar.itemAt(i).widget().isHidden()]
-    assert widgets[:4] == [window.image.drag_handle, window.image.rotate_b, window.image.mh, window.image.mv]
-    assert widgets[4].width() == 1
-    assert widgets[5] is window.image.background_button
+    assert widgets[:8] == [window.image.drag_handle, window.image.rotate_b, window.image.mh, window.image.mv,
+                          window.image.crop_button, window.image.mosaic_button, window.image.save_button, window.image.save_as_button]
+    assert widgets[8].width() == 1
+    assert widgets[9] is window.image.background_button
     assert window.image.sync_button.isHidden()
     assert widgets[-3:] == [window.image.filename_label, window.image.fit_b, window.image.full]
     assert window.image.zoom_label.parentWidget() is window.image.zoom_panel

@@ -48,7 +48,6 @@ def test_svg_live_reload_preserves_view_and_last_complete_document(browser):
     write_svg(path)
     page = window.open_folder(folders[0], path)
     page.image.choose_zoom(1500)
-    page.image.rotate()
     original = page.image.frames[0][0]
     path.write_text('<svg xmlns="http://www.w3.org/2000/svg"><', encoding="utf-8")
     assert not page.reload_current_image()
@@ -56,7 +55,7 @@ def test_svg_live_reload_preserves_view_and_last_complete_document(browser):
     write_svg(path, "lime")
     wait_until(lambda: page.image.frames[0][0] is not original)
     wait_until(lambda: page.thumbs.buttons[path].preview.pixmap().toImage().pixelColor(28, 21).green() == 255)
-    assert page.image.zoom == 1.5 and page.image.rotation == 90
+    assert page.image.zoom == 1.5 and page.image.rotation == 0
     assert page.image.frames[0][0].render((100, 80)).pixelColor(20, 15).green() == 255
 
 

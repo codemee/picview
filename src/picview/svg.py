@@ -13,7 +13,8 @@ class SvgDocument:
     def __init__(self, path: Path):
         self.renderer = QSvgRenderer()
         self.renderer.setAnimationEnabled(False)
-        if not self.renderer.load(str(path)):
+        self.data = path.read_bytes()
+        if not self.renderer.load(self.data):
             raise ValueError(f"Invalid SVG: {path.name}")
         size = self.renderer.defaultSize()
         if size.isEmpty(): size = self.renderer.viewBoxF().size().toSize()

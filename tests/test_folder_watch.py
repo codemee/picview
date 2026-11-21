@@ -229,13 +229,11 @@ def test_current_image_modification_updates_both_panes_and_keeps_view(viewer):
     window, folder, paths = viewer
     path = paths[0]
     tile = window.thumbs.buttons[path]
-    window.image.rotate()
-    window.image.mirror_h()
     window.image.slider.setValue(1400)
     Image.new("RGB", (160, 100), "blue").save(path)
     wait_until(lambda: window.image.frames[0][0].size == (160, 100) and thumbnail_color(window, path) == "#0000ff")
     assert window.image.frames[0][0].getpixel((0, 0)) == (0, 0, 255, 255)
-    assert window.image.rotation == 90 and window.image.fh
+    assert window.image.rotation == 0 and not window.image.fh
     assert window.image.slider.value() == 1400
     assert window.thumbs.buttons[path] is tile
     assert window.thumbs.selected_path == path

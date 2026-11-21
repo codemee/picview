@@ -1,6 +1,9 @@
 from PIL import Image
-from PySide6.QtCore import QPoint
+import pytest
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QColor
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication
 
 from picview.qt_app import PALETTE, PicView
 from picview.settings import IMAGE_BACKGROUND_COLORS, normalize_tab_state
@@ -52,7 +55,7 @@ def test_default_follows_theme_and_custom_background_stays_fixed(browser):
     assert pane.background_color() == PALETTE["pane"]
     window.toggle_lang()
     assert pane.background_choices["default"].text() == window.t["bg_default"]
-    assert pane.background_button.toolTip() == window.t["background"]
+    assert pane.background_button.toolTip() == f"{window.t['background']} (Alt+B)"
     window.toggle_theme()  # Restore the application palette for other tests.
 
 
@@ -119,3 +122,68 @@ def test_invalid_saved_background_uses_theme_default():
     for invalid in (None, [], {}, "#ffffff", "invalid"):
         state = normalize_tab_state({"folder": "C:/Pictures", "image_background": invalid})
         assert state["image_background"] == "default"
+
+
+@pytest.mark.parametrize("compare", [False, True])
+@pytest.mark.parametrize("fullscreen", [False, True])
+def test_background_shortcut_grid_navigation_and_apply(browser, compare, fullscreen):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    pane = first.image
+    if compare:
+        second = window.open_folder(folders[1])
+        window.set_compare(True)
+        window.check_compare_page(first, True)
+        window.focus_compare_page(first)
+    if fullscreen:
+        pane.open_full()
+        host = window.compare_full_window if compare else pane.full_window
+        host.activateWindow()
+        wait_until(lambda: QApplication.activeWindow() is host)
+        menu = host.image_toolbar.background_menu
+    else:
+        host = pane.scroll
+        menu = pane.background_menu
+    pane.set_background("black")
+    selected = first.thumbs.selected_path
+    QTest.keyClick(host, Qt.Key.Key_B, Qt.KeyboardModifier.AltModifier)
+    wait_until(menu.isVisible)
+    wait_until(lambda: QApplication.focusWidget() is menu.choices["black"])
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Down)
+    assert QApplication.focusWidget() is menu.choices["blue"]
+    assert pane.background_mode == "black"
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Right)
+    assert QApplication.focusWidget() is menu.choices["green"]
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Up)
+    assert QApplication.focusWidget() is menu.choices["gray"]
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Return)
+    assert not menu.isVisible()
+    assert pane.background_mode == "gray"
+    assert first.thumbs.selected_path == selected
+    if compare: assert second.image.background_mode == "gray"
+    if fullscreen: host.close()
+
+
+def test_background_keyboard_default_tab_space_and_cancel_in_narrow_window(browser):
+    window, folders = browser
+    pane = window.open_folder(folders[0]).image
+    window.resize(260, 300)
+    wait_until(lambda: pane.background_button in pane.toolbar_overflow.overflowed)
+    QTest.keyClick(pane.scroll, Qt.Key.Key_B, Qt.KeyboardModifier.AltModifier)
+    menu = pane.background_menu
+    wait_until(lambda: QApplication.focusWidget() is menu.choices["default"])
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Down)
+    assert QApplication.focusWidget() is menu.choices["white"]
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Escape)
+    assert not menu.isVisible() and pane.background_mode == "default"
+    pane.show_background_menu()
+    wait_until(lambda: QApplication.focusWidget() is menu.choices["default"])
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_End)
+    assert QApplication.focusWidget() is menu.choices["dark_teal"]
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Tab)
+    assert QApplication.focusWidget() is menu.choices["default"]
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Tab, Qt.KeyboardModifier.ShiftModifier)
+    assert QApplication.focusWidget() is menu.choices["dark_teal"]
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Space)
+    assert not menu.isVisible() and pane.background_mode == "dark_teal"
+    assert not pane.is_modified

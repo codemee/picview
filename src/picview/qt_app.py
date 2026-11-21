@@ -19,13 +19,16 @@ from PySide6.QtWidgets import (
 
 from . import __version__
 from .application import PicViewApplication
+from .crop import CropLabel
+from .background import BackgroundColorMenu
+from .editing import FORMATS, SAVE_FILTERS, mosaic_image, transform_image, write_edits
 from .instance import InstanceReceiver, forward_paths
 from .about import AboutDialog
 from .file_actions import copy_file, show_properties
 from .settings import IMAGE_BACKGROUND_COLORS, load_settings, normalize_tab_state, save_settings
 from . import shell_integration
 from .svg import SvgDocument
-from .thumbnails import THUMBNAILS
+from .thumbnails import THUMBNAILS, file_version
 from .system_menu import install_about_item, is_about_message
 from .utils import IMAGE_SUFFIXES, image_files, natural_key
 
@@ -132,12 +135,18 @@ class ViewportInteraction(QObject):
     """Keep drag coordinates in screen space while the scrolled label moves."""
     def __init__(self, scroll, label, zoom, interacted=lambda: None, pan=True):
         super().__init__(scroll)
-        self.scroll, self.zoom, self.interacted, self.pan = scroll, zoom, interacted, pan
+        self.scroll, self.label, self.zoom, self.interacted, self.pan = scroll, label, zoom, interacted, pan
         self.start = None
         scroll.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         for widget in (scroll.viewport(), label): widget.installEventFilter(self)
 
     def eventFilter(self, watched, event):
+        if (watched is self.label and (getattr(self.label, "crop_active", False) or getattr(self.label, "mosaic_active", False))
+                and event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseMove, QEvent.Type.MouseButtonRelease)):
+            if event.type() == QEvent.Type.MouseButtonPress:
+                self.scroll.setFocus(Qt.FocusReason.MouseFocusReason)
+                self.interacted()
+            return False
         if event.type() == QEvent.Type.Wheel and event.modifiers() & (
                 Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.MetaModifier):
             self.scroll.setFocus(Qt.FocusReason.MouseFocusReason)
@@ -271,6 +280,13 @@ TEXT["en"].update({
     "show_modified": "Show date modified", "show_subfolders": "Show subfolders", "folder_back": "Back to previous folder", "folder_up": "Parent folder", "folder_unavailable": "Cannot open folder: {folder}", "copy": "Copy", "properties": "Properties", "file_close": "Close",
     "file_name": "Name", "file_type": "Type", "file_location": "Location", "file_size": "Size",
     "modified": "Modified", "created": "Created", "dimensions": "Dimensions", "bytes": "bytes",
+    "crop": "Crop image (drag edge or corner handles)",
+    "mosaic": "Mosaic (drag a rectangle)",
+    "save_image": "Save image", "save_as": "Save image as", "save_error": "Could not save image:\n{error}",
+    "unsaved_title": "Unsaved changes", "unsaved_message": "Save changes to {name}?",
+    "dialog_save": "Save", "dialog_discard": "Discard", "dialog_cancel": "Cancel",
+    "dialog_ok": "OK", "dialog_yes": "Yes", "dialog_no": "No",
+    "flatten_message": "This format saves only the current animation frame. Continue?",
     "background": "Image background", "bg_default": "Default (follow theme)",
     "bg_white": "White", "bg_black": "Black", "bg_gray": "Gray", "bg_light_gray": "Light gray",
     "bg_cream": "Cream", "bg_blue": "Light blue", "bg_green": "Light green", "bg_pink": "Light pink",
@@ -307,6 +323,13 @@ TEXT["zh"].update({
     "show_modified": "顯示修改日期時間", "show_subfolders": "顯示子資料夾", "folder_back": "返回上一個資料夾", "folder_up": "上一層資料夾", "folder_unavailable": "無法開啟資料夾：{folder}", "copy": "複製", "properties": "內容", "file_close": "關閉",
     "file_name": "檔名", "file_type": "類型", "file_location": "位置", "file_size": "大小",
     "modified": "修改時間", "created": "建立時間", "dimensions": "圖片尺寸", "bytes": "位元組",
+    "crop": "裁切圖片（拖曳邊角控點）",
+    "mosaic": "馬賽克（拖曳矩形範圍）",
+    "save_image": "存檔", "save_as": "另存新檔", "save_error": "無法儲存圖片：\n{error}",
+    "unsaved_title": "尚未儲存的修改", "unsaved_message": "要儲存對「{name}」的修改嗎？",
+    "dialog_save": "儲存", "dialog_discard": "不儲存", "dialog_cancel": "取消",
+    "dialog_ok": "確定", "dialog_yes": "是", "dialog_no": "否",
+    "flatten_message": "此格式只會儲存動畫的目前影格，是否繼續？",
     "background": "圖片背景色", "bg_default": "預設（跟隨主題）",
     "bg_white": "白色", "bg_black": "黑色", "bg_gray": "灰色", "bg_light_gray": "淺灰色",
     "bg_cream": "米色", "bg_blue": "淺藍色", "bg_green": "淺綠色", "bg_pink": "淺粉色",
@@ -379,6 +402,7 @@ class IconButton(QToolButton):
         pm.fill(Qt.GlobalColor.transparent)
         icon_color = QColor(PALETTE["text"])
         if self.kind == "rotate": icon_color = QColor(PALETTE["warm"])
+        if self.kind == "mosaic": icon_color = QColor("#9a9a9a")
         if self.kind.startswith(("lang-", "theme-")) or self.kind in ("中", "A", "shell-integration"):
             icon_color = QColor(PALETTE["muted"])
         p = QPainter(pm); p.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -422,6 +446,29 @@ class IconButton(QToolButton):
         elif self.kind == "rotate":
             p.drawArc(QRectF(4, 4, 16, 16), 40 * 16, 285 * 16)
             line(19.5, 4, 20.5, 10); line(20.5, 10, 14.5, 7)
+        elif self.kind == "crop":
+            line(7, 3, 7, 17); line(7, 17, 21, 17)
+            line(3, 7, 17, 7); line(17, 7, 17, 21)
+        elif self.kind == "mosaic":
+            for row in range(3):
+                for column in range(3):
+                    color = QColor(icon_color)
+                    color.setAlpha(80 + ((row + column * 2) % 3) * 80)
+                    p.setBrush(color)
+                    p.drawRect(QRectF(3 + column * 6, 3 + row * 6, 5, 5))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+        elif self.kind == "save":
+            polygon((4, 3), (17, 3), (21, 7), (21, 21), (4, 21))
+            p.drawRect(QRectF(8, 3, 8, 6)); p.drawRect(QRectF(8, 14, 9, 7))
+        elif self.kind == "save-as":
+            # Keep the overlap transparent so both disks read clearly on hover.
+            p.save()
+            p.setClipRegion(QRegion(0, 0, 24, 24).subtracted(QRegion(1, 7, 16, 16)))
+            polygon((8, 2), (18, 2), (22, 6), (22, 16), (8, 16))
+            p.drawRect(QRectF(11, 2, 6, 4)); p.drawRect(QRectF(11, 11, 8, 5))
+            p.restore()
+            polygon((2, 8), (12, 8), (16, 12), (16, 22), (2, 22))
+            p.drawRect(QRectF(5, 8, 6, 4)); p.drawRect(QRectF(5, 17, 8, 5))
         elif self.kind in {"mirror-h", "mirror-v"}:
             p.setBrush(Qt.BrushStyle.NoBrush)
             # Longer, lighter marks survive the 48 -> 20 px reduction as dashes,
@@ -809,6 +856,11 @@ class FullscreenImageToolbar(QFrame):
                                (self.mirror_v_button, "mirror_v")):
             button.clicked.connect(lambda _checked=False, method=action: getattr(self.page.image, method)())
             row.addWidget(button)
+        self.mosaic_button = IconButton("mosaic", "", self)
+        self.mosaic_button.setCheckable(True)
+        self.mosaic_button.clicked.connect(lambda: self.page.image.mosaic_button.click())
+        if len(self.pages) == 1 and not owner.compare_enabled: row.addWidget(self.mosaic_button)
+        else: self.mosaic_button.hide()
         row.addWidget(self.separator())
         self.sync_button = IconButton("sync", "")
         self.sync_button.setCheckable(True)
@@ -819,7 +871,7 @@ class FullscreenImageToolbar(QFrame):
         self.background_button = IconButton("background", "")
         self.background_button.clicked.connect(self.show_background_menu)
         row.addWidget(self.background_button)
-        self.background_menu = QMenu(self)
+        self.background_menu = BackgroundColorMenu(self, IMAGE_BACKGROUND_COLORS, self.choose_background)
         row.addWidget(self.separator())
         self.fit_button = IconButton("fit", "")
         self.fit_button.setCheckable(True)
@@ -883,26 +935,8 @@ class FullscreenImageToolbar(QFrame):
 
     def show_background_menu(self):
         pane = self.page.image
-        self.background_menu.clear()
-        panel = QWidget(self.background_menu)
-        grid = QGridLayout(panel)
-        grid.setContentsMargins(8, 8, 8, 8)
-        grid.setSpacing(4)
-        for index, (mode, color) in enumerate(IMAGE_BACKGROUND_COLORS.items()):
-            swatch = color or PALETTE["pane"]
-            button = QPushButton(pane.labels[f"bg_{mode}"], panel) if mode == "default" else QPushButton(panel)
-            button.setToolTip(pane.labels[f"bg_{mode}"])
-            button.setFixedSize(172, 34) if mode == "default" else button.setFixedSize(40, 30)
-            button.setStyleSheet(
-                f"background:{swatch};color:{'#fff' if QColor(swatch).lightness() < 128 else '#172a31'};"
-                f"border:{'2px' if mode == pane.background_mode else '1px'} solid "
-                f"{PALETTE['focus'] if mode == pane.background_mode else PALETTE['edge']};border-radius:4px;")
-            button.clicked.connect(lambda _checked=False, chosen=mode: self.choose_background(chosen))
-            grid.addWidget(button, 0, 0, 1, 4) if mode == "default" else grid.addWidget(button, 1 + (index - 1) // 4, (index - 1) % 4)
-        action = QWidgetAction(self.background_menu)
-        action.setDefaultWidget(panel)
-        self.background_menu.addAction(action)
-        self.background_menu.popup(self.background_button.mapToGlobal(QPoint(0, -self.background_menu.sizeHint().height())))
+        self.background_menu.configure(pane.labels, PALETTE, pane.background_mode)
+        self.background_menu.open_at(self.background_button, pane.background_mode, above=True)
 
     def choose_background(self, mode):
         self.page.image.choose_background(mode)
@@ -915,11 +949,15 @@ class FullscreenImageToolbar(QFrame):
 
     def refresh(self, *_):
         pane = self.page.image
+        self.mosaic_button.setToolTip(shortcut_tooltip(pane.labels["mosaic"], "Alt+M"))
+        self.mosaic_button.blockSignals(True)
+        self.mosaic_button.setChecked(pane.mosaic_button.isChecked())
+        self.mosaic_button.blockSignals(False)
         for button, label, key in ((self.rotate_button, "rotate", "Alt+C"),
                                    (self.mirror_h_button, "mh", "Alt+H"),
                                    (self.mirror_v_button, "mv", "Alt+V")):
             button.setToolTip(shortcut_tooltip(pane.labels[label], key))
-        self.background_button.setToolTip(pane.labels["background"])
+        self.background_button.setToolTip(shortcut_tooltip(pane.labels["background"], "Alt+B"))
         self.background_button.set_swatch_color(pane.background_color())
         self.sync_button.blockSignals(True)
         self.sync_button.setChecked(self.owner.sync_enabled)
@@ -1770,6 +1808,13 @@ class ImagePane(QFrame):
         super().__init__(parent); self.labels=labels; self.path=None; self.frames=[]; self.index=0; self.rotation=0; self.fh=False; self.fv=False; self.zoom=1.0; self.fit_to_pane=False; self.auto_scale=False; self._applying_auto_scale=False; self.display_scale=1.0; self.fullscreen_zoom=None; self.fullscreen_display_scale=1.0; self.full_window=None; self.timer=QTimer(self); self.timer.timeout.connect(self.next_frame)
         self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,4,10,8); layout.setSpacing(4)
         self.comparison_title = None
+        self.crop = (0., 0., 1., 1.)
+        self.undo_stack = []
+        self.redo_stack = []
+        self._crop_before = None
+        self._saved_state = None
+        self._saved_version = None
+        self.animation_loop = 0
         self.comparison_selected = False
         self._comparison_reorder_start = None
         self._comparison_reorder_dragging = False
@@ -1783,6 +1828,22 @@ class ImagePane(QFrame):
         bar=QHBoxLayout(); self.drag_handle=PaneDragHandle("image", labels["drag_pane"]); bar.addWidget(self.drag_handle); self.rotate_b=IconButton("rotate",labels["rotate"]); self.mh=IconButton("mirror-h",labels["mh"]); self.mv=IconButton("mirror-v",labels["mv"]); self.fit_b=IconButton("fit",labels["fit"]); self.fit_b.setCheckable(True); self.fit_b.toggled.connect(self.set_fit); self.full=IconButton("fullscreen",labels["full"])
         self.fit_b.clicked.connect(lambda checked: self.operationApplied.emit("fit", self.fit_to_pane))
         for b,fn in ((self.rotate_b,self.rotate),(self.mh,self.mirror_h),(self.mv,self.mirror_v)): b.clicked.connect(fn); bar.addWidget(b)
+        self.crop_button = IconButton("crop", labels["crop"])
+        self.crop_button.setCheckable(True)
+        self.crop_button.setEnabled(False)
+        self.crop_button.toggled.connect(self.set_crop_active)
+        bar.addWidget(self.crop_button)
+        self.mosaic_button = IconButton("mosaic", labels["mosaic"])
+        self.mosaic_button.setCheckable(True)
+        self.mosaic_button.setEnabled(False)
+        self.mosaic_button.toggled.connect(self.set_mosaic_active)
+        bar.addWidget(self.mosaic_button)
+        self.save_button = IconButton("save", labels["save_image"])
+        self.save_button.clicked.connect(self.save_image)
+        self.save_as_button = IconButton("save-as", labels["save_as"])
+        self.save_as_button.clicked.connect(self.save_image_as)
+        bar.addWidget(self.save_button)
+        bar.addWidget(self.save_as_button)
         bar.setSpacing(4)
         separate_tools(bar)
         self.full.clicked.connect(self.open_full)
@@ -1802,26 +1863,9 @@ class ImagePane(QFrame):
         self.end_compare_button.hide()
         bar.addWidget(self.end_compare_button)
         separate_tools(bar)
-        self.background_menu = QMenu(self)
-        self.background_panel = QWidget()
-        choices = QGridLayout(self.background_panel)
-        choices.setContentsMargins(8, 8, 8, 8)
-        choices.setSpacing(4)
-        self.background_choices = {}
-        for index, mode in enumerate(IMAGE_BACKGROUND_COLORS):
-            button = QPushButton()
-            button.setCheckable(True)
-            button.clicked.connect(lambda checked=False, mode=mode: self.choose_background(mode))
-            self.background_choices[mode] = button
-            if mode == "default":
-                button.setMinimumHeight(34)
-                choices.addWidget(button, 0, 0, 1, 4)
-            else:
-                button.setFixedSize(40, 30)
-                choices.addWidget(button, 1 + (index - 1) // 4, (index - 1) % 4)
-        background_action = QWidgetAction(self.background_menu)
-        background_action.setDefaultWidget(self.background_panel)
-        self.background_menu.addAction(background_action)
+        self.background_menu = BackgroundColorMenu(self, IMAGE_BACKGROUND_COLORS, self.choose_background)
+        self.background_panel = self.background_menu.panel
+        self.background_choices = self.background_menu.choices
         self.filename_label=QLabel(); self.filename_label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.filename_label.setSizePolicy(QSizePolicy.Policy.Ignored,QSizePolicy.Policy.Fixed); bar.addWidget(self.filename_label,1)
         for button in (self.fit_b,self.full): bar.addWidget(button)
         self.zoom_label=ScaleValueButton(1000,1,4000,1000,10,"%",labels["edit_zoom"]); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,1000); self.slider.setRange(1,4000); self.slider.setValue(1000); self.slider.logicalValueChanged.connect(self.set_zoom_percent); self.zoom_label.valueChosen.connect(self.choose_zoom); self.slider.setFixedSize(SLIDER_WIDTH,30)
@@ -1834,7 +1878,7 @@ class ImagePane(QFrame):
         self.setMinimumSize(54, 50)
         layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         self.toolbar_overflow = ToolbarOverflow(self.toolbar_widget, bar,
-            [self.end_compare_button, self.sync_button, self.background_button, self.full, self.mv, self.mh, self.rotate_b, self.fit_b, self.filename_label, self.drag_handle],
+            [self.end_compare_button, self.sync_button, self.background_button, self.full, self.save_as_button, self.save_button, self.mv, self.mh, self.rotate_b, self.mosaic_button, self.crop_button, self.fit_b, self.filename_label, self.drag_handle],
             lambda: self.labels["more_tools"])
         layout.addWidget(self.toolbar_widget)
         self.comparison_header = QWidget(self)
@@ -1851,7 +1895,11 @@ class ImagePane(QFrame):
         self.comparison_header.setFixedHeight(24)
         self.comparison_header.hide()
         layout.addWidget(self.comparison_header)
-        self.scroll=QScrollArea(); self.scroll.setWidgetResizable(False); self.scroll.setAlignment(Qt.AlignmentFlag.AlignCenter); self.scroll.setFrameShape(QFrame.Shape.NoFrame); self.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};"); self.label=QLabel(labels["empty"]); self.label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.label.setStyleSheet(f"color:{PALETTE['muted']};background:transparent;"); self.scroll.setWidget(self.label); layout.addWidget(self.scroll)
+        self.scroll=QScrollArea(); self.scroll.setWidgetResizable(False); self.scroll.setAlignment(Qt.AlignmentFlag.AlignCenter); self.scroll.setFrameShape(QFrame.Shape.NoFrame); self.scroll.viewport().setStyleSheet(f"background:{PALETTE['pane']};"); self.label=CropLabel(labels["empty"]); self.label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.label.setStyleSheet(f"color:{PALETTE['muted']};background:transparent;"); self.scroll.setWidget(self.label); layout.addWidget(self.scroll)
+        self.label.cropStarted.connect(self.begin_crop)
+        self.label.cropChanged.connect(lambda crop: self.set_crop(crop, record=False))
+        self.label.cropFinished.connect(self.finish_crop)
+        self.label.mosaicSelected.connect(self.apply_mosaic)
         for target in (self, self.comparison_header, self.scroll, self.scroll.viewport(), self.label):
             target.setAcceptDrops(True)
         self.scroll.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
@@ -1864,6 +1912,15 @@ class ImagePane(QFrame):
             lambda direction: self.adjust_zoom(direction * 10), self.interacted.emit)
 
     def update_shortcut_tooltips(self):
+        self.mosaic_button.setToolTip(shortcut_tooltip(self.labels["mosaic"], "Alt+M"))
+        self.mosaic_button.setAccessibleName(self.labels["mosaic"])
+        for button, key in ((self.crop_button, "crop"),):
+            button.setToolTip(self.labels[key])
+            button.setAccessibleName(self.labels[key])
+        for button, key, shortcut in ((self.save_button, "save_image", QKeySequence.StandardKey.Save),
+                                      (self.save_as_button, "save_as", QKeySequence.StandardKey.SaveAs)):
+            button.setToolTip(shortcut_tooltip(self.labels[key], shortcut))
+            button.setAccessibleName(self.labels[key])
         for button, label, keys in ((self.fit_b, "fit", "Alt+F"), (self.rotate_b, "rotate", "Alt+C"),
                                     (self.mv, "mv", "Alt+V"), (self.mh, "mh", "Alt+H")):
             button.setToolTip(shortcut_tooltip(self.labels[label], keys))
@@ -1886,20 +1943,9 @@ class ImagePane(QFrame):
         if self.full_window is not None:
             self.full_window.set_background(color)
         self.update_comparison_fullscreen()
-        self.background_button.setToolTip(self.labels["background"])
+        self.background_button.setToolTip(shortcut_tooltip(self.labels["background"], "Alt+B"))
         self.background_button.setAccessibleName(self.labels["background"])
-        self.background_panel.setStyleSheet(f"background:{PALETTE['card']};")
-        for mode, button in self.background_choices.items():
-            swatch = IMAGE_BACKGROUND_COLORS[mode] or PALETTE["pane"]
-            text = "#ffffff" if QColor(swatch).lightness() < 128 else "#172a31"
-            name = self.labels[f"bg_{mode}"]
-            button.setText(name if mode == "default" else "")
-            button.setAccessibleName(name)
-            button.setToolTip(name if mode == "default" else f"{name} ({swatch})")
-            button.setChecked(mode == self.background_mode)
-            button.setStyleSheet(
-                f"QPushButton{{background:{swatch};color:{text};border:1px solid {PALETTE['edge']};border-radius:4px;padding:3px 6px;}}"
-                f"QPushButton:hover,QPushButton:checked{{border:2px solid {PALETTE['focus']};padding:2px 5px;}}")
+        self.background_menu.configure(self.labels, PALETTE, self.background_mode)
 
     def set_background(self, mode):
         self.background_mode = mode if isinstance(mode, str) and mode in IMAGE_BACKGROUND_COLORS else "default"
@@ -1913,7 +1959,7 @@ class ImagePane(QFrame):
     def show_background_menu(self):
         self.apply_background()
         anchor = self.background_button if self.background_button.isVisible() else self.toolbar_overflow.more_button
-        QTimer.singleShot(0, self, lambda: self.background_menu.popup(anchor.mapToGlobal(QPoint(0, anchor.height()))))
+        QTimer.singleShot(0, self, lambda: self.background_menu.open_at(anchor, self.background_mode))
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -1926,6 +1972,10 @@ class ImagePane(QFrame):
             painter.end()
 
     def eventFilter(self, watched, event):
+        if (watched in (self.scroll, self.label, self.scroll.viewport()) and self.label.mosaic_active
+                and event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape):
+            self.cancel_mosaic()
+            return True
         if watched in (self.comparison_header, self.comparison_label, self.scroll.viewport(), self.label):
             if event.type() == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
                 self._comparison_reorder_start = event.globalPosition().toPoint() if self.comparison_title else None
@@ -2072,6 +2122,7 @@ class ImagePane(QFrame):
 
     def update_filename(self):
         name = self.path.name if self.path else ""
+        if self.is_modified: name += " *"
         self.filename_label.setText(self.labels["compare_mode"] if self.comparison_title else name)
         self.filename_label.setStyleSheet("font-weight:600;" if self.comparison_title else "")
         self.comparison_label.setText(f"{self.comparison_title} / {name}" if self.comparison_title else "")
@@ -2085,6 +2136,13 @@ class ImagePane(QFrame):
     def set_comparison_mode(self, title=None):
         self.comparison_title = title
         comparing = title is not None
+        cropping_available = not comparing and not getattr(self.window(), "compare_enabled", False)
+        if not cropping_available:
+            self.crop_button.setChecked(False)
+            self.mosaic_button.setChecked(False)
+        for button in (self.crop_button, self.mosaic_button):
+            button.setProperty("toolbar_available", cropping_available)
+        self.update_crop_controls()
         self.zoom_panel.available = not comparing or self.zoom_panel.hover_host is not self
         if not self.zoom_panel.available: self.zoom_panel.hide()
         self.toolbar_widget.setVisible(not comparing)
@@ -2119,6 +2177,9 @@ class ImagePane(QFrame):
 
     def reload_preserving_view(self):
         if self.path is None: return False
+        if self._saved_version is not None and file_version(self.path) == self._saved_version:
+            return True
+        if self.is_modified: return False
         try:
             frames = self.read_frames(self.path)
         except Exception:
@@ -2129,6 +2190,10 @@ class ImagePane(QFrame):
         was_empty = not self.frames
         self.timer.stop()
         self.frames = frames
+        self.undo_stack.clear()
+        self.redo_stack.clear()
+        self._saved_state = self.state_key()
+        self._saved_version = None
         self.index = min(self.index, len(frames) - 1)
         if was_empty:
             self.auto_scale = True
@@ -2140,11 +2205,17 @@ class ImagePane(QFrame):
         return True
 
     def load(self,path):
+        self.undo_stack.clear(); self.redo_stack.clear(); self._crop_before = None
+        self._saved_state = None; self._saved_version = None; self.animation_loop = 0
+        self.reset_crop_state()
         self.auto_scale=False; self.path=path; self.rotation=0; self.fh=self.fv=False; self.zoom=1.0; self.fullscreen_zoom=None; self.frames=[]; self.timer.stop()
         self.slider.blockSignals(True); self.slider.setMaximum(4000); self.slider.setValue(1000); self.slider.blockSignals(False); self.zoom_label.set_value(1000)
         self.update_filename(); self.filename_label.setToolTip(str(path))
         try:
             self.frames = self.read_frames(path)
+            if path.suffix.lower() != ".svg":
+                with Image.open(path) as source: self.animation_loop = source.info.get("loop", 0)
+            self._saved_state = self.state_key()
             self.index=0; self.auto_scale=True
             width, height = self.image_size()
             fit = width > max(1, self.scroll.width() - 8) or height > max(1, self.scroll.height() - 8)
@@ -2164,38 +2235,311 @@ class ImagePane(QFrame):
             QTimer.singleShot(0,self.apply_default_zoom)
             if len(self.frames)>1:self.timer.start(self.frames[0][1])
         except Exception: self.frames=[]; self.label.clear(); self.label.setText(self.labels["empty"]); self.label.setFixedSize(self.label.sizeHint())
+        self.update_crop_controls()
         self.informationChanged.emit()
     def clear(self):
+        self.undo_stack.clear(); self.redo_stack.clear(); self._crop_before = None
+        self._saved_state = None; self._saved_version = None
+        self.reset_crop_state()
         self.auto_scale=False; self.timer.stop(); self.frames=[]; self.path=None; self.fit_b.setChecked(False)
         self.filename_label.clear(); self.filename_label.setToolTip("")
         self.update_filename()
         self.label.clear(); self.label.setText(self.labels["empty"]); self.label.setFixedSize(self.label.sizeHint())
         if self.full_window is not None: self.open_full()
         self.update_comparison_fullscreen()
+        self.update_crop_controls()
         self.informationChanged.emit()
     def next_frame(self): self.index=(self.index+1)%len(self.frames); self.timer.start(self.frames[self.index][1]); self.render()
-    def image(self):
+    def image(self, cropped=True):
         im=self.frames[self.index][0]
         if isinstance(im, SvgDocument): return self.svg_image(self.image_size())
         if self.rotation: im=im.rotate(-self.rotation,expand=True)
         if self.fh: im=ImageOps.mirror(im)
         if self.fv: im=ImageOps.flip(im)
+        if cropped and self.crop != (0., 0., 1., 1.): im = im.crop(self.crop_box())
         return im
-    def image_size(self):
+    def full_image_size(self):
         width, height = self.frames[self.index][0].size
         return (height, width) if self.rotation % 180 else (width, height)
 
-    def svg_image(self, size):
-        source_size = (size[1], size[0]) if self.rotation % 180 else size
+    def crop_box(self):
+        width, height = self.full_image_size()
+        left, top, right, bottom = self.crop
+        x0, y0 = min(width - 1, round(left * width)), min(height - 1, round(top * height))
+        return x0, y0, max(x0 + 1, round(right * width)), max(y0 + 1, round(bottom * height))
+
+    def image_size(self):
+        left, top, right, bottom = self.crop_box()
+        return right - left, bottom - top
+
+    def reset_crop_state(self):
+        self.mosaic_button.setChecked(False)
+        self.crop = (0., 0., 1., 1.)
+        self.crop_button.blockSignals(True)
+        self.crop_button.setChecked(False)
+        self.crop_button.blockSignals(False)
+        self.crop_button.refresh_icon()
+        self.label.crop_active = False
+        self.label.drag_handle = None
+        self.label.unsetCursor()
+
+    def update_crop_controls(self):
+        available = bool(self.frames) and self.comparison_title is None and not getattr(self.window(), "compare_enabled", False)
+        self.crop_button.setEnabled(available)
+        self.mosaic_button.setEnabled(available)
+        self.save_button.setEnabled(bool(self.frames))
+        self.save_as_button.setEnabled(bool(self.frames))
+
+    def set_crop_active(self, active):
+        self.finish_crop()
+        if active and (not self.frames or self.comparison_title is not None or getattr(self.window(), "compare_enabled", False)):
+            self.crop_button.setChecked(False)
+            return
+        self.label.crop_active = active
+        if active: self.mosaic_button.setChecked(False)
+        self.label.drag_handle = None
+        self.label.unsetCursor()
+        self.apply_default_zoom()
+        self.render()
+
+    def set_mosaic_active(self, active):
+        if active and (not self.frames or self.comparison_title is not None or getattr(self.window(), "compare_enabled", False)):
+            self.mosaic_button.setChecked(False)
+            return
+        if active: self.crop_button.setChecked(False)
+        self.label.mosaic_active = active
+        self.label.cancel_mosaic_selection()
+        if active: self.label.setCursor(Qt.CursorShape.CrossCursor)
+        else: self.label.unsetCursor()
+        if self.full_window is not None:
+            label = self.full_window.image_label
+            label.mosaic_active = active
+            label.cancel_mosaic_selection()
+            if active: label.setCursor(Qt.CursorShape.CrossCursor)
+            else: label.unsetCursor()
+            self.full_window.image_toolbar.refresh()
+
+    def toggle_mosaic(self):
+        if self.mosaic_button.isEnabled(): self.mosaic_button.click()
+
+    def cancel_mosaic(self):
+        labels = [self.label]
+        if self.full_window is not None: labels.append(self.full_window.image_label)
+        if any(label.mosaic_start is not None for label in labels):
+            for label in labels: label.cancel_mosaic_selection()
+        else: self.mosaic_button.setChecked(False)
+
+    def apply_mosaic(self, region):
+        if not self.frames or not self.mosaic_button.isEnabled(): return
+        width, height = self.image_size()
+        left, top, right, bottom = region
+        box = (max(0, min(width - 1, round(left * width))), max(0, min(height - 1, round(top * height))),
+               max(1, min(width, round(right * width))), max(1, min(height, round(bottom * height))))
+        if box[2] <= box[0] or box[3] <= box[1]: return
+        try:
+            frames = [(mosaic_image(transform_image(source, self.rotation, self.fh, self.fv, self.crop_box()), box), delay)
+                      for source, delay in self.frames]
+        except Exception as error:
+            self.message_box(QMessageBox.Icon.Critical, self.labels["mosaic"], str(error))
+            return
+        self.record_edit()
+        self.frames = frames
+        self.rotation = 0; self.fh = self.fv = False
+        self.crop = (0., 0., 1., 1.)
+        self.update_filename()
+        self.render()
+
+    def set_crop(self, crop, *, record=True):
+        if tuple(crop) == self.crop: return
+        if record: self.record_edit()
+        self.crop = tuple(crop)
+        self.update_crop_controls()
+        # The full image stays at a fixed scale and position during a drag.
+        self.label.crop = self.crop
+        self.label.update()
+        self.update_filename()
+        self.informationChanged.emit()
+        if self.full_window is not None: self.update_full_image()
+
+    def edit_state(self):
+        return self.frames, self.rotation, self.fh, self.fv, self.crop, self.animation_loop
+
+    def state_key(self):
+        return id(self.frames), self.rotation, self.fh, self.fv, self.crop
+
+    @property
+    def is_modified(self):
+        return bool(self.frames) and self._saved_state is not None and self.state_key() != self._saved_state
+
+    def record_edit(self):
+        if not self.frames: return
+        self.finish_crop()
+        self.undo_stack.append(self.edit_state())
+        self.redo_stack.clear()
+
+    def begin_crop(self):
+        self._crop_before = self.edit_state()
+
+    def finish_crop(self):
+        before, self._crop_before = self._crop_before, None
+        if before is not None and before[1:] != self.edit_state()[1:]:
+            self.undo_stack.append(before)
+            self.redo_stack.clear()
+
+    def restore_edit(self, state):
+        self.frames, self.rotation, self.fh, self.fv, self.crop, self.animation_loop = state
+        self.index = min(self.index, len(self.frames) - 1)
+        self.timer.stop()
+        if len(self.frames) > 1: self.timer.start(self.frames[self.index][1])
+        self.label.drag_handle = None
+        self.label.cancel_mosaic_selection()
+        if self.full_window is not None: self.full_window.image_label.cancel_mosaic_selection()
+        self.update_crop_controls()
+        self.update_filename()
+        self.render()
+
+    def undo(self):
+        self.finish_crop()
+        if not self.undo_stack: return
+        self.redo_stack.append(self.edit_state())
+        self.restore_edit(self.undo_stack.pop())
+        self.operationApplied.emit("undo", None)
+
+    def redo(self):
+        self.finish_crop()
+        if not self.redo_stack: return
+        self.undo_stack.append(self.edit_state())
+        self.restore_edit(self.redo_stack.pop())
+        self.operationApplied.emit("redo", None)
+
+    def message_box(self, icon, title, text, buttons=QMessageBox.StandardButton.Ok, default=QMessageBox.StandardButton.Ok):
+        dialog = QMessageBox(self.window())
+        dialog.setOption(QMessageBox.Option.DontUseNativeDialog, True)
+        dialog.setIcon(icon)
+        dialog.setWindowTitle(title)
+        dialog.setTextFormat(Qt.TextFormat.PlainText)
+        dialog.setText(text)
+        dialog.setStandardButtons(buttons)
+        for standard, key in ((QMessageBox.StandardButton.Save, "dialog_save"),
+                              (QMessageBox.StandardButton.Discard, "dialog_discard"),
+                              (QMessageBox.StandardButton.Cancel, "dialog_cancel"),
+                              (QMessageBox.StandardButton.Ok, "dialog_ok"),
+                              (QMessageBox.StandardButton.Yes, "dialog_yes"),
+                              (QMessageBox.StandardButton.No, "dialog_no")):
+            button = dialog.button(standard)
+            if button is not None: button.setText(self.labels[key])
+        dialog.setDefaultButton(default)
+        for escape in (QMessageBox.StandardButton.Cancel, QMessageBox.StandardButton.No, QMessageBox.StandardButton.Ok):
+            if buttons & escape:
+                dialog.setEscapeButton(escape)
+                break
+        return dialog.exec()
+
+    def ask_unsaved_changes(self):
+        return self.message_box(QMessageBox.Icon.Warning, self.labels["unsaved_title"],
+            self.labels["unsaved_message"].format(name=self.path.name),
+            QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save)
+
+    def confirm_unsaved(self):
+        if not self.is_modified: return True
+        choice = self.ask_unsaved_changes()
+        if choice == QMessageBox.StandardButton.Save: return self.save_image()
+        if choice == QMessageBox.StandardButton.Discard:
+            if self.path.is_file(): self.load(self.path)
+            else: self.clear()
+            return True
+        return False
+
+    def save_image(self):
+        if not self.frames or self.path is None: return False
+        return self.save_to(self.path)
+
+    def save_image_as(self):
+        if not self.frames or self.path is None: return False
+        filters = SAVE_FILTERS
+        if isinstance(self.frames[0][0], SvgDocument) or self.path.suffix.lower() == ".svg": filters = "SVG (*.svg);;" + filters
+        fmt = FORMATS.get(self.path.suffix.lower(), "PNG")
+        selected_filter = next((item for item in filters.split(";;") if item.startswith(fmt.title() if fmt == "WEBP" else fmt)), filters.split(";;")[0])
+        name, selected_filter = QFileDialog.getSaveFileName(self.window(), self.labels["save_as"], str(self.path), filters, selected_filter)
+        if not name: return False
+        destination = Path(name).expanduser().resolve()
+        if not destination.suffix:
+            destination = destination.with_suffix(selected_filter.split("*", 1)[1].split()[0].rstrip(")"))
+            if destination.exists() and self.message_box(QMessageBox.Icon.Question, self.labels["save_as"],
+                    self.labels["file_conflict"].format(name=destination.name),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes: return False
+        return self.save_to(destination)
+
+    def save_to(self, destination):
+        if not self.frames: return False
+        self.finish_crop()
+        destination = Path(destination).resolve()
+        fmt = FORMATS.get(destination.suffix.lower())
+        if len(self.frames) > 1 and fmt in {"JPEG", "BMP"}:
+            if self.message_box(QMessageBox.Icon.Warning, self.labels["save_as"], self.labels["flatten_message"],
+                    QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+                    QMessageBox.StandardButton.Cancel) != QMessageBox.StandardButton.Ok: return False
+        try:
+            write_edits(destination, self.frames, self.index, self.rotation, self.fh, self.fv, self.crop_box(), self.animation_loop)
+            saved_frames = self.read_frames(destination)
+        except Exception as error:
+            self.message_box(QMessageBox.Icon.Critical, self.labels["save_image"], self.labels["save_error"].format(error=error))
+            return False
+        undo, redo = self.undo_stack.copy(), self.redo_stack.copy()
+        previous_index = self.index
+        page = getattr(self, "owner_page", None)
+        if destination != self.path and page is not None:
+            # Load the new document into this tab while retaining its edit history.
+            page.open_folder(destination.parent, destination, check_unsaved=False)
+            window = self.window()
+            window.update_tab_titles()
+            window.update_title()
+        self.path = destination
+        self.frames = saved_frames
+        self.index = min(previous_index, len(saved_frames) - 1)
+        self.rotation = 0; self.fh = self.fv = False
+        self.reset_crop_state()
+        self.undo_stack, self.redo_stack = undo, redo
+        self._saved_state = self.state_key()
+        self._saved_version = file_version(destination)
+        self.update_crop_controls()
+        self.update_filename()
+        self.filename_label.setToolTip(str(destination))
+        if page is not None:
+            page.image_dirty = False
+            page.refresh_folder()
+            page.thumbs.refresh_previews({destination})
+        self.render()
+        return True
+
+    def svg_image(self, size, cropped=True):
+        full_size = size
+        box = self.crop_box()
+        if cropped and self.crop != (0., 0., 1., 1.):
+            width, height = self.full_image_size()
+            full_size = (max(1, round(size[0] * width / (box[2] - box[0]))),
+                         max(1, round(size[1] * height / (box[3] - box[1]))))
+        source_size = (full_size[1], full_size[0]) if self.rotation % 180 else full_size
         image = self.frames[self.index][0].render(source_size)
         if self.rotation: image = image.transformed(QTransform().rotate(self.rotation), Qt.TransformationMode.SmoothTransformation)
         if self.fh or self.fv: image = image.transformed(QTransform().scale(-1 if self.fh else 1, -1 if self.fv else 1))
+        if cropped and self.crop != (0., 0., 1., 1.):
+            width, height = self.full_image_size()
+            x0, y0, x1, y1 = box
+            left, top = round(x0 / width * image.width()), round(y0 / height * image.height())
+            right, bottom = round(x1 / width * image.width()), round(y1 / height * image.height())
+            image = image.copy(left, top, max(1, right - left), max(1, bottom - top))
+            image = image.scaled(*size, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
         return image
 
     def render(self):
         if not self.frames:return
-        width, height = self.image_size()
-        scale=min(max(1,self.scroll.viewport().width()-8)/width,max(1,self.scroll.viewport().height()-8)/height) if self.fit_to_pane else self.zoom
+        cropping = self.label.crop_active
+        width, height = self.full_image_size() if cropping else self.image_size()
+        padding = 2 * self.label.margin if cropping else 0
+        scale=min(max(1,self.scroll.viewport().width()-8-padding)/width,max(1,self.scroll.viewport().height()-8-padding)/height) if self.fit_to_pane else self.zoom
         self.display_scale=scale
         if self.fit_to_pane:
             ticks=max(1,round(scale*1000))
@@ -2209,13 +2553,15 @@ class ImagePane(QFrame):
         self.label.setScaledContents(svg)
         if svg:
             dpr = self.devicePixelRatioF()
-            pix = QPixmap.fromImage(self.svg_image(tuple(max(1, round(value * dpr)) for value in size)))
+            pix = QPixmap.fromImage(self.svg_image(tuple(max(1, round(value * dpr)) for value in size), cropped=not cropping))
             pix.setDevicePixelRatio(dpr)
         else:
-            im=self.image()
+            im=self.image(cropped=not cropping)
             if size != im.size: im=im.resize(size,Image.Resampling.LANCZOS)
             pix=QPixmap.fromImage(qimage(im))
-        self.label.setPixmap(pix); self.label.setFixedSize(*size)
+        self.label.crop = self.crop
+        self.label.source_size = self.full_image_size()
+        self.label.setPixmap(pix); self.label.setFixedSize(size[0] + padding, size[1] + padding)
         self.informationChanged.emit()
         if self.full_window is not None:
             self.update_full_image()
@@ -2228,7 +2574,7 @@ class ImagePane(QFrame):
         self.render()
     def apply_default_zoom(self):
         if not self.auto_scale or not self.frames or not self.isVisible(): return
-        width, height = self.image_size()
+        width, height = self.full_image_size() if self.label.crop_active else self.image_size()
         oversized=width>max(1,self.scroll.width()-8) or height>max(1,self.scroll.height()-8)
         if oversized != self.fit_to_pane:
             self._applying_auto_scale=True
@@ -2236,13 +2582,23 @@ class ImagePane(QFrame):
             finally: self._applying_auto_scale=False
     def wheelEvent(self,e): self.scroll.verticalScrollBar().setValue(self.scroll.verticalScrollBar().value()-e.angleDelta().y()); e.accept()
     def rotate(self):
-        self.rotation=(self.rotation+90)%360; self.render()
+        self.record_edit()
+        left, top, right, bottom = self.crop
+        self.crop = ((top, 1 - right, bottom, 1 - left) if self.fh != self.fv
+                     else (1 - bottom, left, 1 - top, right))
+        self.rotation=(self.rotation+90)%360; self.update_filename(); self.render()
         self.operationApplied.emit("rotate", None)
     def mirror_h(self):
-        self.fh=not self.fh; self.render()
+        self.record_edit()
+        left, top, right, bottom = self.crop
+        self.crop = (1 - right, top, 1 - left, bottom)
+        self.fh=not self.fh; self.update_filename(); self.render()
         self.operationApplied.emit("mirror_h", None)
     def mirror_v(self):
-        self.fv=not self.fv; self.render()
+        self.record_edit()
+        left, top, right, bottom = self.crop
+        self.crop = (left, 1 - bottom, right, 1 - top)
+        self.fv=not self.fv; self.update_filename(); self.render()
         self.operationApplied.emit("mirror_v", None)
     def set_zoom_percent(self, ticks):
         self.auto_scale=False
@@ -2310,6 +2666,9 @@ class ImagePane(QFrame):
         if self.full_window is None or not self.frames: return
         full = self.full_window
         label = full.image_label
+        label.mosaic_active = self.mosaic_button.isChecked()
+        if label.mosaic_active: label.setCursor(Qt.CursorShape.CrossCursor)
+        else: label.unsetCursor()
         available = full.image_scroll.viewport().size()
         pixmap = self.fullscreen_pixmap(available, label.devicePixelRatioF())
         label.setPixmap(pixmap)
@@ -2344,7 +2703,8 @@ class SingleImageFullscreen(QMainWindow):
         self.image_scroll = QScrollArea(root)
         self.image_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.image_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image_label = QLabel()
+        self.image_label = CropLabel()
+        self.image_label.mosaicSelected.connect(pane.apply_mosaic)
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setMinimumSize(0, 0)
         self.image_scroll.setWidget(self.image_label)
@@ -2371,6 +2731,9 @@ class SingleImageFullscreen(QMainWindow):
         self.image_toolbar.reposition()
 
     def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape and self.pane.mosaic_button.isChecked():
+            self.pane.cancel_mosaic()
+            return
         if event.key() in (Qt.Key.Key_Escape, Qt.Key.Key_F11):
             self.close()
         else:
@@ -2458,7 +2821,8 @@ class FolderTab(QWidget):
             pane.scroll.viewport().installEventFilter(self)
             pane.slider.logicalValueChanged.connect(self.cancel_scroll_restore)
 
-    def open_folder(self, folder, selected=None, state=None):
+    def open_folder(self, folder, selected=None, state=None, *, check_unsaved=True):
+        if check_unsaved and not self.image.confirm_unsaved(): return False
         self.folder_refresh_timer.stop()
         watched = self.folder_watcher.directories() + self.folder_watcher.files()
         if watched: self.folder_watcher.removePaths(watched)
@@ -2495,6 +2859,7 @@ class FolderTab(QWidget):
             self.image.clear()
             self.update_empty_message()
         if self.active or self.comparison_visible: self.activate_image()
+        return True
 
     def refresh_subfolders(self):
         directories = []
@@ -2533,6 +2898,11 @@ class FolderTab(QWidget):
                               if selected in self.thumbs.buttons else None)
 
     def select_image(self, path):
+        if path != self.image.path and not self.image.confirm_unsaved():
+            self.thumbs.blockSignals(True)
+            self.thumbs.select(self.image.path)
+            self.thumbs.blockSignals(False)
+            return
         if self._initial_view is None: self.cancel_scroll_restore()
         self._selection_pending = path
         self.image_dirty = True
@@ -2540,6 +2910,11 @@ class FolderTab(QWidget):
 
     def activate_image(self):
         path = self.thumbs.selected_path
+        if path != self.image.path and not self.image.confirm_unsaved():
+            self.thumbs.blockSignals(True)
+            self.thumbs.select(self.image.path)
+            self.thumbs.blockSignals(False)
+            return
         if path is None:
             self.image.clear()
             self.update_empty_message()
@@ -3941,7 +4316,7 @@ class PicView(QMainWindow):
             if not self.compare_enabled and layout_spec is not None and not self._restoring_layout:
                 self._pane_layout = layout_spec
             page = self.add_page(layout_spec if state is None else None)
-        page.open_folder(folder, selected, state)
+        if not page.open_folder(folder, selected, state): return None
         if not restoring: self.tabs.setCurrentWidget(page)
         if page is self.current_tab(): page.set_active(True)
         self.refresh_sort_buttons()
@@ -3968,7 +4343,7 @@ class PicView(QMainWindow):
                                       "fit_to_pane": None, "rotation": 0, "fh": False, "fv": False}
         previous = page.snapshot()
         selected = Path(state["selected_file"]) if state["selected_file"] else None
-        page.open_folder(folder, selected, state)
+        if not page.open_folder(folder, selected, state): return False
         if returning: page.folder_history.pop()
         else: page.folder_history.append(previous)
         if not page.files:
@@ -4134,6 +4509,13 @@ class PicView(QMainWindow):
 
     def tab_changed(self, index):
         page = self.tabs.widget(index) if index >= 0 else None
+        previous = self._previous_tab
+        if (not self.compare_enabled and not self._restoring_layout and previous is not None
+                and previous is not page and previous in self.pages() and not previous.image.confirm_unsaved()):
+            self.tabs.blockSignals(True)
+            self.tabs.setCurrentWidget(previous)
+            self.tabs.blockSignals(False)
+            return
         self.tabs.bar.display_current_index = (
             self.tabs.indexOf(page.comparison_source_page)
             if page is not None and hasattr(page, "comparison_source_page") else None)
@@ -4168,6 +4550,7 @@ class PicView(QMainWindow):
         if index is None: index = self.tabs.currentIndex()
         if index < 0 or index >= self.tabs.count(): return
         page = self.tabs.widget(index)
+        if not page.image.confirm_unsaved(): return
         if page.folder is not None and not hasattr(page, "comparison_source_page"):
             self.closed_tabs.append((index, page.snapshot()))
             self.closed_tabs = self.closed_tabs[-20:]
@@ -4640,7 +5023,7 @@ class PicView(QMainWindow):
             for page in self.comparison_order:
                 if page is source: continue
                 image = page.image
-                if action in ("rotate", "mirror_h", "mirror_v"):
+                if action in ("rotate", "mirror_h", "mirror_v", "undo", "redo"):
                     getattr(image, action)()
                 elif action == "zoom":
                     if self.compare_full_window is not None:
@@ -4735,6 +5118,9 @@ class PicView(QMainWindow):
 
     def image_action(self, action, *args):
         active = QApplication.activeWindow()
+        if action == "show_background_menu" and isinstance(active, (SingleImageFullscreen, ComparisonFullscreen)):
+            active.image_toolbar.show_background_menu()
+            return
         if action == "toggle_fit" and isinstance(active, (SingleImageFullscreen, ComparisonFullscreen)):
             active.image_toolbar.fit_button.click()
             return
@@ -4793,6 +5179,10 @@ class PicView(QMainWindow):
 
     def setup_shortcuts(self):
         bindings = [(QKeySequence.StandardKey.Open, self.choose), (QKeySequence.StandardKey.AddTab, self.choose),
+                    (QKeySequence.StandardKey.Undo, lambda: self.image_action("undo")),
+                    (QKeySequence.StandardKey.Redo, lambda: self.image_action("redo")),
+                    (QKeySequence.StandardKey.Save, lambda: self.image_action("save_image")),
+                    (QKeySequence.StandardKey.SaveAs, lambda: self.image_action("save_image_as")),
                     (QKeySequence.StandardKey.Close, lambda: self.close_tab()),
                     (QKeySequence.StandardKey.NextChild, lambda: self.switch_tab(1)),
                     (QKeySequence.StandardKey.PreviousChild, lambda: self.switch_tab(-1)),
@@ -4804,6 +5194,8 @@ class PicView(QMainWindow):
                     ("Space", self.advance_or_check), ("Backspace", lambda: self.navigation_action("select_relative", -1)),
                     ("Alt+F", lambda: self.image_action("toggle_fit")),
                     ("Alt+C", lambda: self.image_action("rotate")),
+                    ("Alt+B", lambda: self.image_action("show_background_menu")),
+                    ("Alt+M", lambda: self.image_action("toggle_mosaic")),
                     ("Alt+V", lambda: self.image_action("mirror_v")), ("Alt+H", lambda: self.image_action("mirror_h")),
                     ("+", lambda: self.zoom_focused(1)), ("=", lambda: self.zoom_focused(1)),
                     ("-", lambda: self.zoom_focused(-1)), ("0", lambda: self.zoom_focused(0)), ("F11", lambda: self.image_action("open_full"))]
@@ -4940,6 +5332,10 @@ class PicView(QMainWindow):
             elif path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES: self.open_folder(path.parent, path)
 
     def closeEvent(self, event):
+        for page in self.pages():
+            if not page.image.confirm_unsaved():
+                event.ignore()
+                return
         self._closing = True
         if self.compare_enabled: self.set_compare(False)
         pages = self.pages()

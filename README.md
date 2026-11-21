@@ -70,6 +70,24 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 
 ## 使用方式
 
+### 裁切與馬賽克
+
+| 工具 | 圖示 | 快捷鍵 |
+| --- | --- | --- |
+| 裁切 | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/crop-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/crop-light.png" width="34" height="34" alt="裁切"></picture> | 點擊工具按鈕 |
+| 馬賽克 | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mosaic-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mosaic-light.png" width="34" height="34" alt="馬賽克"></picture> | Alt+M |
+| 存檔 | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-light.png" width="34" height="34" alt="存檔"></picture> | Ctrl+S |
+| 另存新檔 | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-as-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-as-light.png" width="34" height="34" alt="另存新檔"></picture> | Ctrl+Shift+S |
+
+- 非比圖模式下，點擊單圖窗格工具列的「裁切圖片」，即可拖曳四角或四邊的八個控點，即時裁切目前圖片。工具收合時可從「…」找到。
+- 再次點擊裁切工具可收起控點並檢視結果。按 **Ctrl+Z** 可逐步復原裁切、旋轉與鏡射，**Ctrl+Y** 可重做；一次控點拖曳算一步。
+- 裁切結果會套用於全螢幕檢視，也支援旋轉、鏡射、SVG 與 GIF；進入比圖模式時會關閉裁切控點。
+- 單圖工具列提供「存檔」（**Ctrl+S**）與「另存新檔」（**Ctrl+Shift+S**），以原始解析度儲存裁切、旋轉及鏡射結果，不受檢視縮放比例影響；另存後會切換至新檔案。macOS 使用 Command 取代 Ctrl，重做使用 Command+Shift+Z。
+- PNG、GIF、WebP、TIFF 可保留多影格；JPEG、BMP 只儲存目前影格，轉存前會提示。SVG 可保留向量內容另存 SVG，也可輸出點陣圖片。JPEG 的透明區域以白色填補。
+- 修改後的檔名旁會顯示 `*`。切換圖片、資料夾或標籤、關閉標籤或程式前，未存檔的修改會提供「儲存／不儲存／取消」選擇。比圖模式各窗格保留獨立的編輯狀態。
+- 點擊「馬賽克」或按 **Alt+M** 啟用工具，在圖片上拖曳矩形，放開滑鼠後套用；可連續框選多個區域，每次框選各算一個可復原步驟。再次按 **Alt+M** 關閉工具。**Esc** 可取消正在框選的範圍；沒有框選時則關閉工具。
+- 馬賽克支援非比圖模式的單圖與全螢幕檢視，並與裁切工具互斥。修改可用 **Ctrl+Z／Ctrl+Y** 復原、重做，再用存檔或另存新檔儲存。動畫會處理所有影格；SVG 套用馬賽克後，以點陣內容存入 SVG。
+
 ### 視窗與工具列
 
 - 每個工具列共用一個「…」收合入口，縮圖工具列的日期、整合、語言與配色設定也在其中。縮放與縮圖大小控制改放在窗格右下角的半透明面板；滑鼠移入窗格時顯示，移出時隱藏。點擊數值按鈕才顯示數值輸入與重設按鈕。
@@ -90,7 +108,7 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 - 縮圖使用共用的記憶體快取（上限 64 MiB），不另存縮圖檔案。
 - 調整窗格大小只重新排列縮圖，不會重新解碼所有圖片。
 - 單圖與縮圖窗格各有自己的大小調整面板；比圖時只在整個比圖區右下角顯示一個共用縮放面板，操作目前選取的圖片。取消比圖後，滑鼠仍在單圖窗格內時會立即恢復顯示面板。
-- 視窗標題會顯示目前版本，例如 **PicView v0.1.20**。
+- 視窗標題會顯示目前版本，例如 **PicView v0.1.21**。
 
 ### 瀏覽子資料夾
 
@@ -250,6 +268,7 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 
 ### 透明圖片的背景色
 
+- 按 **Alt+B** 也可展開面板，預先聚焦目前顏色。用方向鍵選色、**Enter／空白鍵** 套用、**Esc** 取消；**Tab／Shift+Tab** 可依序移動，**Home／End** 可跳至首尾。單圖、比圖與全螢幕皆支援。
 - 點擊單圖工具列的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/background-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/background-light.png" width="34" height="34" alt="圖片背景色" title="圖片背景色"></picture>，展開背景色面板。
 - 選擇 **預設（跟隨主題）**，沿用目前配色主題的圖片背景。
 - 可改選白、黑、灰、淺灰、米、淺藍、淺綠或淺粉色，讓透明圖片的細節更容易辨識。
@@ -270,6 +289,8 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 | 切換符合窗格（Fit） | <kbd>Alt</kbd>+<kbd>F</kbd> |
 | 順時針旋轉 | <kbd>Alt</kbd>+<kbd>C</kbd> |
 | 上下／左右鏡射 | <kbd>Alt</kbd>+<kbd>V</kbd> / <kbd>Alt</kbd>+<kbd>H</kbd> |
+| 開啟背景色面板 | <kbd>Alt</kbd>+<kbd>B</kbd> |
+| 切換馬賽克工具 | <kbd>Alt</kbd>+<kbd>M</kbd> |
 | 開啟全螢幕 | <kbd>F11</kbd> |
 | 關閉全螢幕 | <kbd>Esc</kbd> |
 | 開啟資料夾 | 系統的「開啟」快捷鍵 |
