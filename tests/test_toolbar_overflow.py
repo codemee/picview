@@ -162,6 +162,41 @@ def test_zoom_panel_stays_in_viewport_and_out_of_toolbar_overflow(browser):
         assert pane.scroll.viewport().rect().contains(pane.zoom_panel.geometry())
 
 
+@pytest.mark.parametrize("orientation", [Qt.Orientation.Vertical, Qt.Orientation.Horizontal])
+def test_scale_panel_keeps_slider_padding_with_wide_value_button(browser, orientation):
+    window, folders = browser
+    page = window.open_folder(folders[0])
+    window.set_orientation(orientation)
+    page.image.choose_zoom(500)
+    for width in (1100, 420, 260):
+        window.resize(width, 400)
+        QTest.qWait(40)
+        for panel in (page.image.zoom_panel, page.thumbs.size_panel):
+            panel.value_button.setMinimumWidth(96)
+            panel.reposition()
+            margins = panel.layout().contentsMargins()
+            if panel.parentWidget().width() - 16 < 96 + margins.left() + margins.right() + panel.layout().spacing():
+                assert panel.isHidden()
+                continue
+            assert panel.value_button.geometry().left() >= margins.left()
+            assert panel.slider.geometry().left() >= panel.value_button.geometry().right() + panel.layout().spacing()
+            assert panel.slider.geometry().right() <= panel.width() - margins.right() - 1
+            assert panel.parentWidget().rect().contains(panel.geometry())
+
+
+def test_zoom_panel_reflows_when_value_text_changes(browser):
+    window, folders = browser
+    pane = window.open_folder(folders[0]).image
+    panel = pane.zoom_panel
+    panel.show()
+    for value in (10, 500, 10000, 1000):
+        pane.zoom_label.set_value(value)
+        QTest.qWait(20)
+        margins = panel.layout().contentsMargins()
+        assert pane.slider.geometry().right() <= panel.width() - margins.right() - 1
+        assert pane.zoom_label.width() >= pane.zoom_label.minimumWidth()
+
+
 def test_comparison_uses_one_shared_zoom_panel_and_restores_single_pane_controls(browser):
     window, folders = browser
     first = window.open_folder(folders[0])

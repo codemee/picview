@@ -60,7 +60,7 @@ def test_shortcut_tooltips_follow_language_and_new_tabs(browser):
             assert tab.image.full.toolTip() == f"{window.t['full']} (F11)"
             assert tab.image.zoom_label.toolTip() == f"{window.t['edit_zoom']} (+ / - / 0)"
             assert tab.image.zoom_label.reset_button.toolTip() == "100% (0)"
-        assert page.image.rotate_b.toolTip() == f"{window.t['rotate']} ({QKeySequence('Alt+C').toString(QKeySequence.SequenceFormat.NativeText)})"
+        assert page.image.rotate_b.toolTip() == f"{window.t['rotate']} ({QKeySequence('Alt+R').toString(QKeySequence.SequenceFormat.NativeText)})"
 
 
 @pytest.mark.parametrize("compare", [False, True])
@@ -80,12 +80,49 @@ def test_alt_image_shortcuts_target_active_view(browser, compare):
     assert target.fit_to_pane and target.fit_b.isChecked()
     QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_F, Qt.KeyboardModifier.AltModifier)
     assert not target.fit_to_pane and not target.fit_b.isChecked()
-    QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_C, Qt.KeyboardModifier.AltModifier)
+    QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_R, Qt.KeyboardModifier.AltModifier)
     QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_V, Qt.KeyboardModifier.AltModifier)
     QTest.keyClick(second.thumbs.scroll, Qt.Key.Key_H, Qt.KeyboardModifier.AltModifier)
     assert target.rotation == 90 and target.fv and target.fh
     assert other.rotation == 0 and not other.fv and not other.fh
     assert target.fv and target.fh
+
+
+@pytest.mark.parametrize("focus_pane", ["thumbs", "image"])
+def test_crop_and_splice_shortcuts_do_not_conflict_with_rotation(browser, focus_pane):
+    window, folders = browser
+    page = window.open_folder(folders[0])
+    image = page.image
+    target = getattr(page, focus_pane).scroll
+    target.setFocus()
+    QTest.keyClick(target, Qt.Key.Key_C, Qt.KeyboardModifier.AltModifier)
+    assert image.crop_button.isChecked() and image.label.crop_active
+    assert image.rotation == 0
+    QTest.keyClick(target, Qt.Key.Key_J, Qt.KeyboardModifier.AltModifier)
+    assert image.splice_button.isChecked() and image.label.splice_active
+    assert not image.crop_button.isChecked() and image.rotation == 0
+    QTest.keyClick(target, Qt.Key.Key_J, Qt.KeyboardModifier.AltModifier)
+    assert not image.splice_button.isChecked()
+    QTest.keyClick(target, Qt.Key.Key_C, Qt.KeyboardModifier.AltModifier)
+    QTest.keyClick(target, Qt.Key.Key_C, Qt.KeyboardModifier.AltModifier)
+    assert not image.crop_button.isChecked()
+    QTest.keyClick(target, Qt.Key.Key_R, Qt.KeyboardModifier.AltModifier)
+    assert image.rotation == 90
+    for button, label, key in ((image.crop_button, "crop", "Alt+C"),
+                               (image.splice_button, "splice", "Alt+J"),
+                               (image.rotate_b, "rotate", "Alt+R")):
+        binding = QKeySequence(key).toString(QKeySequence.SequenceFormat.NativeText)
+        assert button.toolTip() == f"{window.t[label]} ({binding})"
+
+
+def test_crop_and_splice_shortcuts_respect_comparison_mode(browser):
+    window, folders = browser
+    pane = window.open_folder(folders[0]).image
+    window.set_compare(True)
+    QTest.keyClick(pane.scroll, Qt.Key.Key_C, Qt.KeyboardModifier.AltModifier)
+    QTest.keyClick(pane.scroll, Qt.Key.Key_J, Qt.KeyboardModifier.AltModifier)
+    assert not pane.crop_button.isChecked() and not pane.splice_button.isChecked()
+    assert pane.rotation == 0
 
 
 def test_tabs_share_the_active_thumbnail_toolbar(browser):

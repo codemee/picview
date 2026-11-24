@@ -21,7 +21,7 @@ from . import __version__
 from .application import PicViewApplication
 from .crop import CropLabel
 from .background import BackgroundColorMenu
-from .editing import FORMATS, SAVE_FILTERS, mosaic_image, transform_image, write_edits
+from .editing import FORMATS, SAVE_FILTERS, mosaic_image, splice_image, transform_image, write_edits
 from .instance import InstanceReceiver, forward_paths
 from .about import AboutDialog
 from .file_actions import copy_file, show_properties
@@ -141,7 +141,8 @@ class ViewportInteraction(QObject):
         for widget in (scroll.viewport(), label): widget.installEventFilter(self)
 
     def eventFilter(self, watched, event):
-        if (watched is self.label and (getattr(self.label, "crop_active", False) or getattr(self.label, "mosaic_active", False))
+        if (watched is self.label and (getattr(self.label, "crop_active", False) or getattr(self.label, "mosaic_active", False)
+                                      or getattr(self.label, "splice_active", False))
                 and event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseMove, QEvent.Type.MouseButtonRelease)):
             if event.type() == QEvent.Type.MouseButtonPress:
                 self.scroll.setFocus(Qt.FocusReason.MouseFocusReason)
@@ -282,6 +283,7 @@ TEXT["en"].update({
     "modified": "Modified", "created": "Created", "dimensions": "Dimensions", "bytes": "bytes",
     "crop": "Crop image (drag edge or corner handles)",
     "mosaic": "Mosaic (drag a rectangle)",
+    "splice": "Cut and join (drag to remove a row or column strip)",
     "save_image": "Save image", "save_as": "Save image as", "save_error": "Could not save image:\n{error}",
     "unsaved_title": "Unsaved changes", "unsaved_message": "Save changes to {name}?",
     "dialog_save": "Save", "dialog_discard": "Discard", "dialog_cancel": "Cancel",
@@ -325,6 +327,7 @@ TEXT["zh"].update({
     "modified": "修改時間", "created": "建立時間", "dimensions": "圖片尺寸", "bytes": "位元組",
     "crop": "裁切圖片（拖曳邊角控點）",
     "mosaic": "馬賽克（拖曳矩形範圍）",
+    "splice": "裁剪接合（拖曳移除橫條或直條）",
     "save_image": "存檔", "save_as": "另存新檔", "save_error": "無法儲存圖片：\n{error}",
     "unsaved_title": "尚未儲存的修改", "unsaved_message": "要儲存對「{name}」的修改嗎？",
     "dialog_save": "儲存", "dialog_discard": "不儲存", "dialog_cancel": "取消",
@@ -457,6 +460,15 @@ class IconButton(QToolButton):
                     p.setBrush(color)
                     p.drawRect(QRectF(3 + column * 6, 3 + row * 6, 5, 5))
             p.setBrush(Qt.BrushStyle.NoBrush)
+        elif self.kind == "splice":
+            p.drawRect(QRectF(4, 2, 16, 4))
+            p.drawRect(QRectF(4, 18, 16, 4))
+            dashed = QPen(icon_color, stroke, Qt.PenStyle.DashLine)
+            dashed.setDashPattern([2, 2])
+            p.setPen(dashed)
+            p.drawRect(QRectF(4, 8, 16, 8))
+            p.setPen(QPen(icon_color, stroke))
+            line(10, 12, 14, 12); line(12, 10, 12, 14)
         elif self.kind == "save":
             polygon((4, 3), (17, 3), (21, 7), (21, 21), (4, 21))
             p.drawRect(QRectF(8, 3, 8, 6)); p.drawRect(QRectF(8, 14, 9, 7))
@@ -724,6 +736,7 @@ class HoverScalePanel(QWidget):
         self.pane = pane
         self.hover_host = pane
         self.available = True
+        self._fits_viewport = True
         self.value_button = value_button
         self.slider = slider
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -732,6 +745,8 @@ class HoverScalePanel(QWidget):
         row.setSpacing(6)
         row.addWidget(value_button)
         row.addWidget(slider)
+        self.installEventFilter(self)
+        value_button.installEventFilter(self)
         pane.installEventFilter(self)
         pane.scroll.viewport().installEventFilter(self)
         value_button.editor_menu.aboutToHide.connect(
@@ -751,25 +766,37 @@ class HoverScalePanel(QWidget):
 
     def reposition(self):
         viewport = self.parentWidget()
-        width = min(self.value_button.sizeHint().width() + SLIDER_WIDTH + 22,
+        margins = self.layout().contentsMargins()
+        spacing = margins.left() + margins.right() + self.layout().spacing()
+        value_width = max(self.value_button.minimumWidth(), self.value_button.minimumSizeHint().width(),
+                          self.value_button.sizeHint().width())
+        width = min(value_width + SLIDER_WIDTH + spacing,
                     max(0, viewport.width() - 16))
-        self.slider.setFixedWidth(max(0, width - self.value_button.sizeHint().width() - 22))
+        self._fits_viewport = width >= value_width + spacing and viewport.height() >= 54
+        if not self._fits_viewport:
+            self.hide()
+            return
+        self.slider.setFixedWidth(max(0, width - value_width - spacing))
         self.resize(width, 38)
+        self.layout().activate()
         self.move(max(0, viewport.width() - width - 8), max(0, viewport.height() - self.height() - 8))
         self.raise_()
 
     def update_visibility(self):
-        self.setVisible(self.available and self.hover_host.isVisible() and (
-            self.hover_host.underMouse() or self.value_button.editor_menu.isVisible()))
         self.reposition()
+        self.setVisible(self.available and self._fits_viewport and self.hover_host.isVisible() and (
+            self.hover_host.underMouse() or self.value_button.editor_menu.isVisible()))
 
     def eventFilter(self, watched, event):
-        if watched is self.parentWidget() and event.type() == QEvent.Type.Resize:
+        if (watched is self and event.type() == QEvent.Type.LayoutRequest
+                or watched is self.value_button and event.type() in (QEvent.Type.FontChange, QEvent.Type.StyleChange)):
             self.reposition()
+        if watched is self.parentWidget() and event.type() == QEvent.Type.Resize:
+            self.update_visibility()
         if watched is self.hover_host:
             if event.type() == QEvent.Type.Enter:
                 self.reposition()
-                self.setVisible(self.available)
+                self.setVisible(self.available and self._fits_viewport)
             elif event.type() == QEvent.Type.Leave:
                 QTimer.singleShot(0, self, self.update_visibility)
             elif event.type() == QEvent.Type.Hide:
@@ -859,8 +886,15 @@ class FullscreenImageToolbar(QFrame):
         self.mosaic_button = IconButton("mosaic", "", self)
         self.mosaic_button.setCheckable(True)
         self.mosaic_button.clicked.connect(lambda: self.page.image.mosaic_button.click())
-        if len(self.pages) == 1 and not owner.compare_enabled: row.addWidget(self.mosaic_button)
-        else: self.mosaic_button.hide()
+        self.splice_button = IconButton("splice", "", self)
+        self.splice_button.setCheckable(True)
+        self.splice_button.clicked.connect(lambda: self.page.image.splice_button.click())
+        if len(self.pages) == 1 and not owner.compare_enabled:
+            row.addWidget(self.splice_button)
+            row.addWidget(self.mosaic_button)
+        else:
+            self.splice_button.hide()
+            self.mosaic_button.hide()
         row.addWidget(self.separator())
         self.sync_button = IconButton("sync", "")
         self.sync_button.setCheckable(True)
@@ -949,11 +983,15 @@ class FullscreenImageToolbar(QFrame):
 
     def refresh(self, *_):
         pane = self.page.image
+        self.splice_button.setToolTip(shortcut_tooltip(pane.labels["splice"], "Alt+J"))
+        self.splice_button.blockSignals(True)
+        self.splice_button.setChecked(pane.splice_button.isChecked())
+        self.splice_button.blockSignals(False)
         self.mosaic_button.setToolTip(shortcut_tooltip(pane.labels["mosaic"], "Alt+M"))
         self.mosaic_button.blockSignals(True)
         self.mosaic_button.setChecked(pane.mosaic_button.isChecked())
         self.mosaic_button.blockSignals(False)
-        for button, label, key in ((self.rotate_button, "rotate", "Alt+C"),
+        for button, label, key in ((self.rotate_button, "rotate", "Alt+R"),
                                    (self.mirror_h_button, "mh", "Alt+H"),
                                    (self.mirror_v_button, "mv", "Alt+V")):
             button.setToolTip(shortcut_tooltip(pane.labels[label], key))
@@ -1827,30 +1865,34 @@ class ImagePane(QFrame):
         self.background_mode = "default"
         bar=QHBoxLayout(); self.drag_handle=PaneDragHandle("image", labels["drag_pane"]); bar.addWidget(self.drag_handle); self.rotate_b=IconButton("rotate",labels["rotate"]); self.mh=IconButton("mirror-h",labels["mh"]); self.mv=IconButton("mirror-v",labels["mv"]); self.fit_b=IconButton("fit",labels["fit"]); self.fit_b.setCheckable(True); self.fit_b.toggled.connect(self.set_fit); self.full=IconButton("fullscreen",labels["full"])
         self.fit_b.clicked.connect(lambda checked: self.operationApplied.emit("fit", self.fit_to_pane))
-        for b,fn in ((self.rotate_b,self.rotate),(self.mh,self.mirror_h),(self.mv,self.mirror_v)): b.clicked.connect(fn); bar.addWidget(b)
-        self.crop_button = IconButton("crop", labels["crop"])
-        self.crop_button.setCheckable(True)
-        self.crop_button.setEnabled(False)
-        self.crop_button.toggled.connect(self.set_crop_active)
-        bar.addWidget(self.crop_button)
-        self.mosaic_button = IconButton("mosaic", labels["mosaic"])
-        self.mosaic_button.setCheckable(True)
-        self.mosaic_button.setEnabled(False)
-        self.mosaic_button.toggled.connect(self.set_mosaic_active)
-        bar.addWidget(self.mosaic_button)
         self.save_button = IconButton("save", labels["save_image"])
         self.save_button.clicked.connect(self.save_image)
         self.save_as_button = IconButton("save-as", labels["save_as"])
         self.save_as_button.clicked.connect(self.save_image_as)
         bar.addWidget(self.save_button)
         bar.addWidget(self.save_as_button)
+        separate_tools(bar)
+        for b,fn in ((self.rotate_b,self.rotate),(self.mh,self.mirror_h),(self.mv,self.mirror_v)): b.clicked.connect(fn); bar.addWidget(b)
+        self.crop_button = IconButton("crop", labels["crop"])
+        self.crop_button.setCheckable(True)
+        self.crop_button.setEnabled(False)
+        self.crop_button.toggled.connect(self.set_crop_active)
+        bar.addWidget(self.crop_button)
+        self.splice_button = IconButton("splice", labels["splice"])
+        self.splice_button.setCheckable(True)
+        self.splice_button.setEnabled(False)
+        self.splice_button.toggled.connect(self.set_splice_active)
+        bar.addWidget(self.splice_button)
+        self.mosaic_button = IconButton("mosaic", labels["mosaic"])
+        self.mosaic_button.setCheckable(True)
+        self.mosaic_button.setEnabled(False)
+        self.mosaic_button.toggled.connect(self.set_mosaic_active)
+        bar.addWidget(self.mosaic_button)
         bar.setSpacing(4)
         separate_tools(bar)
         self.full.clicked.connect(self.open_full)
         self.background_button = IconButton("background", labels["background"])
         self.background_button.clicked.connect(self.show_background_menu)
-        bar.addWidget(self.background_button)
-        separate_tools(bar)
         self.sync_button = IconButton("sync", labels["sync_tools"])
         self.sync_button.setCheckable(True)
         self.sync_button.setEnabled(False)
@@ -1867,7 +1909,11 @@ class ImagePane(QFrame):
         self.background_panel = self.background_menu.panel
         self.background_choices = self.background_menu.choices
         self.filename_label=QLabel(); self.filename_label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.filename_label.setSizePolicy(QSizePolicy.Policy.Ignored,QSizePolicy.Policy.Fixed); bar.addWidget(self.filename_label,1)
-        for button in (self.fit_b,self.full): bar.addWidget(button)
+        self.filename_label.setProperty("toolbar_available", False)
+        self.filename_label.hide()
+        bar.addStretch(1)
+        self._toolbar_stretch_index = bar.count() - 1
+        for button in (self.background_button,self.fit_b,self.full): bar.addWidget(button)
         self.zoom_label=ScaleValueButton(1000,1,4000,1000,10,"%",labels["edit_zoom"]); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,1000); self.slider.setRange(1,4000); self.slider.setValue(1000); self.slider.logicalValueChanged.connect(self.set_zoom_percent); self.zoom_label.valueChosen.connect(self.choose_zoom); self.slider.setFixedSize(SLIDER_WIDTH,30)
         self.toolbar_widget = QWidget(self)
         self.toolbar_widget.setLayout(bar)
@@ -1878,7 +1924,7 @@ class ImagePane(QFrame):
         self.setMinimumSize(54, 50)
         layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         self.toolbar_overflow = ToolbarOverflow(self.toolbar_widget, bar,
-            [self.end_compare_button, self.sync_button, self.background_button, self.full, self.save_as_button, self.save_button, self.mv, self.mh, self.rotate_b, self.mosaic_button, self.crop_button, self.fit_b, self.filename_label, self.drag_handle],
+            [self.end_compare_button, self.sync_button, self.background_button, self.full, self.save_as_button, self.save_button, self.mv, self.mh, self.rotate_b, self.mosaic_button, self.splice_button, self.crop_button, self.fit_b, self.filename_label, self.drag_handle],
             lambda: self.labels["more_tools"])
         layout.addWidget(self.toolbar_widget)
         self.comparison_header = QWidget(self)
@@ -1900,6 +1946,7 @@ class ImagePane(QFrame):
         self.label.cropChanged.connect(lambda crop: self.set_crop(crop, record=False))
         self.label.cropFinished.connect(self.finish_crop)
         self.label.mosaicSelected.connect(self.apply_mosaic)
+        self.label.spliceSelected.connect(self.apply_splice)
         for target in (self, self.comparison_header, self.scroll, self.scroll.viewport(), self.label):
             target.setAcceptDrops(True)
         self.scroll.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
@@ -1912,16 +1959,18 @@ class ImagePane(QFrame):
             lambda direction: self.adjust_zoom(direction * 10), self.interacted.emit)
 
     def update_shortcut_tooltips(self):
+        self.splice_button.setToolTip(shortcut_tooltip(self.labels["splice"], "Alt+J"))
+        self.splice_button.setAccessibleName(self.labels["splice"])
         self.mosaic_button.setToolTip(shortcut_tooltip(self.labels["mosaic"], "Alt+M"))
         self.mosaic_button.setAccessibleName(self.labels["mosaic"])
         for button, key in ((self.crop_button, "crop"),):
-            button.setToolTip(self.labels[key])
+            button.setToolTip(shortcut_tooltip(self.labels[key], "Alt+C"))
             button.setAccessibleName(self.labels[key])
         for button, key, shortcut in ((self.save_button, "save_image", QKeySequence.StandardKey.Save),
                                       (self.save_as_button, "save_as", QKeySequence.StandardKey.SaveAs)):
             button.setToolTip(shortcut_tooltip(self.labels[key], shortcut))
             button.setAccessibleName(self.labels[key])
-        for button, label, keys in ((self.fit_b, "fit", "Alt+F"), (self.rotate_b, "rotate", "Alt+C"),
+        for button, label, keys in ((self.fit_b, "fit", "Alt+F"), (self.rotate_b, "rotate", "Alt+R"),
                                     (self.mv, "mv", "Alt+V"), (self.mh, "mh", "Alt+H")):
             button.setToolTip(shortcut_tooltip(self.labels[label], keys))
         self.full.setToolTip(shortcut_tooltip(self.labels["full"], "F11"))
@@ -1972,6 +2021,10 @@ class ImagePane(QFrame):
             painter.end()
 
     def eventFilter(self, watched, event):
+        if (watched in (self.scroll, self.label, self.scroll.viewport()) and self.label.splice_active
+                and event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape):
+            self.cancel_splice()
+            return True
         if (watched in (self.scroll, self.label, self.scroll.viewport()) and self.label.mosaic_active
                 and event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape):
             self.cancel_mosaic()
@@ -2123,7 +2176,7 @@ class ImagePane(QFrame):
     def update_filename(self):
         name = self.path.name if self.path else ""
         if self.is_modified: name += " *"
-        self.filename_label.setText(self.labels["compare_mode"] if self.comparison_title else name)
+        self.filename_label.setText(self.labels["compare_mode"] if self.comparison_title else "")
         self.filename_label.setStyleSheet("font-weight:600;" if self.comparison_title else "")
         self.comparison_label.setText(f"{self.comparison_title} / {name}" if self.comparison_title else "")
         self.update_comparison_fullscreen()
@@ -2136,11 +2189,15 @@ class ImagePane(QFrame):
     def set_comparison_mode(self, title=None):
         self.comparison_title = title
         comparing = title is not None
+        self.filename_label.setProperty("toolbar_available", comparing)
+        self.filename_label.setVisible(comparing)
+        self.toolbar.setStretch(self._toolbar_stretch_index, 0 if comparing else 1)
         cropping_available = not comparing and not getattr(self.window(), "compare_enabled", False)
         if not cropping_available:
             self.crop_button.setChecked(False)
             self.mosaic_button.setChecked(False)
-        for button in (self.crop_button, self.mosaic_button):
+            self.splice_button.setChecked(False)
+        for button in (self.crop_button, self.splice_button, self.mosaic_button):
             button.setProperty("toolbar_available", cropping_available)
         self.update_crop_controls()
         self.zoom_panel.available = not comparing or self.zoom_panel.hover_host is not self
@@ -2210,7 +2267,7 @@ class ImagePane(QFrame):
         self.reset_crop_state()
         self.auto_scale=False; self.path=path; self.rotation=0; self.fh=self.fv=False; self.zoom=1.0; self.fullscreen_zoom=None; self.frames=[]; self.timer.stop()
         self.slider.blockSignals(True); self.slider.setMaximum(4000); self.slider.setValue(1000); self.slider.blockSignals(False); self.zoom_label.set_value(1000)
-        self.update_filename(); self.filename_label.setToolTip(str(path))
+        self.update_filename()
         try:
             self.frames = self.read_frames(path)
             if path.suffix.lower() != ".svg":
@@ -2273,6 +2330,7 @@ class ImagePane(QFrame):
         return right - left, bottom - top
 
     def reset_crop_state(self):
+        self.splice_button.setChecked(False)
         self.mosaic_button.setChecked(False)
         self.crop = (0., 0., 1., 1.)
         self.crop_button.blockSignals(True)
@@ -2287,6 +2345,7 @@ class ImagePane(QFrame):
         available = bool(self.frames) and self.comparison_title is None and not getattr(self.window(), "compare_enabled", False)
         self.crop_button.setEnabled(available)
         self.mosaic_button.setEnabled(available)
+        self.splice_button.setEnabled(available)
         self.save_button.setEnabled(bool(self.frames))
         self.save_as_button.setEnabled(bool(self.frames))
 
@@ -2296,17 +2355,24 @@ class ImagePane(QFrame):
             self.crop_button.setChecked(False)
             return
         self.label.crop_active = active
-        if active: self.mosaic_button.setChecked(False)
+        if active:
+            self.mosaic_button.setChecked(False)
+            self.splice_button.setChecked(False)
         self.label.drag_handle = None
         self.label.unsetCursor()
         self.apply_default_zoom()
         self.render()
 
+    def toggle_crop(self):
+        if self.crop_button.isEnabled(): self.crop_button.click()
+
     def set_mosaic_active(self, active):
         if active and (not self.frames or self.comparison_title is not None or getattr(self.window(), "compare_enabled", False)):
             self.mosaic_button.setChecked(False)
             return
-        if active: self.crop_button.setChecked(False)
+        if active:
+            self.crop_button.setChecked(False)
+            self.splice_button.setChecked(False)
         self.label.mosaic_active = active
         self.label.cancel_mosaic_selection()
         if active: self.label.setCursor(Qt.CursorShape.CrossCursor)
@@ -2347,6 +2413,53 @@ class ImagePane(QFrame):
         self.rotation = 0; self.fh = self.fv = False
         self.crop = (0., 0., 1., 1.)
         self.update_filename()
+        self.render()
+
+    def set_splice_active(self, active):
+        if active and not self.splice_button.isEnabled():
+            self.splice_button.setChecked(False)
+            return
+        if active:
+            self.crop_button.setChecked(False)
+            self.mosaic_button.setChecked(False)
+        labels = [self.label]
+        if self.full_window is not None: labels.append(self.full_window.image_label)
+        for label in labels:
+            label.splice_active = active
+            label.cancel_splice_selection()
+            if active: label.setCursor(Qt.CursorShape.CrossCursor)
+            else: label.unsetCursor()
+        if self.full_window is not None: self.full_window.image_toolbar.refresh()
+
+    def toggle_splice(self):
+        if self.splice_button.isEnabled(): self.splice_button.click()
+
+    def cancel_splice(self):
+        labels = [self.label]
+        if self.full_window is not None: labels.append(self.full_window.image_label)
+        if any(label.splice_start is not None for label in labels):
+            for label in labels: label.cancel_splice_selection()
+        else: self.splice_button.setChecked(False)
+
+    def apply_splice(self, axis, start, end):
+        if not self.frames or not self.splice_button.isEnabled() or axis not in ("x", "y"): return
+        width, height = self.image_size()
+        extent = width if axis == "x" else height
+        first, last = sorted((max(0, min(extent, round(start * extent))),
+                              max(0, min(extent, round(end * extent)))))
+        if first == last or last - first >= extent: return
+        try:
+            frames = [(splice_image(transform_image(source, self.rotation, self.fh, self.fv, self.crop_box()), axis, first, last), delay)
+                      for source, delay in self.frames]
+        except Exception as error:
+            self.message_box(QMessageBox.Icon.Critical, self.labels["splice"], str(error))
+            return
+        self.record_edit()
+        self.frames = frames
+        self.rotation = 0; self.fh = self.fv = False
+        self.crop = (0., 0., 1., 1.)
+        self.update_filename()
+        self.apply_default_zoom()
         self.render()
 
     def set_crop(self, crop, *, record=True):
@@ -2394,6 +2507,8 @@ class ImagePane(QFrame):
         self.label.drag_handle = None
         self.label.cancel_mosaic_selection()
         if self.full_window is not None: self.full_window.image_label.cancel_mosaic_selection()
+        self.label.cancel_splice_selection()
+        if self.full_window is not None: self.full_window.image_label.cancel_splice_selection()
         self.update_crop_controls()
         self.update_filename()
         self.render()
@@ -2506,7 +2621,6 @@ class ImagePane(QFrame):
         self._saved_version = file_version(destination)
         self.update_crop_controls()
         self.update_filename()
-        self.filename_label.setToolTip(str(destination))
         if page is not None:
             page.image_dirty = False
             page.refresh_folder()
@@ -2667,7 +2781,8 @@ class ImagePane(QFrame):
         full = self.full_window
         label = full.image_label
         label.mosaic_active = self.mosaic_button.isChecked()
-        if label.mosaic_active: label.setCursor(Qt.CursorShape.CrossCursor)
+        label.splice_active = self.splice_button.isChecked()
+        if label.mosaic_active or label.splice_active: label.setCursor(Qt.CursorShape.CrossCursor)
         else: label.unsetCursor()
         available = full.image_scroll.viewport().size()
         pixmap = self.fullscreen_pixmap(available, label.devicePixelRatioF())
@@ -2705,6 +2820,7 @@ class SingleImageFullscreen(QMainWindow):
         self.image_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label = CropLabel()
         self.image_label.mosaicSelected.connect(pane.apply_mosaic)
+        self.image_label.spliceSelected.connect(pane.apply_splice)
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setMinimumSize(0, 0)
         self.image_scroll.setWidget(self.image_label)
@@ -2731,6 +2847,9 @@ class SingleImageFullscreen(QMainWindow):
         self.image_toolbar.reposition()
 
     def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape and self.pane.splice_button.isChecked():
+            self.pane.cancel_splice()
+            return
         if event.key() == Qt.Key.Key_Escape and self.pane.mosaic_button.isChecked():
             self.pane.cancel_mosaic()
             return
@@ -4614,7 +4733,7 @@ class PicView(QMainWindow):
         if path is None:
             self.image_status.set_details("", "")
             return
-        parts = [path.name]
+        parts = [path.name + (" *" if pane.is_modified else "")]
         if pane.frames:
             width, height = pane.frames[0][0].size
             parts.append(f"{width} × {height} px")
@@ -5193,7 +5312,9 @@ class PicView(QMainWindow):
                     ("PgUp", lambda: self.navigation_action("select_relative", -1)), ("PgDown", lambda: self.navigation_action("select_relative", 1)),
                     ("Space", self.advance_or_check), ("Backspace", lambda: self.navigation_action("select_relative", -1)),
                     ("Alt+F", lambda: self.image_action("toggle_fit")),
-                    ("Alt+C", lambda: self.image_action("rotate")),
+                    ("Alt+R", lambda: self.image_action("rotate")),
+                    ("Alt+C", lambda: self.image_action("toggle_crop")),
+                    ("Alt+J", lambda: self.image_action("toggle_splice")),
                     ("Alt+B", lambda: self.image_action("show_background_menu")),
                     ("Alt+M", lambda: self.image_action("toggle_mosaic")),
                     ("Alt+V", lambda: self.image_action("mirror_v")), ("Alt+H", lambda: self.image_action("mirror_h")),

@@ -74,19 +74,23 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 
 | Tool | Icon | Shortcut |
 | --- | --- | --- |
-| Crop | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/crop-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/crop-light.png" width="34" height="34" alt="Crop"></picture> | Click the tool button |
+| Crop | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/crop-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/crop-light.png" width="34" height="34" alt="Crop"></picture> | Alt+C |
+| Cut and join | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/splice-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/splice-light.png" width="34" height="34" alt="Cut and join"></picture> | Alt+J |
 | Mosaic | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mosaic-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/mosaic-light.png" width="34" height="34" alt="Mosaic"></picture> | Alt+M |
 | Save | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-light.png" width="34" height="34" alt="Save"></picture> | Ctrl+S |
 | Save As | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-as-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-as-light.png" width="34" height="34" alt="Save As"></picture> | Ctrl+Shift+S |
 
 - Outside comparison mode, click “Crop image” in the image toolbar and drag any of the eight corner or edge handles to crop the current image live. Look in “…” if the tool is collapsed.
+- Use **Alt+C** to toggle crop and **Alt+J** to toggle cut and join. Rotation now uses **Alt+R**.
 - Click the crop tool again to hide the handles and view the result. **Ctrl+Z** undoes cropping, rotation, and mirroring one step at a time; **Ctrl+Y** redoes them. Each handle drag counts as one step.
 - Cropping also applies to full-screen viewing and supports rotation, mirroring, SVG, and GIF. Entering comparison mode closes the crop handles.
 - The image toolbar provides Save (**Ctrl+S**) and Save As (**Ctrl+Shift+S**), saving edits at source resolution regardless of viewing zoom. Save As switches the current document to the new file. On macOS use Command instead of Ctrl and Command+Shift+Z to redo.
 - PNG, GIF, WebP, and TIFF retain multiple frames. JPEG and BMP save the current frame, with a warning before conversion. SVG sources can retain vector content when saved as SVG or be exported as bitmaps. JPEG fills transparency with white.
-- An asterisk beside the filename indicates unsaved edits. Changing images, folders, or tabs, closing a tab, or quitting prompts to Save, Discard, or Cancel. Comparison panes retain independent edit states.
+- An asterisk beside the filename in the status bar indicates unsaved edits. Changing images, folders, or tabs, closing a tab, or quitting prompts to Save, Discard, or Cancel. Comparison panes retain independent edit states.
 - Click Mosaic or press **Alt+M**, then drag a rectangle on the image and release to pixelate it. Repeat to cover additional regions; each rectangle is one undo step. Press **Alt+M** again to leave the tool. **Esc** cancels the current rectangle or leaves the tool when no selection is in progress.
 - Mosaic works outside comparison mode in the image pane and full screen, and is mutually exclusive with cropping. Use **Ctrl+Z/Ctrl+Y** to undo/redo, then Save or Save As to write the result. Animations apply the effect to every frame. SVG files containing mosaic edits are saved with embedded raster content.
+- Cut and join removes a strip and joins the remaining sides directly. Drag left/right to select a full-height column strip, or up/down for a full-width row strip. The translucent preview switches direction as you drag; release to apply. Clicking or selecting the entire image makes no change.
+- Repeat to remove more strips; each splice is one undo step. Supports source-resolution saving, every animation frame, and full screen. **Esc** cancels the current selection or leaves the tool if none is active. Available outside comparison mode and mutually exclusive with crop and mosaic. Edited SVGs use embedded raster content.
 
 ### Window and toolbars
 
@@ -97,7 +101,8 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Drag the dotted handle to the left of the thumbnail tabs or the image toolbar to a top, bottom, left, or right window edge to arrange the panes and choose their order. Drag the divider to resize them. The pane layout is shared across tabs and stays fixed when switching tabs.
 - Folder tabs sit inside the thumbnail pane, sharing a row with the thumbnail tools on the right. The tab strip follows the active thumbnail pane.
 - When tabs overflow, scroll arrows appear at opposite ends of the tab bar. Both scroll arrows and the tab-list dropdown use thin chevrons.
-- Fit and full screen sit on the right of the toolbar. The shared comparison toolbar uses the same order, with end-comparison and sync controls in a separate group visible only in comparison mode.
+- Save and Save As form a separate group immediately after the left drag handle. Background color, Fit, and full screen sit on the right, in that order. The shared comparison toolbar uses the same order, with end-comparison and sync controls in a separate group visible only in comparison mode.
+- The single-image toolbar omits the filename; the filename and unsaved marker appear in the bottom status bar. The comparison toolbar keeps its “Comparison mode” label.
 - Hover over buttons or zoom controls to see their assigned keyboard shortcuts. The overflow menu also shows the corresponding keys.
 - Thumbnail cards use distinct backgrounds and thin borders in both light and dark themes, keeping their boundaries visible while scrolling.
 - Toggle tools such as sync and fit-to-pane use a background to indicate their active state. Icons keep their original color and stroke width; the background deepens on hover.
@@ -108,7 +113,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - Image and thumbnail panes have their own size panels. Comparison mode uses one shared zoom panel at the bottom-right of the whole comparison area, targeting the selected image. Leaving comparison restores the image panel immediately if the pointer remains over its pane.
-- The window title shows the current version, for example **PicView v0.1.22**.
+- The window title shows the current version, for example **PicView v0.1.23**.
 
 ### Browse subfolders
 
@@ -289,7 +294,9 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 | Thumbnail in previous / next row | <kbd>Up</kbd> / <kbd>Down</kbd> |
 | First / last image | <kbd>Home</kbd> / <kbd>End</kbd> |
 | Toggle fit to pane | <kbd>Alt</kbd>+<kbd>F</kbd> |
-| Rotate clockwise | <kbd>Alt</kbd>+<kbd>C</kbd> |
+| Toggle crop tool | <kbd>Alt</kbd>+<kbd>C</kbd> |
+| Toggle cut and join tool | <kbd>Alt</kbd>+<kbd>J</kbd> |
+| Rotate clockwise | <kbd>Alt</kbd>+<kbd>R</kbd> |
 | Mirror vertically / horizontally | <kbd>Alt</kbd>+<kbd>V</kbd> / <kbd>Alt</kbd>+<kbd>H</kbd> |
 | Open background color panel | <kbd>Alt</kbd>+<kbd>B</kbd> |
 | Toggle mosaic tool | <kbd>Alt</kbd>+<kbd>M</kbd> |

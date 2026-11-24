@@ -51,7 +51,7 @@ def test_multilevel_undo_redo_shortcuts_and_drag_grouping(browser):
     QTest.mouseRelease(label, Qt.MouseButton.LeftButton, pos=start + QPoint(19, 19))
     assert len(pane.undo_stack) == 3
     cropped = pane.image()
-    assert pane.is_modified and "*" in pane.filename_label.text()
+    assert pane.is_modified and "*" in window.image_status.details
     for expected in (mirrored, rotated, original):
         QTest.keySequence(pane.scroll, QKeySequence(QKeySequence.StandardKey.Undo))
         assert pane.image().tobytes() == expected.tobytes()

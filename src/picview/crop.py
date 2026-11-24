@@ -1,4 +1,4 @@
-"""Interactive crop handles in display coordinates; originals remain untouched."""
+"""Image crop handles, mosaic rectangles, and full-span splice selections."""
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QLabel
@@ -9,6 +9,7 @@ class CropLabel(QLabel):
     cropStarted = Signal()
     cropFinished = Signal()
     mosaicSelected = Signal(object)
+    spliceSelected = Signal(str, float, float)
     margin = 8
 
     def __init__(self, text="", parent=None):
@@ -17,6 +18,10 @@ class CropLabel(QLabel):
         self.mosaic_active = False
         self.mosaic_start = None
         self.mosaic_end = None
+        self.splice_active = False
+        self.splice_start = None
+        self.splice_end = None
+        self.splice_axis = "x"
         self.crop = (0., 0., 1., 1.)
         self.source_size = (1, 1)
         self.drag_handle = None
@@ -44,6 +49,14 @@ class CropLabel(QLabel):
         return min(distances)[1] if distances else None
 
     def paintEvent(self, event):
+        if self.splice_active:
+            super().paintEvent(event)
+            if self.splice_start is not None:
+                painter = QPainter(self)
+                painter.setPen(QPen(QColor("#e05a47"), 1.5, Qt.PenStyle.DashLine))
+                painter.setBrush(QColor(224, 90, 71, 85))
+                painter.drawRect(self.splice_rect())
+            return
         if self.mosaic_active:
             super().paintEvent(event)
             if self.mosaic_start is not None:
@@ -71,6 +84,12 @@ class CropLabel(QLabel):
             painter.drawRect(QRectF(point.x() - 4, point.y() - 4, 8, 8))
 
     def mousePressEvent(self, event):
+        if self.splice_active and event.button() == Qt.MouseButton.LeftButton and not self.pixmap().isNull():
+            self.splice_start = self.splice_end = self.selection_point(event.position())
+            self.splice_axis = "x"
+            self.update()
+            event.accept()
+            return
         if self.mosaic_active and event.button() == Qt.MouseButton.LeftButton and not self.pixmap().isNull():
             self.mosaic_start = self.mosaic_end = self.selection_point(event.position())
             self.update()
@@ -87,6 +106,10 @@ class CropLabel(QLabel):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        if self.splice_active:
+            if self.splice_start is not None: self.update_splice_selection(event.position())
+            event.accept()
+            return
         if self.mosaic_active:
             if self.mosaic_start is not None:
                 self.mosaic_end = self.selection_point(event.position())
@@ -116,6 +139,18 @@ class CropLabel(QLabel):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if self.splice_active and self.splice_start is not None and event.button() == Qt.MouseButton.LeftButton:
+            self.update_splice_selection(event.position())
+            axis = self.splice_axis
+            start = self.splice_start.x() if axis == "x" else self.splice_start.y()
+            end = self.splice_end.x() if axis == "x" else self.splice_end.y()
+            size = self.pixmap().deviceIndependentSize()
+            extent = size.width() if axis == "x" else size.height()
+            self.cancel_splice_selection()
+            if abs(end - start) * extent >= 3:
+                self.spliceSelected.emit(axis, min(start, end), max(start, end))
+            event.accept()
+            return
         if self.mosaic_active and self.mosaic_start is not None and event.button() == Qt.MouseButton.LeftButton:
             start, end = self.mosaic_start, self.selection_point(event.position())
             size = self.pixmap().deviceIndependentSize()
@@ -139,4 +174,26 @@ class CropLabel(QLabel):
 
     def cancel_mosaic_selection(self):
         self.mosaic_start = self.mosaic_end = None
+        self.update()
+
+    def update_splice_selection(self, position):
+        self.splice_end = self.selection_point(position)
+        size = self.pixmap().deviceIndependentSize()
+        # Compare display pixels, not normalized distances: tall and wide
+        # images must respond to the same mouse gesture in the same way.
+        dx = position.x() - self.splice_start.x() * size.width()
+        dy = position.y() - self.splice_start.y() * size.height()
+        self.splice_axis = "x" if abs(dx) >= abs(dy) else "y"
+        self.update()
+
+    def splice_rect(self):
+        size = self.pixmap().deviceIndependentSize()
+        if self.splice_axis == "x":
+            left, right = sorted((self.splice_start.x(), self.splice_end.x()))
+            return QRectF(left * size.width(), 0, (right - left) * size.width(), size.height())
+        top, bottom = sorted((self.splice_start.y(), self.splice_end.y()))
+        return QRectF(0, top * size.height(), size.width(), (bottom - top) * size.height())
+
+    def cancel_splice_selection(self):
+        self.splice_start = self.splice_end = None
         self.update()

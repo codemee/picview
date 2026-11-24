@@ -48,7 +48,7 @@ def test_comparison_panes_reorder_and_end_from_shared_toolbar(browser):
     assert window.current_tab() is first
 
 
-def test_comparison_toolbar_names_mode_and_exit_restores_filename(browser):
+def test_comparison_toolbar_names_mode_and_exit_hides_filename(browser):
     window, folders = browser
     first = window.open_folder(folders[0])
     second = window.open_folder(folders[1])
@@ -61,7 +61,8 @@ def test_comparison_toolbar_names_mode_and_exit_restores_filename(browser):
     assert window.comparison_area.toolbar_image.filename_label.text() == window.t["compare_mode"]
     window.set_compare(False)
     for page in (first, second):
-        assert page.image.filename_label.text() == page.image.path.name
+        assert page.image.filename_label.isHidden()
+        assert page.image.filename_label.text() == ""
 
 
 def test_comparison_focus_border_follows_input_pane(browser):
@@ -682,7 +683,7 @@ def test_comparison_order_layout_shared_toolbar_and_close_one(browser):
     assert window.comparison_area.pages == [second, first]
     window.toggle_theme()
     window.toggle_lang()
-    assert QKeySequence("Alt+C").toString(QKeySequence.SequenceFormat.NativeText) in first.image.rotate_b.toolTip()
+    assert QKeySequence("Alt+R").toString(QKeySequence.SequenceFormat.NativeText) in first.image.rotate_b.toolTip()
 
 
 def test_comparison_switch_keeps_outer_layout_and_exit_keeps_current_layout(browser):

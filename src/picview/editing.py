@@ -41,6 +41,24 @@ def mosaic_image(image, box):
     return result
 
 
+def splice_image(image, axis, start, end):
+    """Remove a full-height/width strip and join the untouched pixel regions."""
+    if axis not in ("x", "y"): raise ValueError("Invalid splice axis")
+    width, height = image.size
+    extent = width if axis == "x" else height
+    if not 0 <= start < end <= extent or end - start >= extent:
+        raise ValueError("A splice must leave at least one pixel")
+    if axis == "x":
+        result = Image.new(image.mode, (width - end + start, height))
+        result.paste(image.crop((0, 0, start, height)), (0, 0))
+        result.paste(image.crop((end, 0, width, height)), (start, 0))
+    else:
+        result = Image.new(image.mode, (width, height - end + start))
+        result.paste(image.crop((0, 0, width, start)), (0, 0))
+        result.paste(image.crop((0, end, width, height)), (0, start))
+    return result
+
+
 def svg_bytes(source, rotation, horizontal, vertical, box):
     if not isinstance(source, SvgDocument):
         # A raster edit must not leave the unmodified vector content underneath.

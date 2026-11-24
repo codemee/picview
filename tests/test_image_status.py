@@ -67,3 +67,43 @@ def test_status_background_and_text_stay_inside_pane_margins(browser):
         assert bar.rect().contains(label.geometry())
         assert label.height() >= label.fontMetrics().height()
         assert bar.y() + bar.height() <= page.image.height() - 8
+
+
+def test_filename_and_unsaved_marker_live_in_status_bar(browser, monkeypatch):
+    window, folders = browser
+    pane = window.open_folder(folders[0]).image
+    name = pane.path.name
+    assert pane.filename_label.isHidden() and pane.filename_label.text() == ""
+    assert window.image_status.details.split("  |  ")[0] == name
+    pane.rotate()
+    assert window.image_status.details.split("  |  ")[0] == name + " *"
+    assert name + " *" in window.image_status.toolTip()
+    pane.undo()
+    assert window.image_status.details.split("  |  ")[0] == name
+    pane.redo()
+    assert window.image_status.details.split("  |  ")[0] == name + " *"
+    def unexpected(*args): raise AssertionError(args[2])
+    monkeypatch.setattr(pane, "message_box", unexpected)
+    assert pane.save_image()
+    assert window.image_status.details.split("  |  ")[0] == name
+    window.resize(260, 300)
+    pane.toolbar_overflow.update()
+    assert pane.filename_label.isHidden()
+    assert pane.filename_label not in pane.toolbar_overflow.overflowed
+
+
+def test_comparison_status_marker_tracks_active_image(browser):
+    window, folders = browser
+    first = window.open_folder(folders[0])
+    second = window.open_folder(folders[1])
+    first.image.mirror_h()
+    add(window, first, second)
+    window.focus_compare_page(first)
+    assert window.image_status.details.split("  |  ")[0] == first.image.path.name + " *"
+    assert first.image.filename_label.text() == window.t["compare_mode"]
+    assert first.image.filename_label.isVisible()
+    window.focus_compare_page(second)
+    assert window.image_status.details.split("  |  ")[0] == second.image.path.name
+    window.set_compare(False)
+    for page in (first, second):
+        assert page.image.filename_label.isHidden() and page.image.filename_label.text() == ""

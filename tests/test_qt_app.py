@@ -104,12 +104,13 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     assert window.open_button.icon().pixmap(window.open_button.iconSize()).width() == 20
     assert window.image.mh.icon().availableSizes()[0].width() == 48
     widgets = [toolbar.itemAt(i).widget() for i in range(toolbar.count()) if toolbar.itemAt(i).widget() and not toolbar.itemAt(i).widget().isHidden()]
-    assert widgets[:8] == [window.image.drag_handle, window.image.rotate_b, window.image.mh, window.image.mv,
-                          window.image.crop_button, window.image.mosaic_button, window.image.save_button, window.image.save_as_button]
-    assert widgets[8].width() == 1
-    assert widgets[9] is window.image.background_button
+    assert widgets[:3] == [window.image.drag_handle, window.image.save_button, window.image.save_as_button]
+    assert widgets[3].width() == 1
+    assert widgets[4:10] == [window.image.rotate_b, window.image.mh, window.image.mv,
+                            window.image.crop_button, window.image.splice_button, window.image.mosaic_button]
     assert window.image.sync_button.isHidden()
-    assert widgets[-3:] == [window.image.filename_label, window.image.fit_b, window.image.full]
+    assert window.image.filename_label.isHidden()
+    assert widgets[-3:] == [window.image.background_button, window.image.fit_b, window.image.full]
     assert window.image.zoom_label.parentWidget() is window.image.zoom_panel
     assert window.image.slider.parentWidget() is window.image.zoom_panel
     assert window.image.slider.width() == window.thumbs.slider.width()
@@ -152,7 +153,7 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     assert window.thumbs.slider.value() == 140
     assert window.thumbs.slider.sliderPosition() == window.thumbs.slider.HALF_RANGE
     assert window.thumbs.size_label.text() == "140px"
-    assert window.image.filename_label.text() == "image0.png"
+    assert window.image_status.details.startswith("image0.png  |")
     assert window.image.fit_b.isChecked()
     assert PALETTE["accent"] == THUMBNAIL_SELECTED
     assert IMAGE_BACKGROUND in window.image.scroll.viewport().styleSheet()
@@ -242,13 +243,13 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
 
     QTest.keyClick(window, Qt.Key.Key_Right)
     assert window.thumbs.selected_path == paths[1]
-    assert window.image.filename_label.text() == "image1.png"
+    assert window.image_status.details.startswith("image1.png  |")
     assert not window.image.fit_b.isChecked()
     assert window.image.zoom_label.text() == "100%"
     assert window.image.label.pixmap().width() == 200
     QTest.keyClick(window, Qt.Key.Key_End)
     assert window.thumbs.selected_path == paths[2]
-    assert window.image.filename_label.text() == "image2.png"
+    assert window.image_status.details.startswith("image2.png  |")
     assert window.image.fit_b.isChecked()
     QTest.keyClick(window, Qt.Key.Key_Home)
     assert window.thumbs.selected_path == paths[0]
