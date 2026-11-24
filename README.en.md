@@ -111,9 +111,12 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Widen the window to restore the hidden tools automatically.
 - Visible thumbnails load first; the rest are decoded progressively in the background.
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
+- Large images render only the visible region using a shared multiresolution preview cache (up to 128 MiB). Zooming and panning show a preview immediately, then refine it in the background when interaction stops. Image panes, comparison, and full screen share this mechanism; editing and saving retain the native resolution.
+- Windows UNC paths and mapped network drives load file lists, images, and thumbnails in the background. A shared memory cache (up to 64 MiB) reuses downloaded file data. Changes are checked in the background every 5 seconds; temporary connection failures retain the current contents.
+- Large-image rendering improvements are shared across platforms. The network-drive optimizations above currently activate only on Windows; SMB shares mounted under `/Volumes/...` on macOS still use the standard loading path.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - Image and thumbnail panes have their own size panels. Comparison mode uses one shared zoom panel at the bottom-right of the whole comparison area, targeting the selected image. Leaving comparison restores the image panel immediately if the pointer remains over its pane.
-- The window title shows the current version, for example **PicView v0.1.24**.
+- The window title shows the current version, for example **PicView v0.1.25**.
 
 ### Browse subfolders
 

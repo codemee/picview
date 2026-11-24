@@ -10,10 +10,10 @@ from PySide6.QtSvg import QSvgRenderer
 
 
 class SvgDocument:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, *, data: bytes | None = None):
         self.renderer = QSvgRenderer()
         self.renderer.setAnimationEnabled(False)
-        self.data = path.read_bytes()
+        self.data = path.read_bytes() if data is None else data
         if not self.renderer.load(self.data):
             raise ValueError(f"Invalid SVG: {path.name}")
         size = self.renderer.defaultSize()

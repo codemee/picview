@@ -12,11 +12,14 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QImage
 
 from .svg import SvgDocument
+from . import raster  # Apply the same pixel limits to background decoders.
+from .network_io import buffered_source, is_network_path, stat_version
 
 
 def file_version(path: Path):
     try:
         stat = path.stat()
+        if is_network_path(path): return stat_version(stat)
         return stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_ino
     except OSError:
         return None
@@ -50,12 +53,13 @@ def image_source(path):
 def thumbnail_image(path: Path, size: int, dpr: float, version) -> QImage:
     """Create only QImage data here; QPixmap and widgets stay on the UI thread."""
     if path.suffix.lower() == ".svg":
-        document = SvgDocument(path)
+        with buffered_source(path, version) as stream:
+            document = SvgDocument(path, data=stream.read())
         target = QSize(*document.size).scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio)
         result = document.render((max(1, round(target.width() * dpr)), max(1, round(target.height() * dpr))))
         result.setDevicePixelRatio(dpr)
     else:
-        with image_source(path) as stream, Image.open(stream) as source:
+        with buffered_source(path, version) as stream, Image.open(stream) as source:
             # JPEG decoders can reduce resolution before allocating the full image.
             source.draft("RGB", (size, size))
             image = ImageOps.exif_transpose(source)
@@ -77,8 +81,8 @@ class ThumbnailCache:
         self.revisions = {}
         self.pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="picview-thumbnail")
 
-    def key(self, path, size, dpr):
-        return path, size, dpr, file_version(path), self.revisions.get(path, 0)
+    def key(self, path, size, dpr, *, version=...):
+        return path, size, dpr, file_version(path) if version is ... else version, self.revisions.get(path, 0)
 
     def get(self, key):
         image = self.images.get(key)
@@ -90,7 +94,9 @@ class ThumbnailCache:
             if not future.done(): continue
             del self.inflight[key]
             if future.cancelled() or future.exception() is not None: continue
-            if key != self.key(*key[:3]): continue
+            if is_network_path(key[0]):
+                if key[4] != self.revisions.get(key[0], 0): continue
+            elif key != self.key(*key[:3]): continue
             image = future.result()
             cost = image.sizeInBytes()
             if cost > self.max_bytes: continue

@@ -28,6 +28,9 @@ from .file_actions import copy_file, show_properties
 from .settings import IMAGE_BACKGROUND_COLORS, load_settings, normalize_tab_state, save_settings
 from . import shell_integration
 from .svg import SvgDocument
+from .raster import decoded_frame
+from .raster_view import RasterState, RasterView, VIRTUAL_IMAGE_PIXELS
+from .network_io import is_network_path, scan_directory, LatestRequest, SCAN_POOL, IMAGE_POOL, decode_network_image, NetworkSvg
 from .thumbnails import THUMBNAILS, file_version
 from .system_menu import install_about_item, is_about_message
 from .utils import IMAGE_SUFFIXES, image_files, natural_key
@@ -1021,7 +1024,7 @@ class ThumbnailTile(QFrame):
     """A thumbnail card with its name above and optional modified time below."""
     clicked_path = Signal(Path, object)
     contextRequested = Signal(Path, QPoint)
-    def __init__(self, path: Path, pixmap: QPixmap | None, size: int, selected: bool, show_modified=True) -> None:
+    def __init__(self, path: Path, pixmap: QPixmap | None, size: int, selected: bool, show_modified=True, mtime_ns=...) -> None:
         super().__init__(); self.path = path; self.selected = selected; self.setFixedSize(size + 12, size + 38)
         self._drag_start = None
         layout = QVBoxLayout(self); layout.setContentsMargins(5, 5, 5, 5); layout.setSpacing(2)
@@ -1036,7 +1039,7 @@ class ThumbnailTile(QFrame):
         if pixmap: self.preview.setPixmap(pixmap)
         layout.addWidget(self.name); layout.addWidget(self.preview); layout.addWidget(self.modified_label)
         self.set_size(size, show_modified)
-        self.update_modified()
+        self.update_modified(mtime_ns)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(lambda pos: self.contextRequested.emit(self.path, self.mapToGlobal(pos)))
         self.apply_style()
@@ -1047,9 +1050,10 @@ class ThumbnailTile(QFrame):
         self.modified_label.setVisible(show_modified)
         self.elide_modified()
 
-    def update_modified(self, mtime_ns=None):
+    def update_modified(self, mtime_ns=...):
         try:
-            if mtime_ns is None: mtime_ns = self.path.stat().st_mtime_ns
+            if mtime_ns is ...: mtime_ns = self.path.stat().st_mtime_ns
+            if mtime_ns is None: raise ValueError("No modification time")
             text = datetime.fromtimestamp(mtime_ns / 1_000_000_000).strftime("%Y-%m-%d %H:%M:%S")
         except (OSError, ValueError, OverflowError):
             text = ""
@@ -1132,8 +1136,8 @@ class ThumbnailTile(QFrame):
 class FolderTile(ThumbnailTile):
     opened = Signal(Path)
 
-    def __init__(self, path, size, show_modified):
-        super().__init__(path, None, size, False, show_modified)
+    def __init__(self, path, size, show_modified, mtime_ns=...):
+        super().__init__(path, None, size, False, show_modified, mtime_ns)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         self.setToolTip(str(path))
         self.setAccessibleName(path.name + "/")
@@ -1269,6 +1273,7 @@ class ThumbnailPane(QFrame):
         self._selection_start = None
         self._selection_base = set()
         self._loaded = {}
+        self.file_versions = None
         self._pending_paths = set()
         self._jobs = {}
         self._stopped = False
@@ -1486,7 +1491,9 @@ class ThumbnailPane(QFrame):
         for index, path in enumerate(self.directories):
             tile = self.folder_buttons.get(path)
             if tile is None:
-                tile = FolderTile(path, self.size, self.show_modified)
+                version = self.file_versions.get(path) if self.file_versions is not None else None
+                mtime = (version[1] if version is not None else None) if self.file_versions is not None else ...
+                tile = FolderTile(path, self.size, self.show_modified, mtime)
                 tile.clicked_path.connect(self.select_directory)
                 tile.opened.connect(self.folderOpened.emit)
                 self.folder_buttons[path] = tile
@@ -1498,7 +1505,9 @@ class ThumbnailPane(QFrame):
             tile = self.buttons.get(path)
             new = tile is None
             if new:
-                tile = ThumbnailTile(path, None, self.size, path in self.selected_paths, self.show_modified)
+                version = self.file_versions.get(path) if self.file_versions is not None else None
+                mtime = (version[1] if version is not None else None) if self.file_versions is not None else ...
+                tile = ThumbnailTile(path, None, self.size, path in self.selected_paths, self.show_modified, mtime)
                 tile.clicked_path.connect(self.select_clicked)
                 tile.contextRequested.connect(self.show_file_menu)
                 self.buttons[path] = tile
@@ -1512,7 +1521,7 @@ class ThumbnailPane(QFrame):
             if new or rearrange or resized:
                 position = index + len(self.directories)
                 self.grid.addWidget(tile, position // cols, position % cols)
-            if self._loaded.get(path) != THUMBNAILS.key(path, self.size, self.devicePixelRatioF()):
+            if self._loaded.get(path) != self.preview_key(path):
                 self._pending_paths.add(path)
         self.schedule_previews()
         self.refresh_visible_tile_styles()
@@ -1537,6 +1546,11 @@ class ThumbnailPane(QFrame):
     def schedule_previews(self, *_):
         if not self._stopped and not self.preview_timer.isActive() and (self._pending_paths or self._jobs):
             self.preview_timer.start()
+
+    def preview_key(self, path):
+        if self.file_versions is not None:
+            return THUMBNAILS.key(path, self.size, self.devicePixelRatioF(), version=self.file_versions.get(path))
+        return THUMBNAILS.key(path, self.size, self.devicePixelRatioF())
 
     def preview_order(self):
         # Prioritize the viewport and one nearby row, then decode the rest.
@@ -1567,7 +1581,7 @@ class ThumbnailPane(QFrame):
             del self._jobs[key]
             path = key[0]
             if path not in self.buttons: continue
-            if key != THUMBNAILS.key(path, self.size, self.devicePixelRatioF()):
+            if key != self.preview_key(path):
                 self._pending_paths.add(path)
                 continue
             if future.cancelled():
@@ -1582,7 +1596,7 @@ class ThumbnailPane(QFrame):
         applied = 0
         for path in self.preview_order():
             if path in busy: continue
-            key = THUMBNAILS.key(path, self.size, self.devicePixelRatioF())
+            key = self.preview_key(path)
             image = THUMBNAILS.get(key)
             if image is not None:
                 self.apply_preview(key, image)
@@ -1838,6 +1852,7 @@ class ToolbarOverflow(QObject):
 
 class ImagePane(QFrame):
     informationChanged = Signal()
+    loaded = Signal()
     interacted = Signal()
     operationApplied = Signal(str, object)
     comparisonCloseRequested = Signal()
@@ -1853,6 +1868,9 @@ class ImagePane(QFrame):
         self._saved_state = None
         self._saved_version = None
         self.animation_loop = 0
+        self.network_reader = LatestRequest(self, IMAGE_POOL)
+        self._loading_path = None
+        self._network_load_failed = False
         self.comparison_selected = False
         self._comparison_reorder_start = None
         self._comparison_reorder_dragging = False
@@ -2229,11 +2247,16 @@ class ImagePane(QFrame):
         with Image.open(path) as image:
             for index in range(getattr(image, "n_frames", 1)):
                 image.seek(index)
-                frames.append((ImageOps.exif_transpose(image).convert("RGBA").copy(), max(20, int(image.info.get("duration", 100)))))
+                frames.append((decoded_frame(image), max(20, int(image.info.get("duration", 100)))))
         return frames
 
     def reload_preserving_view(self):
         if self.path is None: return False
+        if is_network_path(self.path):
+            if self.is_modified: return False
+            if self._loading_path == self.path: return True
+            self.load_network_image(self.path, preserve=True)
+            return True
         if self._saved_version is not None and file_version(self.path) == self._saved_version:
             return True
         if self.is_modified: return False
@@ -2262,12 +2285,21 @@ class ImagePane(QFrame):
         return True
 
     def load(self,path):
+        self.network_reader.invalidate()
+        self._loading_path = None
         self.undo_stack.clear(); self.redo_stack.clear(); self._crop_before = None
         self._saved_state = None; self._saved_version = None; self.animation_loop = 0
         self.reset_crop_state()
         self.auto_scale=False; self.path=path; self.rotation=0; self.fh=self.fv=False; self.zoom=1.0; self.fullscreen_zoom=None; self.frames=[]; self.timer.stop()
         self.slider.blockSignals(True); self.slider.setMaximum(4000); self.slider.setValue(1000); self.slider.blockSignals(False); self.zoom_label.set_value(1000)
         self.update_filename()
+        if is_network_path(path):
+            self.label.clear()
+            self.label.setText("…")
+            self.load_network_image(path)
+            self.update_crop_controls()
+            self.informationChanged.emit()
+            return
         try:
             self.frames = self.read_frames(path)
             if path.suffix.lower() != ".svg":
@@ -2294,7 +2326,60 @@ class ImagePane(QFrame):
         except Exception: self.frames=[]; self.label.clear(); self.label.setText(self.labels["empty"]); self.label.setFixedSize(self.label.sizeHint())
         self.update_crop_controls()
         self.informationChanged.emit()
+
+    def load_network_image(self, path, preserve=False):
+        self._loading_path = path
+        self._network_load_failed = False
+        def completed(payload, error):
+            self._loading_path = None
+            if self.path != path: return
+            if error is not None:
+                self._network_load_failed = True
+                if not preserve:
+                    self.label.clear()
+                    self.label.setText(self.labels["empty"])
+                self.loaded.emit()
+                return
+            if isinstance(payload, NetworkSvg):
+                try:
+                    frames, loop, version = [(SvgDocument(path, data=payload.data), 100)], 0, payload.version
+                except ValueError:
+                    self._network_load_failed = True
+                    self.loaded.emit()
+                    return
+            else:
+                frames, loop, version = payload
+            if preserve and self.is_modified: return
+            scroll_x, scroll_y = self.scroll.horizontalScrollBar().value(), self.scroll.verticalScrollBar().value()
+            self.frames, self.animation_loop = frames, loop
+            self.index = min(getattr(self, "index", 0), len(frames) - 1) if preserve else 0
+            self.undo_stack.clear(); self.redo_stack.clear()
+            self._saved_state, self._saved_version = self.state_key(), version
+            self.timer.stop()
+            if not preserve:
+                self.auto_scale = True
+                width, height = self.image_size()
+                fit = width > max(1, self.scroll.width() - 8) or height > max(1, self.scroll.height() - 8)
+                self.fit_b.blockSignals(True)
+                self.fit_b.setChecked(fit)
+                self.fit_b.blockSignals(False)
+                self.fit_to_pane = fit
+                policy = Qt.ScrollBarPolicy.ScrollBarAlwaysOff if fit else Qt.ScrollBarPolicy.ScrollBarAsNeeded
+                self.scroll.setHorizontalScrollBarPolicy(policy)
+                self.scroll.setVerticalScrollBarPolicy(policy)
+            self.render()
+            if preserve:
+                self.scroll.horizontalScrollBar().setValue(scroll_x)
+                self.scroll.verticalScrollBar().setValue(scroll_y)
+            if len(frames) > 1: self.timer.start(frames[self.index][1])
+            self.update_crop_controls()
+            self.informationChanged.emit()
+            self.loaded.emit()
+        self.network_reader.submit(decode_network_image, completed, path)
+
     def clear(self):
+        self.network_reader.invalidate()
+        self._loading_path = None
         self.undo_stack.clear(); self.redo_stack.clear(); self._crop_before = None
         self._saved_state = None; self._saved_version = None
         self.reset_crop_state()
@@ -2665,6 +2750,13 @@ class ImagePane(QFrame):
         size=(max(1,round(width*scale)),max(1,round(height*scale)))
         svg = isinstance(self.frames[self.index][0], SvgDocument)
         self.label.setScaledContents(svg)
+        self.label.crop = self.crop
+        self.label.source_size = self.full_image_size()
+        if self.render_virtual(self.label, self.scroll, size, cropped=not cropping, padding=padding // 2):
+            self.informationChanged.emit()
+            if self.full_window is not None: self.update_full_image()
+            self.update_comparison_fullscreen()
+            return
         if svg:
             dpr = self.devicePixelRatioF()
             pix = QPixmap.fromImage(self.svg_image(tuple(max(1, round(value * dpr)) for value in size), cropped=not cropping))
@@ -2680,6 +2772,17 @@ class ImagePane(QFrame):
         if self.full_window is not None:
             self.update_full_image()
         self.update_comparison_fullscreen()
+
+    def render_virtual(self, label, scroll, size, *, cropped=True, padding=0):
+        source = self.frames[self.index][0]
+        if not isinstance(source, Image.Image): return False
+        if source.width * source.height <= VIRTUAL_IMAGE_PIXELS and size[0] * size[1] <= VIRTUAL_IMAGE_PIXELS:
+            return False
+        if label.raster_view is None: label.raster_view = RasterView(label, scroll)
+        box = self.crop_box() if cropped else (0, 0, *self.full_image_size())
+        state = RasterState(source, self.rotation, self.fh, self.fv, box)
+        label.raster_view.set_image(state, size, padding)
+        return True
     def resizeEvent(self,e):
         super().resizeEvent(e)
         if hasattr(self, "resize_refresh_timer"): self.resize_refresh_timer.start(0)
@@ -2784,18 +2887,29 @@ class ImagePane(QFrame):
         label.splice_active = self.splice_button.isChecked()
         if label.mosaic_active or label.splice_active: label.setCursor(Qt.CursorShape.CrossCursor)
         else: label.unsetCursor()
-        available = full.image_scroll.viewport().size()
-        pixmap = self.fullscreen_pixmap(available, label.devicePixelRatioF())
-        label.setPixmap(pixmap)
-        label.resize(pixmap.deviceIndependentSize().toSize())
+        self.render_fullscreen_label(label, full.image_scroll)
         full.image_toolbar.refresh()
 
-    def fullscreen_pixmap(self, available: QSize, dpr: float) -> QPixmap:
-        if not self.frames: return QPixmap()
+    def fullscreen_size(self, available):
         original = QSize(*self.image_size())
         size = (original.scaled(available, Qt.AspectRatioMode.KeepAspectRatio).boundedTo(original)
                 if self.fullscreen_zoom is None else original * self.fullscreen_zoom)
         self.fullscreen_display_scale = size.width() / max(1, original.width())
+        return size
+
+    def render_fullscreen_label(self, label, scroll):
+        if not self.frames:
+            label.clear()
+            return
+        size = self.fullscreen_size(scroll.viewport().size())
+        if self.render_virtual(label, scroll, (max(1, size.width()), max(1, size.height()))): return
+        pixmap = self.fullscreen_pixmap(scroll.viewport().size(), label.devicePixelRatioF())
+        label.setPixmap(pixmap)
+        label.resize(pixmap.deviceIndependentSize().toSize())
+
+    def fullscreen_pixmap(self, available: QSize, dpr: float) -> QPixmap:
+        if not self.frames: return QPixmap()
+        size = self.fullscreen_size(available)
         pixels = (max(1, round(size.width() * dpr)), max(1, round(size.height() * dpr)))
         if isinstance(self.frames[self.index][0], SvgDocument):
             pixmap = QPixmap.fromImage(self.svg_image(pixels))
@@ -2892,6 +3006,9 @@ class FolderTab(QWidget):
         self._pending_image_versions = {}
         self._pending_image_retries = {}
         self._image_versions = {}
+        self.network_scan = LatestRequest(self, SCAN_POOL)
+        self._network_snapshot = None
+        self._network_initial = False
         self._changed_image_paths = set()
         self._image_reload_retries = 0
         self.folder_watcher = QFileSystemWatcher(self)
@@ -2911,6 +3028,7 @@ class FolderTab(QWidget):
         self.split.setHandleWidth(7)
         self.thumbs = ThumbnailPane(labels)
         self.image = ImagePane(labels)
+        self.image.loaded.connect(self.network_image_loaded)
         self.split.addWidget(self.thumbs)
         self.image_slot = QWidget()
         self.image_slot.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
@@ -2942,13 +3060,17 @@ class FolderTab(QWidget):
 
     def open_folder(self, folder, selected=None, state=None, *, check_unsaved=True):
         if check_unsaved and not self.image.confirm_unsaved(): return False
+        self.network_scan.invalidate()
+        self._network_snapshot = None
+        self._network_initial = False
         self.folder_refresh_timer.stop()
         watched = self.folder_watcher.directories() + self.folder_watcher.files()
         if watched: self.folder_watcher.removePaths(watched)
         self._changed_image_paths.clear()
         self._image_reload_retries = 0
         self.image.clear()
-        self.folder = folder.resolve()
+        network = is_network_path(folder)
+        self.folder = Path(folder) if network else folder.resolve()
         self._initial_view = state
         self._restore_selected = selected
         self.thumbs.sort_mode = state.get("sort_mode", "natural") if state else "natural"
@@ -2956,7 +3078,7 @@ class FolderTab(QWidget):
         source = state.get("_source_page") if state else None
         self._shared_folder_source = source
         self.thumbs.defer_build = bool(state and state.get("_defer_thumbnails"))
-        self.files = source.files.copy() if source is not None else self.ordered_files(image_files(self.folder))
+        self.files = source.files.copy() if source is not None else [] if network else self.ordered_files(image_files(self.folder))
         self._layout_pending = True
         if state:
             self.image.set_background(state.get("image_background", "default"))
@@ -2966,6 +3088,18 @@ class FolderTab(QWidget):
             self.split.insertWidget(0, self.thumbs if state.get("thumbnail_first", True) else self.image_slot)
             self._sash_fraction = state["sash_fraction"]
         self.thumbs.selected_directory = None
+        self.thumbs.file_versions = {} if network else None
+        self.folder_poll_timer.setInterval(5000 if network else 750)
+        if network:
+            self._network_initial = True
+            self._image_versions = {}
+            self._pending_image_versions = {}
+            self._pending_image_retries = {}
+            self.thumbs.set_files([], emit_selection=False)
+            self.thumbs.set_directories([])
+            self.folder_poll_timer.start()
+            self.refresh_folder()
+            return True
         self.thumbs.set_files(self.files, selected)
         self.refresh_subfolders()
         self._pending_image_versions = self.pending_image_versions()
@@ -2981,6 +3115,10 @@ class FolderTab(QWidget):
         return True
 
     def refresh_subfolders(self):
+        if self.folder is not None and is_network_path(self.folder):
+            directories = self._network_snapshot.directories if self._network_snapshot is not None and self.show_subfolders else []
+            self.thumbs.set_directories(self.ordered_files(directories))
+            return
         directories = []
         if self.show_subfolders and self.folder:
             try:
@@ -2991,13 +3129,14 @@ class FolderTab(QWidget):
 
     def update_empty_message(self):
         if not self.files:
-            key = "folder_missing" if self.folder and not self.folder.is_dir() else "empty"
+            key = "folder_missing" if self.folder and not is_network_path(self.folder) and not self.folder.is_dir() else "empty"
             self.image.label.setText(self.t[key])
             self.image.label.setFixedSize(self.image.label.sizeHint())
 
     def ordered_files(self, files, versions=None):
         if self.thumbs.sort_mode == "modified":
-            versions = self.image_versions(files) if versions is None else versions
+            if versions is None:
+                versions = self._network_snapshot.versions if self._network_snapshot is not None else self.image_versions(files)
             return sorted(files, key=lambda path: ((versions.get(path) or (0, 0))[1], natural_key(path)),
                           reverse=self.thumbs.sort_descending)
         return sorted(files, key=natural_key, reverse=self.thumbs.sort_descending)
@@ -3062,6 +3201,13 @@ class FolderTab(QWidget):
             self.scroll_restore_timer.start()
         if (self.active or self.comparison_visible) and len(self.image.frames) > 1:
             self.image.timer.start(self.image.frames[self.image.index][1])
+
+    def network_image_loaded(self):
+        if self.image.path != self.thumbs.selected_path: return
+        self.image_dirty = self.image._network_load_failed or not bool(self.image.frames)
+        if self.image._network_load_failed: return
+        if self.image.frames: self.activate_image()
+        self.attentionChanged.emit()
 
     def reload_current_image(self):
         if not self.active and not self.comparison_visible:
@@ -3277,6 +3423,8 @@ class FolderTab(QWidget):
         self.active = False
         self.folder_refresh_timer.stop()
         self.folder_poll_timer.stop()
+        self.network_scan.stop()
+        self.image.network_reader.stop()
         self.scroll_restore_timer.stop()
         self.image.timer.stop()
         self.thumbs.shutdown()
@@ -3294,6 +3442,7 @@ class FolderTab(QWidget):
         event.accept()
 
     def watch_current_folder(self):
+        if self.folder is not None and is_network_path(self.folder): return
         if self.folder and self.folder.is_dir() and str(self.folder) not in self.folder_watcher.directories():
             self.folder_watcher.addPath(str(self.folder))
 
@@ -3308,6 +3457,7 @@ class FolderTab(QWidget):
             self.folder_refresh_timer.start()
 
     def watch_image_files(self, files):
+        if self.folder is not None and is_network_path(self.folder): return
         if getattr(self, "_shared_folder_source", None) is not None: return
         watched = set(self.folder_watcher.files())
         wanted = {str(path) for path in files}
@@ -3329,6 +3479,9 @@ class FolderTab(QWidget):
         return versions
 
     def pending_image_versions(self):
+        if self._network_snapshot is not None:
+            return {path: self._network_snapshot.versions[path][:2] if path in self._network_snapshot.versions else None
+                    for path in self.thumbs.failed_paths}
         versions = {}
         for path in self.thumbs.failed_paths:
             try:
@@ -3338,18 +3491,45 @@ class FolderTab(QWidget):
                 versions[path] = None
         return versions
 
-    def refresh_folder(self):
+    def network_directory_loaded(self, snapshot, error):
+        if self._closing: return
+        if error is not None:
+            if self._network_initial:
+                self.image.label.setText(self.t["folder_unavailable"].format(folder=self.folder))
+            return
+        self._network_snapshot = snapshot
+        self.thumbs.file_versions = snapshot.versions
+        if self._network_initial:
+            self._network_initial = False
+            self.files = self.ordered_files(snapshot.files, snapshot.versions)
+            self._image_versions = {path: snapshot.versions[path] for path in self.files}
+            self.thumbs.set_files(self.files, self._restore_selected)
+            self.refresh_subfolders()
+            if self.active or self.comparison_visible: self.activate_image()
+            if not self.files: self.update_empty_message()
+            QTimer.singleShot(0, self, self.apply_layout)
+        else:
+            self.refresh_folder(snapshot)
+            if self.image_dirty and (self.active or self.comparison_visible): self.activate_image()
+        self.attentionChanged.emit()
+
+    def refresh_folder(self, snapshot=None):
         if self._closing or self.folder is None: return
+        network = is_network_path(self.folder)
+        if network and snapshot is None:
+            if self.network_scan.future is None:
+                self.network_scan.submit(scan_directory, self.network_directory_loaded, self.folder)
+            return
         self.refresh_subfolders()
         self.watch_current_folder()
         try:
-            files = image_files(self.folder, strict=True)
+            files = snapshot.files if snapshot is not None else image_files(self.folder, strict=True)
         except (FileNotFoundError, NotADirectoryError):
             files = []
         except OSError:
             # A temporary access failure does not mean the images were deleted.
             return
-        versions = self.image_versions(files)
+        versions = {path: snapshot.versions[path] for path in files} if snapshot is not None else self.image_versions(files)
         files = self.ordered_files(files, versions)
         changed = {path for path in files if path in self._image_versions and versions[path] != self._image_versions[path]}
         changed.update(self._changed_image_paths.intersection(files))
@@ -3621,7 +3801,7 @@ class ComparisonFullscreen(QMainWindow):
             scroll = QScrollArea(frame)
             scroll.setFrameShape(QFrame.Shape.NoFrame)
             scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            image = QLabel()
+            image = CropLabel()
             image.setAlignment(Qt.AlignmentFlag.AlignCenter)
             image.setMinimumSize(0, 0)
             scroll.setWidget(image)
@@ -3700,11 +3880,7 @@ class ComparisonFullscreen(QMainWindow):
         self.titles[page].setText(f"{page.folder.name if page.folder else ''} / {name}")
         scroll = self.scrollers[page]
         scroll.viewport().setStyleSheet(f"background:{pane.background_color()};")
-        pixmap = pane.fullscreen_pixmap(scroll.viewport().size(), label.devicePixelRatioF())
-        if pixmap.isNull(): label.clear()
-        else:
-            label.setPixmap(pixmap)
-            label.resize(pixmap.deviceIndependentSize().toSize())
+        pane.render_fullscreen_label(label, scroll)
         if self.image_toolbar.page is page: self.image_toolbar.refresh()
 
     def keyPressEvent(self, event):
@@ -4424,8 +4600,8 @@ class PicView(QMainWindow):
         return page
 
     def open_folder(self, folder, selected=None, *, state=None, restoring=False):
-        folder = Path(folder).resolve()
-        if not restoring and not folder.is_dir():
+        folder = Path(folder) if is_network_path(folder) else Path(folder).resolve()
+        if not restoring and not is_network_path(folder) and not folder.is_dir():
             self.notification_bar.showMessage(self.t["folder_missing"] + ": " + str(folder), 8000)
             return None
         page = next((tab for tab in self.pages() if tab.folder is None), None)
@@ -4447,13 +4623,15 @@ class PicView(QMainWindow):
     def navigate_folder(self, page, folder, *, returning=False):
         if self.compare_enabled or page is not self.current_tab(): return False
         folder = Path(folder)
-        try:
-            if not folder.is_dir(): raise OSError()
-            next(folder.iterdir(), None)
-        except OSError:
-            self.notification_bar.showMessage(self.t["folder_unavailable"].format(folder=folder), 8000)
-            return False
-        if folder.resolve() == page.folder: return False
+        network = is_network_path(folder)
+        if not network:
+            try:
+                if not folder.is_dir(): raise OSError()
+                next(folder.iterdir(), None)
+            except OSError:
+                self.notification_bar.showMessage(self.t["folder_unavailable"].format(folder=folder), 8000)
+                return False
+        if (folder if network else folder.resolve()) == page.folder: return False
         if returning:
             state = page.folder_history[-1]
         else:
@@ -4509,7 +4687,7 @@ class PicView(QMainWindow):
 
     def choose(self):
         current = self.folder
-        initial = current.parent if current and current.parent != current and current.parent.is_dir() else current
+        initial = current.parent if current and current.parent != current and (is_network_path(current) or current.parent.is_dir()) else current
         folder = QFileDialog.getExistingDirectory(self, self.t["open"], str(initial) if initial else "")
         if folder: self.open_folder(Path(folder))
 
@@ -4740,6 +4918,7 @@ class PicView(QMainWindow):
         parts.append(path.suffix.lstrip(".").upper())
         version = page._image_versions.get(path)
         try:
+            if version is None and is_network_path(path): raise OSError("Metadata is not available yet")
             size = version[0] if version is not None else path.stat().st_size
             amount = float(size)
             unit = "B"
@@ -5449,7 +5628,10 @@ class PicView(QMainWindow):
         for url in event.mimeData().urls():
             if not url.isLocalFile(): continue
             path = Path(url.toLocalFile())
-            if path.is_dir(): self.open_folder(path)
+            if is_network_path(path):
+                if path.suffix.lower() in IMAGE_SUFFIXES: self.open_folder(path.parent, path)
+                else: self.open_folder(path)
+            elif path.is_dir(): self.open_folder(path)
             elif path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES: self.open_folder(path.parent, path)
 
     def closeEvent(self, event):
@@ -5567,7 +5749,12 @@ def set_application_identity(app: QApplication) -> None:
 
 def open_startup_paths(window: PicView, paths: list[str]) -> None:
     for raw in paths:
-        path = Path(raw).expanduser().resolve()
+        path = Path(raw).expanduser()
+        if is_network_path(path):
+            if path.suffix.lower() in IMAGE_SUFFIXES: window.open_folder(path.parent, path)
+            else: window.open_folder(path)
+            continue
+        path = path.resolve()
         if path.is_dir():
             window.open_folder(path)
         elif path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES:
