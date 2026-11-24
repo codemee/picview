@@ -80,7 +80,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 | Save | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-light.png" width="34" height="34" alt="Save"></picture> | Ctrl+S |
 | Save As | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-as-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-as-light.png" width="34" height="34" alt="Save As"></picture> | Ctrl+Shift+S |
 
-- Outside comparison mode, click “Crop image” in the image toolbar and drag any of the eight corner or edge handles to crop the current image live. Look in “…” if the tool is collapsed.
+- Outside comparison mode, click “Crop image” in the image toolbar and drag any of the eight corner or edge handles to adjust the crop. While dragging, the full image remains visible with discarded areas faded; releasing the mouse hides those areas. Look in “…” if the tool is collapsed.
 - Use **Alt+C** to toggle crop and **Alt+J** to toggle cut and join. Rotation now uses **Alt+R**.
 - Click the crop tool again to hide the handles and view the result. **Ctrl+Z** undoes cropping, rotation, and mirroring one step at a time; **Ctrl+Y** redoes them. Each handle drag counts as one step.
 - Cropping also applies to full-screen viewing and supports rotation, mirroring, SVG, and GIF. Entering comparison mode closes the crop handles.
@@ -113,7 +113,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - Image and thumbnail panes have their own size panels. Comparison mode uses one shared zoom panel at the bottom-right of the whole comparison area, targeting the selected image. Leaving comparison restores the image panel immediately if the pointer remains over its pane.
-- The window title shows the current version, for example **PicView v0.1.23**.
+- The window title shows the current version, for example **PicView v0.1.24**.
 
 ### Browse subfolders
 

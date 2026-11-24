@@ -80,7 +80,7 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 | 存檔 | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-light.png" width="34" height="34" alt="存檔"></picture> | Ctrl+S |
 | 另存新檔 | <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-as-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/save-as-light.png" width="34" height="34" alt="另存新檔"></picture> | Ctrl+Shift+S |
 
-- 非比圖模式下，點擊單圖窗格工具列的「裁切圖片」，即可拖曳四角或四邊的八個控點，即時裁切目前圖片。工具收合時可從「…」找到。
+- 非比圖模式下，點擊單圖窗格工具列的「裁切圖片」，即可拖曳四角或四邊的八個控點，調整裁切範圍。拖曳期間保留完整圖片，將預計裁掉的區域淡化，放開滑鼠後隱藏裁掉的區域。工具收合時可從「…」找到。
 - 快捷鍵為 **Alt+C** 切換裁切、**Alt+J** 切換裁剪接合；旋轉改用 **Alt+R**。
 - 再次點擊裁切工具可收起控點並檢視結果。按 **Ctrl+Z** 可逐步復原裁切、旋轉與鏡射，**Ctrl+Y** 可重做；一次控點拖曳算一步。
 - 裁切結果會套用於全螢幕檢視，也支援旋轉、鏡射、SVG 與 GIF；進入比圖模式時會關閉裁切控點。
@@ -113,7 +113,7 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 - 縮圖使用共用的記憶體快取（上限 64 MiB），不另存縮圖檔案。
 - 調整窗格大小只重新排列縮圖，不會重新解碼所有圖片。
 - 單圖與縮圖窗格各有自己的大小調整面板；比圖時只在整個比圖區右下角顯示一個共用縮放面板，操作目前選取的圖片。取消比圖後，滑鼠仍在單圖窗格內時會立即恢復顯示面板。
-- 視窗標題會顯示目前版本，例如 **PicView v0.1.23**。
+- 視窗標題會顯示目前版本，例如 **PicView v0.1.24**。
 
 ### 瀏覽子資料夾
 

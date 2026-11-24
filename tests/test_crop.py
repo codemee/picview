@@ -57,10 +57,19 @@ def test_crop_pixels_zoom_bounds_navigation_and_comparison(browser):
     QTest.mousePress(label, Qt.MouseButton.LeftButton, pos=start)
     move_drag(label, start + QPoint(60, 0))
     assert pane.image_size() == (90, 80)
-    # The removed portion is transparent on the crop canvas, not merely selected.
+    # During the drag, discarded pixels remain visible at reduced opacity.
     rendered = label.grab().toImage()
-    assert rendered.pixelColor(24, 35).alpha() == 0
-    assert rendered.pixelColor(100, 35).red() == 255
+    discarded = rendered.pixelColor(24, 35)
+    retained = rendered.pixelColor(100, 35)
+    assert discarded.red() == 255
+    assert 60 <= discarded.alpha() <= 90
+    assert retained.red() == 255 and retained.alpha() == 255
+    QTest.mouseRelease(label, Qt.MouseButton.LeftButton, pos=start + QPoint(60, 0))
+    assert label.grab().toImage().pixelColor(24, 35).alpha() == 0
+    assert pane.image_size() == (90, 80)
+    # The committed edge can be dragged again to reveal and adjust the source.
+    start = label.handles()["l"].toPoint()
+    QTest.mousePress(label, Qt.MouseButton.LeftButton, pos=start)
     move_drag(label, start + QPoint(1000, 0))
     assert pane.image_size() == (1, 80)
     move_drag(label, start - QPoint(1000, 0))

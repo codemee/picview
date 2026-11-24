@@ -73,6 +73,11 @@ class CropLabel(QLabel):
             return super().paintEvent(event)
         painter = QPainter(self)
         rect = self.crop_rect()
+        if self.drag_handle is not None:
+            # Keep the discarded pixels visible until the gesture is complete.
+            painter.setOpacity(0.3)
+            painter.drawPixmap(QPointF(self.margin, self.margin), self.pixmap())
+            painter.setOpacity(1.0)
         painter.save()
         painter.setClipRect(rect)
         painter.drawPixmap(QPointF(self.margin, self.margin), self.pixmap())
@@ -162,6 +167,7 @@ class CropLabel(QLabel):
             return
         if self.drag_handle and event.button() == Qt.MouseButton.LeftButton:
             self.drag_handle = None
+            self.update()
             self.cropFinished.emit()
             event.accept()
             return
