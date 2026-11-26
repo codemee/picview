@@ -30,7 +30,7 @@ def test_narrow_and_short_window_overflows_and_restores(browser, orientation):
     for controller in controllers:
         if controller is window.toolbar_overflow:
             assert window.settings_button.isVisible() or controller.more_button.isVisible()
-        else:
+        elif controller is not window.thumbs.toolbar_overflow:
             assert controller.overflowed and controller.more_button.isVisible()
             assert controller.more_button.geometry().right() < controller.host.width()
             controller.populate_menu()
@@ -106,13 +106,14 @@ def test_thumbnail_has_one_ellipsis_and_live_hover_slider(browser):
     window.resize(260, 350)
     QTest.qWait(100)
     thumbs = window.thumbs
-    assert window.toolbar_overflow is thumbs.toolbar_overflow
-    ellipses = [button for button in thumbs.findChildren(IconButton)
+    assert window.toolbar_overflow is not thumbs.toolbar_overflow
+    assert thumbs.toolbar_overflow.more_button.isHidden()
+    ellipses = [button for button in window.folder_toolbar_host.findChildren(IconButton)
                 if button.kind == "more" and button.isVisible()]
     assert ellipses == [window.settings_button]
     window.settings_menu.popup(window.settings_button.mapToGlobal(window.settings_button.rect().bottomLeft()))
     wait_until(window.settings_menu.isVisible)
-    assert thumbs.slider not in thumbs.toolbar_overflow.panel_controls
+    assert thumbs.slider not in window.toolbar_overflow.panel_controls
     window.settings_menu.hide()
     QTest.qWait(50)
     window.resize(1100, 780)

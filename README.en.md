@@ -97,9 +97,10 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Each toolbar has one shared “…” overflow button, including thumbnail date display, integration, language, and theme settings. Zoom and thumbnail size controls sit in translucent panels at the bottom-right of their panes, appearing on hover and hiding when the pointer leaves. Click the value button to reveal numeric input and reset.
 
 - Resize the window down to **260 × 220 px**.
-- Open folder, sorting, and settings share the thumbnail toolbar with folder tabs.
+- Open folder, folder navigation, sorting, and settings use a separate full-width toolbar at the top of the main window.
+- Main window and image toolbar buttons and the thumbnail tab strip use a compact 28 px height, with smaller hover padding and corner radii. The main window toolbar blends directly into the window background.
 - Drag the dotted handle to the left of the thumbnail tabs or the image toolbar to a top, bottom, left, or right window edge to arrange the panes and choose their order. Drag the divider to resize them. The pane layout is shared across tabs and stays fixed when switching tabs.
-- Folder tabs sit inside the thumbnail pane, sharing a row with the thumbnail tools on the right. The tab strip follows the active thumbnail pane.
+- Folder tabs remain inside the thumbnail pane, with a drag handle on the left for arranging the panes. The main window toolbar follows the active folder and is independent of the thumbnail pane width.
 - When tabs overflow, scroll arrows appear at opposite ends of the tab bar. Both scroll arrows and the tab-list dropdown use thin chevrons.
 - Save and Save As form a separate group immediately after the left drag handle. Background color, Fit, and full screen sit on the right, in that order. The shared comparison toolbar uses the same order, with end-comparison and sync controls in a separate group visible only in comparison mode.
 - The single-image toolbar omits the filename; the filename and unsaved marker appear in the bottom status bar. The comparison toolbar keeps its “Comparison mode” label.
@@ -107,7 +108,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Thumbnail cards use distinct backgrounds and thin borders in both light and dark themes, keeping their boundaries visible while scrolling.
 - Toggle tools such as sync and fit-to-pane use a background to indicate their active state. Icons keep their original color and stroke width; the background deepens on hover.
 - The slider handles, active tab underline, and selected comparison pane border share the theme accent color.
-- Tools that no longer fit move into <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="More tools" title="More tools"></picture> on the main, thumbnail, and image toolbars.
+- Tools that no longer fit move into <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="More tools" title="More tools"></picture> on the main window and image toolbars.
 - Widen the window to restore the hidden tools automatically.
 - Visible thumbnails load first; the rest are decoded progressively in the background.
 - Thumbnails use a shared memory cache (up to 64 MiB), with no thumbnail files saved to disk.
@@ -116,15 +117,17 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Large-image rendering improvements are shared across platforms. The network-drive optimizations above currently activate only on Windows; SMB shares mounted under `/Volumes/...` on macOS still use the standard loading path.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - Image and thumbnail panes have their own size panels. Comparison mode uses one shared zoom panel at the bottom-right of the whole comparison area, targeting the selected image. Leaving comparison restores the image panel immediately if the pointer remains over its pane.
-- The window title shows the current version, for example **PicView v0.1.26**.
+- The window title shows the current version, for example **PicView v0.1.27**.
 
 ### Browse subfolders
+
+- Show subfolders is shared across all tabs; each tab saves its own sort method and direction.
 
 - Show subfolders, Parent folder, and Back to previous folder use eye badges and form a separate toolbar group. Turning off Show subfolders hides the two navigation buttons from both the toolbar and its overflow panel.
 
 - Sort direction uses A–Z/Z–A with an arrow. Back and parent-folder controls use arrows over yellow folders to distinguish navigation from sorting.
 
-- Outside comparison mode, the thumbnail toolbar offers a <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/subfolders-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/subfolders-light.png" width="34" height="34" alt="Show subfolders" title="Show subfolders"></picture> **Show subfolders** toggle, enabled by default and remembered after closing the app. Yellow folder cards appear before images and follow the current sort order.
+- Outside comparison mode, the main window toolbar offers a <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/subfolders-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/subfolders-light.png" width="34" height="34" alt="Show subfolders" title="Show subfolders"></picture> **Show subfolders** toggle, enabled by default and remembered after closing the app. Yellow folder cards appear before images and follow the current sort order.
 - Only direct subfolders are listed. Images are not collected recursively, and folders are not scanned for cover thumbnails.
 - Single-click a folder card to select it; double-click to open it in the current tab. Folder cards are excluded from image multiselection, copying, dragging, and comparison.
 - <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-up-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-up-light.png" width="34" height="34" alt="Parent folder" title="Parent folder"></picture> **Parent folder** opens the folder one level up. <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-back-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-back-light.png" width="34" height="34" alt="Back to previous folder" title="Back to previous folder"></picture> **Back to previous folder** follows this tab's browsing history for the current session, restoring the selected image, zoom, and scroll position. In narrow windows, these tools are available from **…**.
@@ -133,7 +136,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 ### Open and drag images
 
 
-- The thumbnail toolbar's right-side “…” menu contains date display, Explorer/Finder integration, language, and theme controls.
+- The main window toolbar's right-side “…” menu contains date display, Explorer/Finder integration, language, and theme controls.
 
 - The folder picker starts in the active tab's parent folder, or the folder itself when it has no parent.
 - Use <kbd>Ctrl</kbd>-click to toggle individual thumbnails, <kbd>Shift</kbd>-click or <kbd>Shift</kbd>+arrow keys to select a range, or <kbd>Ctrl</kbd>+<kbd>A</kbd> to select all. Use <kbd>Command</kbd> instead of <kbd>Ctrl</kbd> on macOS. Drag across empty thumbnail space to select an area, or click empty space to clear the selection.
@@ -149,7 +152,7 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 
 ### File Explorer and Finder context menus
 
-- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-light.png" width="34" height="34" alt="File Explorer and Finder integration" title="File Explorer and Finder integration"></picture> in the thumbnail toolbar settings menu to toggle the Windows File Explorer command or macOS Finder Services command. It is off by default; the active button uses the accent color.
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-light.png" width="34" height="34" alt="File Explorer and Finder integration" title="File Explorer and Finder integration"></picture> in the main window toolbar settings menu to toggle the Windows File Explorer command or macOS Finder Services command. It is off by default; the active button uses the accent color.
 - **Windows:** Right-click a folder, a folder background, or a supported image and choose **Open in PicView**. On Windows 11, the command may be under **Show more options**. It registers only for the current user and does not change the default image viewer.
 
 macOS provides two separate ways to open items. Both require the packaged `PicView.app` in Applications:
@@ -179,14 +182,14 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 
 ### Thumbnail sorting, dates, and file actions
 
-- The sort-method button in the thumbnail toolbar toggles between <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-light.png" width="34" height="34" alt="Sort by name" title="Sort by name"></picture> **Name (natural order)** and <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-light.png" width="34" height="34" alt="Sort by date modified" title="Sort by date modified"></picture> **Date modified** for the active tab only.
+- The sort-method button in the main window toolbar toggles between <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-light.png" width="34" height="34" alt="Sort by name" title="Sort by name"></picture> **Name (natural order)** and <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-light.png" width="34" height="34" alt="Sort by date modified" title="Sort by date modified"></picture> **Date modified** for the active tab only.
 - The adjacent direction button toggles between <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-ascending-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-ascending-light.png" width="34" height="34" alt="Ascending" title="Ascending"></picture> **ascending** and <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-descending-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-descending-light.png" width="34" height="34" alt="Descending" title="Descending"></picture> **descending**. Dates ascend from oldest to newest and descend from newest to oldest. Sorting preserves the selected image and its view settings.
-- <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-light.png" width="34" height="34" alt="Show date modified" title="Show date modified"></picture> in the thumbnail toolbar settings menu toggles **Show date modified** for all tabs. This global preference survives restarting and applies to new and duplicated tabs.
+- <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-light.png" width="34" height="34" alt="Show date modified" title="Show date modified"></picture> in the main window toolbar settings menu toggles **Show date modified** for all tabs. This global preference survives restarting and applies to new and duplicated tabs.
 - Cards show the local modification date and time at the bottom by default; hover over a truncated date to see the full timestamp.
 - Each tab remembers its sort method and direction when duplicated or restored after restarting. New or modified files update their order and timestamps automatically.
 - Right-click a thumbnail card and choose **Copy** to copy the original file to the clipboard for pasting into another application or folder.
 - **Properties** opens the native Explorer property sheet on Windows. On other platforms, or if the system dialog cannot open, it shows the file name, type, location, size, modification time, image dimensions, and creation time when available.
-- When the thumbnail toolbar is narrow, use **⋯ More tools** to operate the sorting and date-display buttons.
+- When the main window toolbar is narrow, use **⋯ More tools** to operate the sorting and date-display buttons.
 
 ### Supported formats
 
@@ -210,7 +213,7 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 
 ### Multiple folder tabs
 
-- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-light.png" width="34" height="34" alt="Open folder" title="Open folder"></picture> in the thumbnail toolbar to open a folder in a new tab.
+- Click <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-light.png" width="34" height="34" alt="Open folder" title="Open folder"></picture> in the main window toolbar to open a folder in a new tab.
 - <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/tab-list-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/tab-list-light.png" width="34" height="34" alt="Select tab" title="Select tab"></picture> at the far right of the tab strip opens a dropdown of all tabs in their current order. Select an entry to switch directly to that tab; a checkmark identifies the current tab.
 - The list shows full tab names. Hover over an entry to see the folder's full path.
 - Drop multiple folders to open a tab for each one.
@@ -321,14 +324,14 @@ macOS provides two separate ways to open items. Both require the packaged `PicVi
 
 ### Language
 
-- Open the thumbnail toolbar settings menu and click the language item to cycle through **Follow system → Chinese → English**.
+- Open the main window toolbar settings menu and click the language item to cycle through **Follow system → Chinese → English**.
 - The icons are <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-system-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-system-light.png" width="34" height="34" alt="Follow system language" title="Follow system language"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-zh-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-zh-light.png" width="34" height="34" alt="Chinese" title="Chinese"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-en-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-en-light.png" width="34" height="34" alt="English" title="English"></picture>.
 - The default is **Follow system**: Chinese for Chinese locales and English otherwise.
 - Your language choice is remembered across restarts.
 
 ### Theme
 
-- Open the thumbnail toolbar settings menu and click the theme item to cycle through **Follow system → Light → Dark**.
+- Open the main window toolbar settings menu and click the theme item to cycle through **Follow system → Light → Dark**.
 - The icons are <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-system-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-system-light.png" width="34" height="34" alt="Follow system theme" title="Follow system theme"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-light-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-light-light.png" width="34" height="34" alt="Light" title="Light"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-dark-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-dark-light.png" width="34" height="34" alt="Dark" title="Dark"></picture>.
 - The default is **Follow system**.
 - The dark theme uses a Unit-01-inspired palette: deep purple surfaces, neon green indicators and sliders, and orange tool accents.

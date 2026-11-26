@@ -117,10 +117,10 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     for slider in (window.image.slider, window.thumbs.slider):
         assert abs(slider.reference_x() - slider.width() / 2) <= 2
         assert slider.height() == 30
-    thumbnail_toolbar = window.thumbs.layout().itemAt(0).layout()
+    thumbnail_toolbar = window.thumbs.header_layout
     thumbnail_widgets = [thumbnail_toolbar.itemAt(i).widget() for i in range(thumbnail_toolbar.count()) if thumbnail_toolbar.itemAt(i).widget() and not thumbnail_toolbar.itemAt(i).widget().isHidden()]
     assert thumbnail_widgets[:2] == [window.thumbs.drag_handle, window.thumbs.tab_slot]
-    assert thumbnail_widgets[-1] is window.settings_button
+    assert window.settings_button not in thumbnail_widgets
     assert window.thumbs.size_label.parentWidget() is window.thumbs.size_panel
     assert window.thumbs.slider.parentWidget() is window.thumbs.size_panel
     assert window.thumbs.size_label.text() == "140px"
@@ -166,7 +166,7 @@ def test_original_size_navigation_and_file_copy(tmp_path, monkeypatch):
     assert window.thumbs.buttons[paths[0]].grab().toImage().pixelColor(12, 12).name() == THUMBNAIL_SELECTED
     selected_tile = window.thumbs.buttons[paths[0]]
     assert selected_tile.grab().toImage().pixelColor(selected_tile.name.mapTo(selected_tile, QPoint(2, 2))).name() == THUMBNAIL_SELECTED
-    assert not window.tool_storage.isVisible()
+    assert window.folder_toolbar.isVisible()
     assert "QToolButton:hover,QToolButton:checked{background:#e2e6ed;" in window.image.fit_b.styleSheet()
     assert PALETTE["accent"] in window.image.slider.styleSheet()
     checked_icon = window.image.fit_b.icon().pixmap(window.image.fit_b.iconSize()).toImage()

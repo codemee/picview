@@ -138,8 +138,11 @@ def test_navigation_tools_work_from_narrow_toolbar_and_relabel(browser):
     QTest.qWait(100)
     controller = window.toolbar_overflow
     controller.populate_menu()
-    assert window.folder_up_button in controller.panel_controls
-    controller.panel_controls[window.folder_up_button].click()
+    if window.folder_up_button in controller.panel_controls:
+        controller.panel_controls[window.folder_up_button].click()
+    else:
+        assert window.folder_up_button.isVisible()
+        window.folder_up_button.click()
     assert page.folder == folders[0]
     window.toggle_lang()
     assert window.folder_back_button.toolTip() == window.t["folder_back"]

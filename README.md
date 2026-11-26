@@ -94,12 +94,13 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 
 ### 視窗與工具列
 
-- 每個工具列共用一個「…」收合入口，縮圖工具列的日期、整合、語言與配色設定也在其中。縮放與縮圖大小控制改放在窗格右下角的半透明面板；滑鼠移入窗格時顯示，移出時隱藏。點擊數值按鈕才顯示數值輸入與重設按鈕。
+- 每個工具列共用一個「…」收合入口，主視窗工具列的日期、整合、語言與配色設定也在其中。縮放與縮圖大小控制改放在窗格右下角的半透明面板；滑鼠移入窗格時顯示，移出時隱藏。點擊數值按鈕才顯示數值輸入與重設按鈕。
 
 - 視窗最小可縮至 **260 × 220 px**。
-- 開啟資料夾、排序與設定工具位於縮圖工具列，與資料夾標籤共用一列。
+- 開啟資料夾、資料夾瀏覽、排序與設定工具位於主視窗頂部的獨立工具列，橫跨整個視窗。
+- 主視窗與單圖工具列的按鈕、縮圖標籤列均採用 28 px 的精簡高度，並減少 hover 灰底的內距與圓角；主視窗工具列直接融入背景。
 - 拖曳縮圖窗格標籤列左側或單圖窗格工具列左側的點狀把手到視窗上、下、左、右邊緣，可調整兩窗格的排列與先後位置；拖曳分隔條可調整比例。窗格版面由所有標籤共用，切換標籤時不會改變。
-- 資料夾標籤位於縮圖窗格內，與右側的縮圖工具共用一列；切換標籤時會跟隨目前的縮圖窗格。
+- 資料夾標籤保留在縮圖窗格內，左側保留調整窗格排列的拖曳手把。主視窗工具列隨目前資料夾切換，不受縮圖窗格寬度影響。
 - 標籤超出可見範圍時，左右捲動箭頭分別顯示於標籤列兩側；左右箭頭與標籤清單的向下箭頭採細線條樣式。
 - 單圖工具列的「存檔／另存新檔」位於左側拖曳把手後方，自成一組；右側依序為背景色、符合窗格與全螢幕。比圖模式的共用工具列也採用相同排列。「取消比圖」與「同步操作」自成一組，只在比圖模式顯示。
 - 單圖工具列省略檔名，檔名與未存檔標記統一顯示於底部狀態列；比圖工具列保留「比圖模式」標示。
@@ -107,7 +108,7 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 - 淺色與深色配色的縮圖卡片皆採用獨立底色與細邊框，捲動時也能清楚辨識卡片邊界。
 - 符合窗格、同步等狀態按鈕以底色表示啟用，圖示維持原本的顏色與線條粗細；滑鼠移入時底色會加深。
 - 滑桿手把、目前標籤的底線，以及比圖作用中窗格的外框採用相同的主題強調色。
-- 縮圖與單圖工具列放不下的工具會收進 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="更多工具" title="更多工具"></picture>。
+- 主視窗與單圖工具列放不下的工具會收進 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/more-light.png" width="34" height="34" alt="更多工具" title="更多工具"></picture>。
 - 放寬視窗後，收起的工具會自動恢復。
 - 縮圖會優先載入可見範圍，其餘在背景逐步製作。
 - 縮圖使用共用的記憶體快取（上限 64 MiB），不另存縮圖檔案。
@@ -116,15 +117,17 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 - 大圖顯示改善為跨平台共用；上述網路磁碟最佳化目前僅啟用於 Windows。macOS 掛載於 `/Volumes/...` 的 SMB 磁碟仍使用一般讀取流程，尚未啟用這項網路最佳化。
 - 調整窗格大小只重新排列縮圖，不會重新解碼所有圖片。
 - 單圖與縮圖窗格各有自己的大小調整面板；比圖時只在整個比圖區右下角顯示一個共用縮放面板，操作目前選取的圖片。取消比圖後，滑鼠仍在單圖窗格內時會立即恢復顯示面板。
-- 視窗標題會顯示目前版本，例如 **PicView v0.1.26**。
+- 視窗標題會顯示目前版本，例如 **PicView v0.1.27**。
 
 ### 瀏覽子資料夾
+
+- 「顯示子資料夾」為所有分頁共用的設定；排序方式與方向則由各分頁獨立保存。
 
 - 「顯示子資料夾」、「上一層資料夾」與「返回上一個資料夾」使用帶眼睛標記的圖示，並以分隔線自成一組。關閉「顯示子資料夾」時，另外兩個導覽按鈕會隱藏，收合選單中也不會出現。
 
 - 排序方向以 A–Z／Z–A 與箭頭標示；「返回」與「上一層」使用黃色資料夾加箭頭的圖示，方便區分。
 
-- 非比圖模式的縮圖工具列提供 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/subfolders-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/subfolders-light.png" width="34" height="34" alt="顯示子資料夾" title="顯示子資料夾"></picture>「顯示子資料夾」開關，預設開啟，關閉程式後會保存選擇。資料夾卡片排在圖片之前，以黃色資料夾圖示顯示，依目前排序方式排列。
+- 非比圖模式的主視窗工具列提供 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/subfolders-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/subfolders-light.png" width="34" height="34" alt="顯示子資料夾" title="顯示子資料夾"></picture>「顯示子資料夾」開關，預設開啟，關閉程式後會保存選擇。資料夾卡片排在圖片之前，以黃色資料夾圖示顯示，依目前排序方式排列。
 - 只列出目前資料夾的直接子資料夾，不遞迴彙整其中的圖片，也不為資料夾掃描封面縮圖。
 - 單擊資料夾卡片只選取，雙擊則在目前分頁進入該資料夾。資料夾卡片不參與圖片的多選、複製、拖曳或比圖操作。
 - 點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-up-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-up-light.png" width="34" height="34" alt="上一層資料夾" title="上一層資料夾"></picture>「上一層資料夾」可回到父資料夾；點擊 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-back-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-back-light.png" width="34" height="34" alt="返回上一個資料夾" title="返回上一個資料夾"></picture>「返回上一個資料夾」可依此分頁本次開啟期間的瀏覽紀錄返回，並還原當時的選圖、縮放與捲動位置。視窗較窄時，這些工具可從「…」開啟。
@@ -133,7 +136,7 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 ### 開啟與拖放圖片
 
 
-- 縮圖工具列右側的「…」選單提供顯示日期、檔案總管／Finder 整合、語言與配色設定。
+- 主視窗工具列右側的「…」選單提供顯示日期、檔案總管／Finder 整合、語言與配色設定。
 
 - 開啟資料夾對話框預設顯示目前標籤資料夾的上一層；若沒有上一層，則顯示目前資料夾。
 - 在縮圖上使用 <kbd>Ctrl</kbd> 點選切換個別選取、<kbd>Shift</kbd> 點選或 <kbd>Shift</kbd>+方向鍵選取連續範圍，或按 <kbd>Ctrl</kbd>+<kbd>A</kbd> 全選；macOS 以 <kbd>Command</kbd> 取代 <kbd>Ctrl</kbd>。也可在縮圖空白處拖曳框選，點擊空白處則取消選取。
@@ -149,7 +152,7 @@ macOS 從 Python／uv 啟動時，Dock 使用 PicView 圖示，但選單列名�
 
 ### 檔案總管與 Finder 右鍵選單
 
-- 點擊縮圖工具列「…」選單中的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-light.png" width="34" height="34" alt="檔案總管與 Finder 整合" title="檔案總管與 Finder 整合"></picture>，直接開啟或關閉 Windows 檔案總管右鍵選單或 macOS Finder「服務」；預設關閉。啟用時按鈕會顯示強調色。
+- 點擊主視窗工具列「…」選單中的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/shell-integration-light.png" width="34" height="34" alt="檔案總管與 Finder 整合" title="檔案總管與 Finder 整合"></picture>，直接開啟或關閉 Windows 檔案總管右鍵選單或 macOS Finder「服務」；預設關閉。啟用時按鈕會顯示強調色。
 - **Windows**：在資料夾、資料夾空白處或支援的圖片檔上按右鍵，選擇「使用 PicView 開啟」。Windows 11 可能需要先選「顯示其他選項」。此設定只修改目前使用者的右鍵選單，不會變更預設開圖程式。
 
 macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封裝版 `PicView.app`：
@@ -177,14 +180,14 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 
 ### 縮圖排序、日期與檔案操作
 
-- 縮圖工具列的排序方式按鈕，在 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-light.png" width="34" height="34" alt="檔名排序" title="檔名排序"></picture> **檔名（自然排序）** 與 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-light.png" width="34" height="34" alt="修改時間排序" title="修改時間排序"></picture> **修改時間** 間切換，只影響目前標籤。
+- 主視窗工具列的排序方式按鈕，在 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-name-light.png" width="34" height="34" alt="檔名排序" title="檔名排序"></picture> **檔名（自然排序）** 與 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-date-light.png" width="34" height="34" alt="修改時間排序" title="修改時間排序"></picture> **修改時間** 間切換，只影響目前標籤。
 - 旁邊的排序方向按鈕，在 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-ascending-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-ascending-light.png" width="34" height="34" alt="順向排序" title="順向排序"></picture> **順向** 與 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-descending-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/sort-descending-light.png" width="34" height="34" alt="逆向排序" title="逆向排序"></picture> **逆向** 間切換；修改時間順向為舊到新，逆向為新到舊。排序不會切換目前圖片或重設檢視狀態。
-- 縮圖工具列「…」選單中的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-light.png" width="34" height="34" alt="顯示修改日期時間" title="顯示修改日期時間"></picture> 切換 **顯示修改日期時間**，立即套用到所有標籤，並保留至下次開啟程式；新開與複製標籤也沿用此全域設定。
+- 主視窗工具列「…」選單中的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/modified-visible-light.png" width="34" height="34" alt="顯示修改日期時間" title="顯示修改日期時間"></picture> 切換 **顯示修改日期時間**，立即套用到所有標籤，並保留至下次開啟程式；新開與複製標籤也沿用此全域設定。
 - 縮圖卡片底部預設顯示本機時間的修改日期時間；卡片太窄時，將滑鼠停在日期上可查看完整時間。
 - 各標籤獨立保存排序方式與方向，複製標籤及重開程式時也會保留。新增或修改檔案後，排序與日期會自動更新。
 - 在縮圖卡片按滑鼠右鍵，選 **複製** 可將原始圖檔複製到剪貼簿，再貼至其他應用程式或資料夾。
 - 右鍵選單的 **內容** 在 Windows 開啟檔案總管原生內容視窗；其他平台或系統視窗無法開啟時，顯示檔名、類型、位置、大小、修改時間、圖片尺寸，以及可取得的建立時間。
-- 縮圖工具列空間不足時，可從 **⋯ 更多工具** 操作排序與日期顯示按鈕。
+- 主視窗工具列空間不足時，可從 **⋯ 更多工具** 操作排序與日期顯示按鈕。
 
 ### 支援格式
 
@@ -208,7 +211,7 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 
 ### 多資料夾標籤
 
-- 點擊縮圖工具列的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-light.png" width="34" height="34" alt="開啟資料夾" title="開啟資料夾"></picture>，在新標籤開啟資料夾。
+- 點擊主視窗工具列的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/folder-light.png" width="34" height="34" alt="開啟資料夾" title="開啟資料夾"></picture>，在新標籤開啟資料夾。
 - 標籤列最右側的 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/tab-list-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/tab-list-light.png" width="34" height="34" alt="選取標籤" title="選取標籤"></picture> 展開所有標籤的下拉清單，依標籤順序排列，可直接選取要切換的標籤；勾選標記表示目前標籤。
 - 清單顯示完整標籤名稱，將滑鼠停在項目上可查看資料夾完整路徑。
 - 一次拖入多個資料夾，會逐一開啟標籤。
@@ -319,14 +322,14 @@ macOS 提供兩種不同的開啟方式，皆需使用放在 Applications 的封
 
 ### 語言
 
-- 展開縮圖工具列右側「…」選單，點擊語言項目，依序切換 **跟隨系統 → 中文 → 英文**。
+- 展開主視窗工具列右側「…」選單，點擊語言項目，依序切換 **跟隨系統 → 中文 → 英文**。
 - 圖示依序為 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-system-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-system-light.png" width="34" height="34" alt="語言跟隨系統" title="語言跟隨系統"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-zh-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-zh-light.png" width="34" height="34" alt="中文" title="中文"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-en-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/lang-en-light.png" width="34" height="34" alt="英文" title="英文"></picture>。
 - 預設跟隨系統：中文系統顯示中文，其餘顯示英文。
 - 重開程式會保留語言選擇。
 
 ### 配色
 
-- 展開縮圖工具列右側「…」選單，點擊配色項目，依序切換 **跟隨系統 → 淺色 → 深色**。
+- 展開主視窗工具列右側「…」選單，點擊配色項目，依序切換 **跟隨系統 → 淺色 → 深色**。
 - 圖示依序為 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-system-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-system-light.png" width="34" height="34" alt="配色跟隨系統" title="配色跟隨系統"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-light-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-light-light.png" width="34" height="34" alt="淺色" title="淺色"></picture> → <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-dark-dark.png"><img src="https://raw.githubusercontent.com/codemee/picview/main/docs/icons/theme-dark-light.png" width="34" height="34" alt="深色" title="深色"></picture>。
 - 預設為 **跟隨系統**。
 - 深色介面採初號機風格：深紫色窗格、螢光綠選取提示與滑桿，以及少量橘色工具點綴。

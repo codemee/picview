@@ -396,9 +396,16 @@ class IconButton(QToolButton):
         self.setProperty("swatch_color", color)
         self.refresh_icon()
 
+    def set_compact(self):
+        self.setProperty("compact_toolbar", True)
+        self.setFixedSize(28, 28)
+        self.refresh_icon()
+
     def refresh_icon(self) -> None:
+        compact = self.property("compact_toolbar") is True
+        radius, padding = (4, 2) if compact else (8, 4)
         self.setStyleSheet(
-            f"QToolButton{{background:transparent;border:0;border-radius:8px;padding:4px;}}"
+            f"QToolButton{{background:transparent;border:0;border-radius:{radius}px;padding:{padding}px;}}"
             f"QToolButton:hover,QToolButton:checked{{background:{toolbar_hover_color()};}}"
             f"QToolButton:pressed,QToolButton:checked:hover{{background:{PALETTE['pressed']};}}"
             "QToolButton::menu-indicator{image:none;width:0;height:0;}")
@@ -1242,10 +1249,19 @@ class PaneDragHandle(QToolButton):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(PALETTE["muted"]))
+        painter.translate(0, (self.height() - 34) / 2)
         for y in (12, 17, 22):
             for x in (8, 13):
                 painter.drawEllipse(QRectF(x, y, 2, 2))
         painter.end()
+
+
+def compact_toolbar(host):
+    host.setProperty("compact_toolbar", True)
+    host.setFixedHeight(28)
+    for child in host.children():
+        if isinstance(child, IconButton): child.set_compact()
+        elif isinstance(child, PaneDragHandle): child.setFixedHeight(28)
 
 
 class ThumbnailPane(QFrame):
@@ -1262,17 +1278,23 @@ class ThumbnailPane(QFrame):
         self.folder_buttons = {}
         self.selected_directory = None
         self.setObjectName("card"); layout=QVBoxLayout(self); layout.setContentsMargins(10,4,10,8); layout.setSpacing(4)
-        header=QHBoxLayout(); header.setSpacing(4); self.drag_handle=PaneDragHandle("thumb", labels["drag_pane"]); header.addWidget(self.drag_handle); header.addStretch(); self.size_label=ScaleValueButton(self.size,72,260,THUMBNAIL_BASE_SIZE,1,"px",labels["edit_thumb"]); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,THUMBNAIL_BASE_SIZE); self.slider.setRange(72,260); self.slider.setValue(self.size); self.slider.setFixedSize(SLIDER_WIDTH,30); self.slider.logicalValueChanged.connect(self._resize); self.size_label.valueChosen.connect(self.slider.setValue); layout.addLayout(header)
+        self.header_widget = QWidget(self)
+        self.header_widget.setFixedHeight(28)
+        self.header_widget.setMinimumWidth(0)
+        self.header_widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        header=QHBoxLayout(self.header_widget); header.setContentsMargins(0,0,0,0); header.setSpacing(4); self.drag_handle=PaneDragHandle("thumb", labels["drag_pane"]); header.addWidget(self.drag_handle); header.addStretch(); self.size_label=ScaleValueButton(self.size,72,260,THUMBNAIL_BASE_SIZE,1,"px",labels["edit_thumb"]); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,THUMBNAIL_BASE_SIZE); self.slider.setRange(72,260); self.slider.setValue(self.size); self.slider.setFixedSize(SLIDER_WIDTH,30); self.slider.logicalValueChanged.connect(self._resize); self.size_label.valueChosen.connect(self.slider.setValue); layout.addWidget(self.header_widget)
+        self.header_layout = header
+        header.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         self.tab_slot = QWidget()
         self.tab_slot.setObjectName("thumbnailTabSlot")
         self.tab_slot.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        self.tab_slot.setFixedHeight(34)
+        self.tab_slot.setFixedHeight(28)
         self.tab_slot.setMaximumWidth(0)
         tab_layout = QHBoxLayout(self.tab_slot)
         tab_layout.setContentsMargins(0, 0, 0, 0)
         header.insertWidget(1, self.tab_slot, 1)
         header.takeAt(2)  # The tab slot supplies the flexible space.
-        header.insertWidget(2, ToolbarSeparator())
+        compact_toolbar(self.header_widget)
         self.context_menu = QMenu(self)
         self.scroll=QScrollArea(); self.scroll.setWidgetResizable(True); self.scroll.setFrameShape(QFrame.Shape.NoFrame); set_widget_background(self.scroll.viewport(), PALETTE["pane"]); self.grid_host=QWidget(); self.grid_host.setObjectName("thumbnailGrid"); set_widget_background(self.grid_host, PALETTE["pane"]); self.grid=QGridLayout(self.grid_host); self.grid.setAlignment(Qt.AlignmentFlag.AlignTop|Qt.AlignmentFlag.AlignLeft); self.scroll.setWidget(self.grid_host); layout.addWidget(self.scroll)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
@@ -1297,7 +1319,7 @@ class ThumbnailPane(QFrame):
         self.scroll.verticalScrollBar().valueChanged.connect(self.schedule_previews)
         self.scroll.verticalScrollBar().valueChanged.connect(self.refresh_visible_tile_styles)
         self.scroll.horizontalScrollBar().valueChanged.connect(self.refresh_visible_tile_styles)
-        self.toolbar_overflow = ToolbarOverflow(self, header, [self.drag_handle],
+        self.toolbar_overflow = ToolbarOverflow(self.header_widget, header, [self.drag_handle],
             lambda: self.labels["more_tools"],
             available_width=self.toolbar_width, flex_widgets=(self.tab_slot,))
         for widget in (self.scroll, self.scroll.viewport(), self.grid_host,
@@ -1331,8 +1353,8 @@ class ThumbnailPane(QFrame):
         self.properties_dialog = show_properties(path, self, self.labels)
 
     def toolbar_width(self):
-        margins = self.layout().contentsMargins()
-        width = self.width() - margins.left() - margins.right()
+        margins = self.header_layout.contentsMargins()
+        width = self.header_widget.width() - margins.left() - margins.right()
         if self.tab_slot.layout().count():
             strip = self.tab_slot.layout().itemAt(0).widget()
             target = min(420, max(1, strip.findChild(QTabBar).count()) * 150 + 42)
@@ -1691,6 +1713,7 @@ class ToolbarOverflow(QObject):
         self.separators = [index for index, item in enumerate(self.items) if isinstance(item.widget(), ToolbarSeparator)]
         self.overflowed = []
         self.more_button = more_button or IconButton("more", title(), host)
+        if host.property("compact_toolbar") is True: self.more_button.set_compact()
         self.more_button.setAccessibleName(title())
         self.menu = QMenu(self.more_button)
         self.menu.aboutToShow.connect(self.populate_menu)
@@ -1946,6 +1969,7 @@ class ImagePane(QFrame):
         self.zoom_label=ScaleValueButton(1000,1,4000,1000,10,"%",labels["edit_zoom"]); self.slider=ReferenceSlider(Qt.Orientation.Horizontal,1000); self.slider.setRange(1,4000); self.slider.setValue(1000); self.slider.logicalValueChanged.connect(self.set_zoom_percent); self.zoom_label.valueChosen.connect(self.choose_zoom); self.slider.setFixedSize(SLIDER_WIDTH,30)
         self.toolbar_widget = QWidget(self)
         self.toolbar_widget.setLayout(bar)
+        compact_toolbar(self.toolbar_widget)
         bar.setContentsMargins(0, 0, 0, 0)
         self.toolbar_widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         bar.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
@@ -3611,8 +3635,10 @@ class FolderTab(QWidget):
             self.notify(self.t[key].format(name=previous.name, next=selected.name if selected else ""))
 
     def set_orientation(self,o):
-        if self.split.orientation()==o:return
-        sizes=self.split.sizes(); self.split.setOrientation(o); QTimer.singleShot(0,self,lambda:self.split.setSizes(sizes))
+        orientation, thumbnail_first, fraction = self.layout_spec()
+        if orientation == o: return
+        # Preserve the intended ratio even before the first queued layout runs.
+        self.apply_layout_spec((o, thumbnail_first, fraction))
         self.layoutChanged.emit(o)
 
     def select_relative(self, offset):
@@ -3719,9 +3745,9 @@ class ComparisonArea(QWidget):
         layout.setContentsMargins(3, 3, 3, 3)
         self.header = QFrame()
         self.header.setObjectName("comparisonToolbar")
-        self.header.setFixedHeight(42)
+        self.header.setFixedHeight(32)
         self.header_layout = QVBoxLayout(self.header)
-        self.header_layout.setContentsMargins(10, 4, 10, 4)
+        self.header_layout.setContentsMargins(10, 2, 10, 2)
         layout.addWidget(self.header)
         self.empty = QLabel()
         self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -4141,7 +4167,7 @@ class FolderTabBar(QTabBar):
 
     def tabSizeHint(self, index):
         size = super().tabSizeHint(index)
-        return QSize(min(200, max(150, size.width())), 34)
+        return QSize(min(200, max(150, size.width())), 28)
 
     def minimumTabSizeHint(self, index):
         width = 108 if self.width() < 182 else 150
@@ -4149,7 +4175,7 @@ class FolderTabBar(QTabBar):
         # fully visible. Absorb that pixel in the first tab instead.
         if index == 0 and self.count() * width == self.width() + 1:
             width -= 1
-        return QSize(width, 34)
+        return QSize(width, 28)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -4203,7 +4229,7 @@ class FolderTabs(QWidget):
         layout.setSpacing(0)
         self.strip = QFrame()
         self.strip.setObjectName("tabStrip")
-        self.strip.setFixedHeight(34)
+        self.strip.setFixedHeight(28)
         self.strip.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.header = QHBoxLayout(self.strip)
         self.header.setContentsMargins(0, 0, 0, 0)
@@ -4404,11 +4430,20 @@ class PicView(QMainWindow):
         self.setCentralWidget(root)
         outer = QVBoxLayout(root)
         outer.setContentsMargins(8, 0, 8, 8)
-        outer.setSpacing(0)
+        outer.setSpacing(4)
         outer.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        self.folder_toolbar_host = QFrame(root)
+        self.folder_toolbar_host.setObjectName("folderToolbar")
+        self.folder_toolbar_host.setFixedHeight(32)
+        self.folder_toolbar_host.setMinimumWidth(0)
+        self.folder_toolbar_host.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.folder_toolbar_layout = QVBoxLayout(self.folder_toolbar_host)
+        self.folder_toolbar_layout.setContentsMargins(10, 2, 10, 2)
+        self.folder_toolbar_layout.setSpacing(0)
+        outer.addWidget(self.folder_toolbar_host)
         tool = QFrame()
         tool.setObjectName("toolbar")
-        tool.setFixedHeight(34)
+        tool.setFixedHeight(28)
         tool.setMinimumWidth(0)
         tool.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         layout = QHBoxLayout(tool)
@@ -4440,7 +4475,7 @@ class PicView(QMainWindow):
         self.integration_button.setCheckable(True)
         self.integration_button.clicked.connect(self.set_shell_integration)
         self.refresh_shell_integration_button()
-        self.tool_storage = tool
+        self.folder_toolbar = tool
         self.tabs = FolderTabs()
         self.tabs.setTabsClosable(True)
         self.tabs.setMovable(True)
@@ -4478,8 +4513,18 @@ class PicView(QMainWindow):
         self._tools_page = None
         self._open_navigation_separator = ToolbarSeparator()
         self._open_sort_separator = ToolbarSeparator()
-        tool.setParent(root)
-        tool.hide()
+        layout.insertWidget(1, self._open_navigation_separator)
+        layout.insertWidget(5, self._open_sort_separator)
+        layout.insertStretch(layout.indexOf(self.settings_button), 1)
+        self.folder_toolbar_layout.addWidget(tool)
+        compact_toolbar(tool)
+        self.tab_list_button.set_compact()
+        self.toolbar_overflow = ToolbarOverflow(tool, layout,
+            [self.subfolders_button, self.folder_back_button, self.folder_up_button,
+             self.direction_button, self.sort_button, self.open_button],
+            lambda: self.t["more_tools"], more_button=self.settings_button,
+            extra_controls=(self.modified_button, self.integration_button, self.language_button, self.theme_button))
+        self.settings_menu = self.toolbar_overflow.menu
         outer.addWidget(self.tabs, 1)
         self.apply_styles()
 
@@ -4498,43 +4543,16 @@ class PicView(QMainWindow):
             slot.setMaximumWidth(16777215)
             slot.layout().addWidget(strip)
             strip.show()
-        if self._tools_page is not page:
-            old = self._tools_page
-            controls = (self.open_button, self._open_navigation_separator, self.folder_back_button, self.folder_up_button, self.subfolders_button, self._open_sort_separator, self.sort_button,
-                        self.direction_button, self.settings_button)
-            if old is not None:
-                old.thumbs.toolbar_overflow.dispose()
-                header = old.thumbs.layout().itemAt(0).layout()
-                for control in controls:
-                    header.removeWidget(control)
-                    control.setParent(self.tool_storage)
-                    control.hide()
-                thumbs = old.thumbs
-                thumbs.toolbar_overflow = ToolbarOverflow(thumbs, header,
-                    [thumbs.drag_handle],
-                    lambda thumbs=thumbs: thumbs.labels["more_tools"],
-                    available_width=thumbs.toolbar_width, flex_widgets=(thumbs.tab_slot,))
-            thumbs = page.thumbs
-            thumbs.toolbar_overflow.dispose()
-            header = thumbs.layout().itemAt(0).layout()
-            for index, control in enumerate(controls[:-1], 3):
-                header.insertWidget(index, control)
-                control.show()
-            thumbs.toolbar_overflow = ToolbarOverflow(thumbs, header,
-                [self.subfolders_button, self.folder_back_button, self.folder_up_button, self.direction_button, self.sort_button, self.open_button, thumbs.drag_handle],
-                lambda thumbs=thumbs: thumbs.labels["more_tools"],
-                available_width=thumbs.toolbar_width, flex_widgets=(thumbs.tab_slot,),
-                more_button=self.settings_button,
-                extra_controls=(self.modified_button, self.integration_button, self.language_button, self.theme_button))
-            self.toolbar_overflow = thumbs.toolbar_overflow
-            self.settings_menu = self.toolbar_overflow.menu
-            self._tools_page = page
+        self._tools_page = page
         page.thumbs.toolbar_overflow.update()
+        self.toolbar_overflow.update()
 
     def apply_styles(self):
         strip = PALETTE["card"]
         hover = PALETTE["pane"]
         set_widget_background(self.centralWidget(), PALETTE["surface"])
+        self.folder_toolbar_host.setStyleSheet(
+            "#folderToolbar{background:transparent;border:0;border-radius:0;}")
         for card in self.findChildren(QFrame, "card"):
             if isinstance(card, (ThumbnailPane, ImagePane)):
                 card.update()
@@ -4697,6 +4715,7 @@ class PicView(QMainWindow):
             tab.show_subfolders = self.show_subfolders and not self.compare_enabled
             tab.refresh_subfolders()
         if page is not None: page.thumbs.toolbar_overflow.update()
+        self.toolbar_overflow.update()
 
     def choose(self):
         current = self.folder

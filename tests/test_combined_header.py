@@ -1,10 +1,10 @@
-from PySide6.QtCore import QPoint
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication, QToolButton
 import pytest
 
-from picview.qt_app import FolderTabBar, PALETTE, themed_palette, use_system_palette
+from picview.qt_app import FolderTabBar, PaneDragHandle, PALETTE, themed_palette, use_system_palette
 
 from test_tabs import browser, wait_until
 
@@ -59,7 +59,7 @@ def test_selected_underline_does_not_leak_below_scroll_arrows(browser, theme):
         bar.setExpanding(False)
         bar.setUsesScrollButtons(True)
         for index in range(8): bar.addTab(f"Folder {index}")
-        bar.resize(450, 34)
+        bar.resize(450, bar.sizeHint().height())
         bar.setCurrentIndex(7)
         bar.show()
         QTest.qWait(50)
@@ -69,8 +69,8 @@ def test_selected_underline_does_not_leak_below_scroll_arrows(browser, theme):
         assert left.isVisible() and right.isVisible()
         # Exercise native styles with arrows at both ends and vertical insets:
         # painting only behind each button rectangle leaves the bottom exposed.
-        left.setGeometry(selected.left() + 2, 3, 16, 28)
-        right.setGeometry(selected.right() - 15, 3, 16, 28)
+        left.setGeometry(selected.left() + 2, 3, 16, bar.height() - 6)
+        right.setGeometry(selected.right() - 15, 3, 16, bar.height() - 6)
         pixels = bar.grab().toImage()
         accent = QColor(PALETTE["accent"])
         for button in (left, right):
@@ -91,7 +91,7 @@ def test_tabs_absorb_one_pixel_overflow_without_obscuring_current_tab(browser, c
     bar.setUsesScrollButtons(True)
     for index in range(count): bar.addTab(f"Folder {index}")
     bar.setCurrentIndex(count - 1)
-    bar.resize(count * 150 - 1, 34)
+    bar.resize(count * 150 - 1, bar.sizeHint().height())
     bar.show()
     try:
         QTest.qWait(50)
@@ -103,27 +103,53 @@ def test_tabs_absorb_one_pixel_overflow_without_obscuring_current_tab(browser, c
         bar.deleteLater()
 
 
-def test_tabs_and_tools_share_thumbnail_header_without_main_toolbar(browser):
+def test_folder_tools_use_main_toolbar_and_tabs_stay_in_thumbnail_pane(browser):
     window, folders = browser
     page = window.open_folder(folders[0])
     wait_until(lambda: len(visible_controls(window)) == 4)
-    assert window.centralWidget().layout().count() == 1
-    assert window.open_button.height() == 34
-    assert window.open_button.parentWidget() is page.thumbs
+    assert window.centralWidget().layout().count() == 2
+    assert window.open_button.height() == 28
+    assert window.open_button.parentWidget() is window.folder_toolbar
+    assert window.folder_toolbar.parentWidget() is window.folder_toolbar_host
+    assert page.thumbs.header_widget.parentWidget() is page.thumbs
+    assert page.thumbs.layout().indexOf(page.thumbs.header_widget) == 0
+    assert not window.folder_toolbar_host.findChildren(PaneDragHandle)
+    assert page.thumbs.drag_handle.parentWidget() is page.thumbs.header_widget
     assert window.tabs.strip.parentWidget() is page.thumbs.tab_slot
     assert window.tabs.layout().count() == 1
     assert page.thumbs.drag_handle.mapTo(window, QPoint(page.thumbs.drag_handle.width(), 0)).x() <= window.tabs.strip.mapTo(window, QPoint()).x()
     assert window.modified_button.isHidden()
-    assert window.settings_button.geometry().right() == page.thumbs.width() - 11
+    assert window.settings_button.geometry().right() == window.folder_toolbar.width() - 1
     assert window.sort_button.geometry().right() < window.direction_button.x()
     assert window.direction_button.geometry().right() < window.settings_button.x()
     page_top = page.mapTo(window, QPoint(0, 0)).y()
-    assert page_top == window.centralWidget().mapTo(window, QPoint()).y()
-    assert window.tabs.strip.mapTo(window, QPoint()).y() == page_top + 4
-    assert window.tabs.strip.height() == 34
-    assert window.open_button.y() == 4
-    assert window.open_button.x() > window.tabs.strip.geometry().right()
-    assert window.open_button.height() == 34
+    assert page_top > window.folder_toolbar_host.mapTo(window, QPoint(0, window.folder_toolbar_host.height())).y()
+    assert window.tabs.strip.mapTo(window, QPoint()).y() == page.thumbs.mapTo(window, QPoint()).y() + 4
+    assert window.tabs.strip.height() == 28
+    assert window.open_button.y() == 0
+    assert window.open_button.x() == 0
+    assert window.open_button.height() == 28
+    assert page.image.toolbar_widget.height() == 28
+    assert page.image.save_button.height() == 28
+    assert page.thumbs.drag_handle.height() == 28
+
+
+@pytest.mark.parametrize("orientation", [Qt.Orientation.Horizontal, Qt.Orientation.Vertical])
+def test_folder_toolbar_stays_full_width_when_thumbnail_pane_shrinks(browser, orientation):
+    window, folders = browser
+    page = window.open_folder(folders[0])
+    window.resize(1100, 780)
+    window.set_orientation(orientation)
+    wait_until(lambda: not page._layout_pending)
+    page.split.setSizes([100, 900])
+    QTest.qWait(100)
+    assert (page.thumbs.width() if orientation == Qt.Orientation.Horizontal else page.thumbs.height()) < 200
+    assert window.folder_toolbar_host.width() == window.centralWidget().width() - 16
+    assert window.folder_toolbar.width() == window.folder_toolbar_host.width() - 20
+    assert window.open_button.isVisible() and window.direction_button.isVisible()
+    assert page.image.toolbar_widget.parentWidget() is page.image
+    assert window.tabs.strip.parentWidget() is page.thumbs.tab_slot
+    assert page.thumbs.header_widget.parentWidget() is page.thumbs
 
 
 def test_many_tabs_scroll_without_continuing_to_hide_tools(browser):

@@ -134,11 +134,12 @@ def test_tabs_share_the_active_thumbnail_toolbar(browser):
         QTest.qWait(50)
         assert window.tabs.strip.parentWidget() is page.thumbs.tab_slot
         assert window.tabs.strip.isVisible()
-        assert window.tabs.strip.height() == 34
+        assert window.tabs.strip.height() == 28
         strip_top = window.tabs.strip.mapToGlobal(QPoint()).y()
         tools_top = page.thumbs.drag_handle.mapToGlobal(QPoint()).y()
         assert strip_top == tools_top
-        assert window.open_button.parentWidget() is page.thumbs
+        assert window.open_button.parentWidget() is window.folder_toolbar
+        assert page.thumbs.header_widget.parentWidget() is page.thumbs
     window.close_tab(window.tabs.indexOf(first))
     assert window.tabs.strip.parentWidget() is second.thumbs.tab_slot
     window.close_tab()
