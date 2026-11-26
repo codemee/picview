@@ -116,9 +116,11 @@ When launched through Python/uv on macOS, the Dock uses the PicView icon, but th
 - Large-image rendering improvements are shared across platforms. The network-drive optimizations above currently activate only on Windows; SMB shares mounted under `/Volumes/...` on macOS still use the standard loading path.
 - Resizing panes rearranges existing thumbnails without decoding every image again.
 - Image and thumbnail panes have their own size panels. Comparison mode uses one shared zoom panel at the bottom-right of the whole comparison area, targeting the selected image. Leaving comparison restores the image panel immediately if the pointer remains over its pane.
-- The window title shows the current version, for example **PicView v0.1.25**.
+- The window title shows the current version, for example **PicView v0.1.26**.
 
 ### Browse subfolders
+
+- Show subfolders, Parent folder, and Back to previous folder use eye badges and form a separate toolbar group. Turning off Show subfolders hides the two navigation buttons from both the toolbar and its overflow panel.
 
 - Sort direction uses A–Z/Z–A with an arrow. Back and parent-folder controls use arrows over yellow folders to distinguish navigation from sorting.
 

@@ -104,14 +104,23 @@ def test_subfolder_toggle_persists_and_watch_updates_cards(browser):
     assert child in page.thumbs.folder_buttons
     window.subfolders_button.click()
     assert not page.thumbs.directories
+    for button in (window.folder_back_button, window.folder_up_button):
+        assert button.isHidden()
+        assert button.property("toolbar_available") is False
+    assert window.folder_back_button not in window.toolbar_overflow.overflowed
+    assert window.folder_up_button not in window.toolbar_overflow.overflowed
     window.close()
     assert load_settings()["show_subfolders"] is False
     fresh = PicView()
     try:
         assert not fresh.show_subfolders
         assert not fresh.current_tab().thumbs.directories
+        for button in (fresh.folder_back_button, fresh.folder_up_button):
+            assert button.property("toolbar_available") is False
         fresh.set_show_subfolders(True)
         assert child in fresh.current_tab().thumbs.folder_buttons
+        for button in (fresh.folder_back_button, fresh.folder_up_button):
+            assert button.property("toolbar_available") is True
         child.rmdir()
         fresh.current_tab().refresh_folder()
         assert child not in fresh.current_tab().thumbs.folder_buttons

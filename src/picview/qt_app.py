@@ -605,6 +605,17 @@ class IconButton(QToolButton):
             p.drawPath(outer.subtracted(cutout))
         else:
             p.drawText(QRectF(0, 0, 24, 24), Qt.AlignmentFlag.AlignCenter, self.kind)
+        if self.kind in {"subfolders", "folder-back", "folder-up"}:
+            # A shared eye badge identifies browsing tools at toolbar size.
+            eye = QPainterPath(QPointF(10, 18.5))
+            eye.quadTo(16.75, 11.5, 23.5, 18.5)
+            eye.quadTo(16.75, 25.5, 10, 18.5)
+            p.setPen(QPen(QColor("#654c00"), 1.0))
+            p.setBrush(QColor("#fff7db"))
+            p.drawPath(eye)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor("#654c00"))
+            p.drawEllipse(QRectF(15.25, 17, 3, 3))
         p.end(); self.setIcon(QIcon(pm))
 
 
@@ -4465,6 +4476,7 @@ class PicView(QMainWindow):
         self.settings_button = IconButton("more", self.t["more_tools"])
         layout.addWidget(self.settings_button)
         self._tools_page = None
+        self._open_navigation_separator = ToolbarSeparator()
         self._open_sort_separator = ToolbarSeparator()
         tool.setParent(root)
         tool.hide()
@@ -4488,7 +4500,7 @@ class PicView(QMainWindow):
             strip.show()
         if self._tools_page is not page:
             old = self._tools_page
-            controls = (self.open_button, self.folder_back_button, self.folder_up_button, self.subfolders_button, self._open_sort_separator, self.sort_button,
+            controls = (self.open_button, self._open_navigation_separator, self.folder_back_button, self.folder_up_button, self.subfolders_button, self._open_sort_separator, self.sort_button,
                         self.direction_button, self.settings_button)
             if old is not None:
                 old.thumbs.toolbar_overflow.dispose()
@@ -4673,8 +4685,9 @@ class PicView(QMainWindow):
                             (self.subfolders_button, "show_subfolders")):
             button.setToolTip(self.t[key])
             button.setAccessibleName(self.t[key])
-            button.setProperty("toolbar_available", not self.compare_enabled)
-            button.setVisible(not self.compare_enabled)
+            available = not self.compare_enabled and (button is self.subfolders_button or self.show_subfolders)
+            button.setProperty("toolbar_available", available)
+            button.setVisible(available)
         self.folder_back_button.setEnabled(bool(page and page.folder_history))
         self.folder_up_button.setEnabled(bool(page and page.folder and page.folder.parent != page.folder))
         self.subfolders_button.blockSignals(True)
