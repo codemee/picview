@@ -257,7 +257,19 @@ def test_atomic_replacement_reinstates_file_watch(viewer):
     for color, rgb in (("blue", (0, 0, 255, 255)), ("green", (0, 128, 0, 255))):
         temporary = folder / "replacement.tmp"
         Image.new("RGB", (120, 80), color).save(temporary, format="PNG")
-        os.replace(temporary, path)
+        # Windows can briefly deny replacement while a decoder or system
+        # scanner has the file open. Keep a deadline so persistent locks fail.
+        replaced = False
+        def replace_when_ready():
+            nonlocal replaced
+            if replaced: return True
+            try:
+                os.replace(temporary, path)
+                replaced = True
+                return True
+            except PermissionError:
+                return False
+        wait_until(replace_when_ready)
         wait_until(lambda: window.image.frames[0][0].getpixel((0, 0)) == rgb)
         assert str(path) in window.folder_watcher.files()
         wait_until(lambda: thumbnail_color(window, path) == ("#0000ff" if color == "blue" else "#008000"))
